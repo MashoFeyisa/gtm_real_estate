@@ -25,11 +25,20 @@ class BlogPost extends Model
         'published_at',
         'scheduled_for',
         'related_post_ids',
+        'job_location',
+        'job_type',
+        'salary_range',
+        'requirements',
+        'experience_level',
+        'education_level',
+        'apply_link',
+        'application_deadline',
     ];
 
     protected $casts = [
         'published_at' => 'datetime',
         'scheduled_for' => 'datetime',
+        'application_deadline' => 'date:Y-m-d',
     ];
 
     public function user(): BelongsTo

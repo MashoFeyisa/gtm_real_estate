@@ -10,11 +10,10 @@ test('home page shows blog and news sections', function () {
     $response->assertSee('Blog');
 });
 
-test('workers attendance page loads', function () {
+test('workers attendance page has been removed', function () {
     $response = $this->get('/attendance');
 
-    $response->assertOk();
-    $response->assertSee('Workers Attendance');
+    $response->assertNotFound();
 });
 
 test('dashboard redirects unauthenticated users to login', function () {
@@ -27,6 +26,7 @@ test('admin user can login with database credentials', function () {
     User::factory()->create([
         'email' => 'admin@realestate.com',
         'password' => bcrypt('secret123'),
+        'role' => 'admin',
     ]);
 
     $response = $this->post('/login', [

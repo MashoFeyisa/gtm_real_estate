@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AttendanceRecord;
+use App\Models\Agent;
 use App\Models\BlogPost;
+use App\Models\Order;
 use App\Models\Property;
+use App\Models\SiteSetting;
 use App\Models\User;
-use App\Models\Worker;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class WorkerManagementController extends Controller
@@ -22,9 +24,17 @@ class WorkerManagementController extends Controller
             abort(403, 'Access denied.');
         }
 
-        $workers = Worker::with('latestAttendance')->latest()->get();
         $users = User::latest()->get();
         $properties = Property::latest()->get();
+        $agents = Agent::query()->with('account')->orderBy('name')->get();
+        $orders = Order::query()->with(['property', 'agent'])->latest()->get();
+
+        $overviewStats = [
+            'totalProperties' => $properties->count(),
+            'activeListings' => $properties->where('is_active', true)->whereNotIn('status', ['draft', 'archived'])->count(),
+            'pendingReviews' => $properties->where('status', 'draft')->count(),
+        ];
+        $recentProperties = $properties->take(3);
 
         $postsQuery = BlogPost::with('user')->latest();
 
@@ -47,29 +57,47 @@ class WorkerManagementController extends Controller
         }
 
         $posts = $postsQuery->get();
-        $attendanceSummary = $this->attendanceSummary();
+        $jobs = BlogPost::query()->where('type', 'job')->latest()->get();
 
-        return view('dashboard', compact('workers', 'users', 'properties', 'posts', 'attendanceSummary'));
+        return view('dashboard', compact('users', 'properties', 'agents', 'orders', 'posts', 'jobs', 'overviewStats', 'recentProperties'));
     }
 
-    public function attendance()
+    public function updateSettings(Request $request)
     {
-        $attendanceSummary = $this->attendanceSummary();
-        $workers = Worker::with('latestAttendance')->get();
-        $records = $workers->map(function (Worker $worker) {
-            return (object) [
-                'worker' => $worker,
-                'status' => $worker->latestAttendance?->status ?? 'pending',
-                'recorded_at' => $worker->latestAttendance?->recorded_at,
-            ];
-        })->sortByDesc(function ($record) {
-            return $record->recorded_at ? $record->recorded_at->timestamp : 0;
-        })->values();
+        $user = auth()->user();
 
-        return view('attendance', compact('records', 'attendanceSummary'));
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $validated = $request->validate([
+            'site_name' => ['required', 'string', 'max:255'],
+            'site_logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+            'contact_email' => ['required', 'email', 'max:255'],
+            'contact_phone' => ['required', 'string', 'max:50'],
+            'contact_address' => ['required', 'string', 'max:255'],
+        ]);
+
+        SiteSetting::set('site_name', $validated['site_name']);
+        SiteSetting::set('contact_email', $validated['contact_email']);
+        SiteSetting::set('contact_phone', $validated['contact_phone']);
+        SiteSetting::set('contact_address', $validated['contact_address']);
+
+        if ($request->hasFile('site_logo')) {
+            $previousLogo = SiteSetting::get('site_logo');
+
+            if ($previousLogo && str_starts_with($previousLogo, 'branding/') && Storage::disk('public')->exists($previousLogo)) {
+                Storage::disk('public')->delete($previousLogo);
+            }
+
+            SiteSetting::set('site_logo', $request->file('site_logo')->store('branding', 'public'));
+        }
+
+        return redirect()->route('dashboard', ['section' => 'settings'])
+            ->with('success', 'Site branding and contact details updated successfully.');
     }
 
-    public function storeWorker(Request $request)
+    public function storeAgent(Request $request)
     {
         $user = auth()->user();
 
@@ -79,33 +107,96 @@ class WorkerManagementController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:workers,email'],
-            'department' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:agents,email'],
             'phone' => ['nullable', 'string', 'max:255'],
+            'bio' => ['nullable', 'string', 'max:1000'],
+            'password' => ['nullable', 'string', 'min:6'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
-        Worker::create($validated);
+        $agent = Agent::create([
+            ...collect($validated)->except(['photo', 'password'])->all(),
+            'password' => $validated['password'] ?? null,
+            'photo_path' => $this->storeAgentPhoto($request),
+        ]);
 
-        return redirect()->route('dashboard')->with('success', 'Worker added successfully.');
+        $this->syncAgentAccount($agent, $validated['password'] ?? null);
+
+        return redirect()->route('dashboard', ['section' => 'agents'])->with('success', 'Agent created successfully.');
     }
 
-    public function recordAttendance(Worker $worker)
+    public function updateAgent(Request $request, Agent $agent)
     {
-        if (! auth()->check()) {
-            abort(403, 'Please login to record attendance.');
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
         }
 
-        $now = Carbon::now('Africa/Addis_Ababa');
-        $status = $this->resolveStatus($now);
-
-        AttendanceRecord::create([
-            'worker_id' => $worker->id,
-            'status' => $status,
-            'recorded_at' => $now,
-            'check_in_time' => $now->format('H:i:s'),
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:agents,email,'.$agent->id],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'bio' => ['nullable', 'string', 'max:1000'],
+            'password' => ['nullable', 'string', 'min:6'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
-        return back()->with('success', $worker->name.' was marked as '.$status.'.');
+        $data = collect($validated)->except(['photo', 'password'])->all();
+        $data['password'] = filled($validated['password'] ?? null) ? $validated['password'] : $agent->password;
+
+        if ($request->hasFile('photo')) {
+            if ($agent->photo_path && Storage::disk('public')->exists($agent->photo_path)) {
+                Storage::disk('public')->delete($agent->photo_path);
+            }
+
+            $data['photo_path'] = $this->storeAgentPhoto($request);
+        }
+
+        $agent->update($data);
+        $this->syncAgentAccount($agent, $validated['password'] ?? null);
+
+        return redirect()->route('dashboard', ['section' => 'agents'])->with('success', 'Agent updated successfully.');
+    }
+
+    /**
+     * Create or update the linked login account for an agent.
+     */
+    protected function syncAgentAccount(Agent $agent, ?string $password = null): void
+    {
+        $account = $agent->account;
+
+        if (! $account) {
+            $account = User::create([
+                'name' => $agent->name,
+                'email' => $agent->email,
+                'password' => $password ?? Str::random(12),
+                'role' => 'agent',
+            ]);
+
+            $agent->forceFill(['user_id' => $account->id])->save();
+
+            return;
+        }
+
+        $account->update([
+            'name' => $agent->name,
+            'email' => $agent->email,
+            ...filled($password) ? ['password' => $password] : [],
+        ]);
+    }
+
+    public function deleteAgent(Agent $agent)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $agent->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Agent deleted successfully.');
     }
 
     public function storeUser(Request $request)
@@ -188,7 +279,7 @@ class WorkerManagementController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'in:blog,news,listing,project'],
+            'type' => ['required', 'in:blog,news,listing,project,job'],
             'category' => ['nullable', 'string', 'max:100'],
             'tags' => ['nullable', 'string', 'max:255'],
             'author_name' => ['nullable', 'string', 'max:255'],
@@ -201,6 +292,7 @@ class WorkerManagementController extends Controller
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'social_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'related_posts' => ['nullable', 'string', 'max:255'],
+            ...$this->jobFieldRules(),
         ]);
 
         $post = BlogPost::create([
@@ -230,7 +322,7 @@ class WorkerManagementController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'in:blog,news,listing,project'],
+            'type' => ['required', 'in:blog,news,listing,project,job'],
             'category' => ['nullable', 'string', 'max:100'],
             'tags' => ['nullable', 'string', 'max:255'],
             'author_name' => ['nullable', 'string', 'max:255'],
@@ -243,6 +335,7 @@ class WorkerManagementController extends Controller
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'social_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'related_posts' => ['nullable', 'string', 'max:255'],
+            ...$this->jobFieldRules(),
         ]);
 
         $data = $this->prepareBlogPostData($validated, $user, $post);
@@ -296,6 +389,23 @@ class WorkerManagementController extends Controller
         return redirect()->route('dashboard')->with('success', 'The post was deleted successfully.');
     }
 
+    /**
+     * @return array<string, array<int, string>>
+     */
+    protected function jobFieldRules(): array
+    {
+        return [
+            'job_location' => ['nullable', 'string', 'max:255'],
+            'job_type' => ['nullable', 'string', 'max:100'],
+            'salary_range' => ['nullable', 'string', 'max:100'],
+            'requirements' => ['nullable', 'string', 'max:5000'],
+            'experience_level' => ['nullable', 'string', 'max:100'],
+            'education_level' => ['nullable', 'string', 'max:255'],
+            'apply_link' => ['nullable', 'string', 'max:2048'],
+            'application_deadline' => ['nullable', 'date', 'after_or_equal:today'],
+        ];
+    }
+
     protected function prepareBlogPostData(array $validated, User $user, ?BlogPost $post = null): array
     {
         $status = $validated['status'] ?? 'published';
@@ -342,6 +452,16 @@ class WorkerManagementController extends Controller
             'published_at' => $publishedAt,
             'scheduled_for' => $status === 'scheduled' ? ($publishedAt ?? now()->addDay()) : null,
             'related_post_ids' => $this->normalizeRelatedPostIds($validated['related_posts'] ?? null),
+            'job_location' => $validated['job_location'] ?? null,
+            'job_type' => $validated['job_type'] ?? null,
+            'salary_range' => $validated['salary_range'] ?? null,
+            'requirements' => $validated['requirements'] ?? null,
+            'experience_level' => $validated['experience_level'] ?? null,
+            'education_level' => $validated['education_level'] ?? null,
+            'apply_link' => $validated['apply_link'] ?? null,
+            'application_deadline' => ! empty($validated['application_deadline'])
+                ? Carbon::parse($validated['application_deadline'])->toDateString()
+                : null,
         ];
     }
 
@@ -352,6 +472,15 @@ class WorkerManagementController extends Controller
         }
 
         return $request->file($field)->store('blog-posts', 'public');
+    }
+
+    protected function storeAgentPhoto(Request $request): ?string
+    {
+        if (! $request->hasFile('photo')) {
+            return null;
+        }
+
+        return $request->file('photo')->store('agent-photos', 'public');
     }
 
     protected function normalizeRelatedPostIds(?string $relatedPosts): ?string
@@ -369,33 +498,5 @@ class WorkerManagementController extends Controller
             ->implode(',');
 
         return $ids !== '' ? $ids : null;
-    }
-
-    protected function resolveStatus(Carbon $now): string
-    {
-        $presentCutoff = Carbon::createFromTime(14, 30, 0, 'Africa/Addis_Ababa');
-        $lateCutoff = Carbon::createFromTime(16, 30, 0, 'Africa/Addis_Ababa');
-
-        if ($now->lte($presentCutoff)) {
-            return 'present';
-        }
-
-        if ($now->gt($presentCutoff) && $now->lt($lateCutoff)) {
-            return 'late';
-        }
-
-        return 'absent';
-    }
-
-    protected function attendanceSummary(): array
-    {
-        $records = AttendanceRecord::whereDate('recorded_at', now('Africa/Addis_Ababa')->toDateString())
-            ->get();
-
-        return [
-            'present' => $records->where('status', 'present')->count(),
-            'late' => $records->where('status', 'late')->count(),
-            'absent' => $records->where('status', 'absent')->count(),
-        ];
     }
 }

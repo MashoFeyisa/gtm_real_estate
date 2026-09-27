@@ -64,6 +64,7 @@ class PropertyController extends Controller
             'city' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'featured' => ['nullable', 'boolean'],
+            'agent_id' => ['nullable', 'exists:agents,id'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -91,6 +92,7 @@ class PropertyController extends Controller
             'city' => $validated['city'] ?? null,
             'address' => $validated['address'] ?? null,
             'featured' => (bool) ($validated['featured'] ?? false),
+            'agent_id' => $validated['agent_id'] ?? null,
             'is_active' => in_array($validated['status'], ['published', 'available', 'sold', 'rented'], true),
         ]);
 
@@ -114,6 +116,7 @@ class PropertyController extends Controller
             'city' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'featured' => ['nullable', 'boolean'],
+            'agent_id' => ['nullable', 'exists:agents,id'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -153,6 +156,7 @@ class PropertyController extends Controller
             'city' => $validated['city'] ?? null,
             'address' => $validated['address'] ?? null,
             'featured' => (bool) ($validated['featured'] ?? false),
+            'agent_id' => $validated['agent_id'] ?? null,
             'is_active' => in_array($validated['status'], ['published', 'available', 'sold', 'rented'], true),
         ]);
 
@@ -191,11 +195,15 @@ class PropertyController extends Controller
     {
         $this->authorizeAdmin();
 
-        $property->status = $property->status === 'sold' ? 'available' : 'sold';
+        $soldStatus = $property->type === 'rent' ? 'rented' : 'sold';
+
+        $property->status = $property->status === $soldStatus ? 'available' : $soldStatus;
         $property->is_active = in_array($property->status, ['published', 'available', 'sold', 'rented'], true);
         $property->save();
 
-        return redirect()->route('dashboard')->with('success', 'Property sale status updated successfully.');
+        $label = $soldStatus === 'rented' ? 'rental' : 'sale';
+
+        return redirect()->route('dashboard')->with('success', 'Property '.$label.' status updated successfully.');
     }
 
     public function destroy(Property $property)

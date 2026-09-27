@@ -1,0 +1,35 @@
+[00:00:00.013060419 / 00:00:00.013060419] [9417824 bytes] Test Runner Configured
+[00:00:00.023864592 / 00:00:00.010804173] [11830264 bytes] PHPUnit Started (PHPUnit 13.3.4 using PHP 8.5.0 (cli) on Linux)
+[00:00:00.025446245 / 00:00:00.001581653] [11848472 bytes] Test Runner Configured
+[00:00:00.026905904 / 00:00:00.001459659] [12186816 bytes] Bootstrap Finished (/home/mmm/Projects/gtm_real_estate/vendor/autoload.php)
+[00:00:00.028446179 / 00:00:00.001540275] [12552832 bytes] Test Runner Triggered PHPUnit Deprecation (The "--log-events-verbose-text <file>" CLI option is deprecated and will be removed in PHPUnit 14. Use "--log-events-text <file> --with-telemetry" instead.)
+[00:00:00.031920989 / 00:00:00.003474810] [13210752 bytes] Event Facade Sealed
+[00:00:00.040942159 / 00:00:00.009021170] [16063432 bytes] Test Suite Loaded (38 tests)
+[00:00:00.041442663 / 00:00:00.000500504] [16252344 bytes] Test Runner Started
+[00:00:00.041503146 / 00:00:00.000060483] [16252344 bytes] Test Suite Sorted
+[00:00:00.042472946 / 00:00:00.000969800] [16252344 bytes] Test Suite Filtered (1 test)
+[00:00:00.042588691 / 00:00:00.000115745] [16252344 bytes] Test Runner Execution Started (1 test)
+[00:00:00.042742443 / 00:00:00.000153752] [16252344 bytes] Test Suite Started (CLI Arguments, 1 test)
+[00:00:00.042900274 / 00:00:00.000157831] [16271392 bytes] Test Suite Started (P\Tests\Feature\RealEstateTest, 1 test)
+[00:00:00.043543657 / 00:00:00.000643383] [16338048 bytes] Before First Test Method Called (P\Tests\Feature\RealEstateTest::setUpBeforeClass)
+[00:00:00.043566897 / 00:00:00.000023240] [16338048 bytes] Before First Test Method Finished:
+                                                           - P\Tests\Feature\RealEstateTest::setUpBeforeClass
+[00:00:00.044196012 / 00:00:00.000629115] [16338048 bytes] Test Preparation Started (P\Tests\Feature\RealEstateTest::__pest_evaluable_admin_can_log_in_with_the_seeded_credentials)
+[00:00:00.144892201 / 00:00:00.100696189] [41494056 bytes] Before Test Method Called (P\Tests\Feature\RealEstateTest::setUp)
+[00:00:00.144942292 / 00:00:00.000050091] [41494056 bytes] Before Test Method Finished:
+                                                           - P\Tests\Feature\RealEstateTest::setUp
+[00:00:00.144968065 / 00:00:00.000025773] [41450656 bytes] Test Prepared (P\Tests\Feature\RealEstateTest::__pest_evaluable_admin_can_log_in_with_the_seeded_credentials)
+[00:00:00.170370276 / 00:00:00.025402211] [47200080 bytes] Test Failed (P\Tests\Feature\RealEstateTest::__pest_evaluable_admin_can_log_in_with_the_seeded_credentials)
+                                                           Failed asserting that two strings are equal.
+[00:00:00.173201139 / 00:00:00.002830863] [47657056 bytes] After Test Method Called (P\Tests\Feature\RealEstateTest::tearDown)
+[00:00:00.173239413 / 00:00:00.000038274] [47657056 bytes] After Test Method Finished:
+                                                           - P\Tests\Feature\RealEstateTest::tearDown
+[00:00:00.173331262 / 00:00:00.000091849] [47657056 bytes] Test Finished (P\Tests\Feature\RealEstateTest::__pest_evaluable_admin_can_log_in_with_the_seeded_credentials)
+[00:00:00.173402264 / 00:00:00.000071002] [47657056 bytes] After Last Test Method Called (P\Tests\Feature\RealEstateTest::tearDownAfterClass)
+[00:00:00.173418971 / 00:00:00.000016707] [47657056 bytes] After Last Test Method Finished:
+                                                           - P\Tests\Feature\RealEstateTest::tearDownAfterClass
+[00:00:00.173434009 / 00:00:00.000015038] [47657056 bytes] Test Suite Finished (P\Tests\Feature\RealEstateTest, 1 test)
+[00:00:00.173539223 / 00:00:00.000105214] [47657056 bytes] Test Suite Finished (CLI Arguments, 1 test)
+[00:00:00.173647342 / 00:00:00.000108119] [47657056 bytes] Test Runner Execution Finished
+[00:00:00.181519407 / 00:00:00.007872065] [51473200 bytes] Test Runner Finished
+[00:00:00.181698897 / 00:00:00.000179490] [51473200 bytes] PHPUnit Finished (Shell Exit Code: 1)

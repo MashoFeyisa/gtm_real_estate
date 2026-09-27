@@ -1,10 +1,15 @@
 <?php
 
+use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AgentPortalController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\WorkerManagementController;
+use App\Models\Agent;
+use App\Models\AgentFeedback;
 use App\Models\BlogPost;
 use App\Models\Property;
 use Illuminate\Support\Facades\Route;
@@ -29,7 +34,7 @@ Route::get('/', function () {
         })->count();
     };
 
-    return view('app', [
+    return view('home', [
         'posts' => BlogPost::with('user')
             ->where('status', 'published')
             ->where('published_at', '<=', now())
@@ -69,6 +74,13 @@ Route::get('/', function () {
             'apartments' => $countByCategoryKeyword(['apartment', 'apartment suite', 'flat']),
             'sold' => $activeProperties->where('status', 'sold')->count(),
         ],
+        'agents' => Agent::query()->orderBy('name')->get(),
+        'testimonials' => AgentFeedback::query()
+            ->with('agent')
+            ->where('is_approved', true)
+            ->latest()
+            ->limit(3)
+            ->get(),
     ]);
 })->name('home');
 
@@ -92,7 +104,7 @@ Route::get('/app', function () {
         })->count();
     };
 
-    return view('app', [
+    return view('home', [
         'posts' => BlogPost::with('user')
             ->where('status', 'published')
             ->where('published_at', '<=', now())
@@ -132,6 +144,13 @@ Route::get('/app', function () {
             'apartments' => $countByCategoryKeyword(['apartment', 'apartment suite', 'flat']),
             'sold' => $activeProperties->where('status', 'sold')->count(),
         ],
+        'agents' => Agent::query()->orderBy('name')->get(),
+        'testimonials' => AgentFeedback::query()
+            ->with('agent')
+            ->where('is_approved', true)
+            ->latest()
+            ->limit(3)
+            ->get(),
     ]);
 })->name('app.home');
 
@@ -144,8 +163,9 @@ Route::get('/project-details', fn () => view('public.page', ['title' => 'Project
 Route::get('/services', fn () => view('public.page', ['title' => 'Services', 'intro' => 'From buying and leasing to project management, we help you move with confidence.', 'page' => 'services']))->name('services');
 Route::get('/about', fn () => view('public.page', ['title' => 'About GTP', 'intro' => 'GTP Real Estate is shaping trusted property experiences in Ethiopia with expertise, integrity, and local insight.', 'page' => 'about']))->name('about');
 Route::get('/leadership', fn () => view('public.page', ['title' => 'Leadership / Team', 'intro' => 'Meet the experienced leaders and advisors guiding our market reputation.', 'page' => 'leadership']))->name('leadership');
-Route::get('/agents', fn () => view('public.page', ['title' => 'Agents', 'intro' => 'Connect with property consultants who understand your local goals and investment priorities.', 'page' => 'agents']))->name('agents');
-Route::get('/agent-details', fn () => view('public.page', ['title' => 'Agent Details', 'intro' => 'Learn more about the agent supporting your search and negotiation journey.', 'page' => 'agent-details']))->name('agent-details');
+Route::get('/agents', [AgentController::class, 'index'])->name('agents');
+Route::get('/agents/{agent}', [AgentController::class, 'show'])->name('agents.show');
+Route::post('/agents/{agent}/feedback', [AgentController::class, 'storeFeedback'])->name('agents.feedback');
 Route::get('/news', function () {
     return view('public.page', [
         'title' => 'News',
@@ -186,13 +206,14 @@ Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
-
-Route::get('/attendance', [WorkerManagementController::class, 'attendance'])->name('attendance');
+Route::post('/properties/{property}/orders', [OrderController::class, 'store'])->name('orders.store');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/orders/{order}/agreement', [OrderController::class, 'downloadAgreement'])->name('orders.agreement');
     Route::get('/dashboard', [WorkerManagementController::class, 'dashboard'])->name('dashboard');
-    Route::post('/dashboard/workers', [WorkerManagementController::class, 'storeWorker'])->name('dashboard.workers.store');
-    Route::post('/dashboard/workers/{worker}/record-attendance', [WorkerManagementController::class, 'recordAttendance'])->name('workers.recordAttendance');
+    Route::post('/dashboard/agents', [WorkerManagementController::class, 'storeAgent'])->name('dashboard.agents.store');
+    Route::put('/dashboard/agents/{agent}', [WorkerManagementController::class, 'updateAgent'])->name('dashboard.agents.update');
+    Route::delete('/dashboard/agents/{agent}', [WorkerManagementController::class, 'deleteAgent'])->name('dashboard.agents.destroy');
     Route::post('/dashboard/users', [WorkerManagementController::class, 'storeUser'])->name('dashboard.users.store');
     Route::put('/dashboard/users/{user}', [WorkerManagementController::class, 'updateUser'])->name('dashboard.users.update');
     Route::delete('/dashboard/users/{user}', [WorkerManagementController::class, 'deleteUser'])->name('dashboard.users.delete');
@@ -200,12 +221,18 @@ Route::middleware('auth')->group(function () {
     Route::put('/dashboard/posts/{post}', [WorkerManagementController::class, 'updateBlogPost'])->name('dashboard.posts.update');
     Route::post('/dashboard/posts/{post}/toggle-publish', [WorkerManagementController::class, 'togglePublish'])->name('dashboard.posts.togglePublish');
     Route::delete('/dashboard/posts/{post}', [WorkerManagementController::class, 'deleteBlogPost'])->name('dashboard.posts.delete');
+    Route::post('/dashboard/settings', [WorkerManagementController::class, 'updateSettings'])->name('dashboard.settings.update');
     Route::post('/dashboard/properties', [PropertyController::class, 'store'])->name('dashboard.properties.store');
     Route::put('/dashboard/properties/{property}', [PropertyController::class, 'update'])->name('dashboard.properties.update');
     Route::post('/dashboard/properties/{property}/toggle-publish', [PropertyController::class, 'togglePublish'])->name('dashboard.properties.togglePublish');
     Route::post('/dashboard/properties/{property}/toggle-sold', [PropertyController::class, 'toggleSold'])->name('dashboard.properties.toggleSold');
     Route::post('/dashboard/properties/{property}/archive', [PropertyController::class, 'archive'])->name('dashboard.properties.archive');
     Route::delete('/dashboard/properties/{property}', [PropertyController::class, 'destroy'])->name('dashboard.properties.destroy');
+});
+
+Route::middleware('agent')->group(function () {
+    Route::get('/agent-portal', [AgentPortalController::class, 'index'])->name('agent.portal');
+    Route::patch('/agent-portal/orders/{order}/status', [AgentPortalController::class, 'updateOrderStatus'])->name('agent.orders.status');
 });
 
 Route::get('/properties', [PropertyController::class, 'index'])->name('properties.index');

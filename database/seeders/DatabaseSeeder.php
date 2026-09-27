@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Agent;
 use App\Models\User;
-use App\Models\Worker;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -35,17 +35,33 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $workers = [
-            ['name' => 'Tadesse Bekele', 'email' => 'tadesse@example.com', 'department' => 'Sales', 'phone' => '+251911000001'],
-            ['name' => 'Mekdes Ali', 'email' => 'mekdes@example.com', 'department' => 'Operations', 'phone' => '+251922000002'],
-            ['name' => 'Yohannes Gebre', 'email' => 'yohannes@example.com', 'department' => 'Support', 'phone' => '+251933000003'],
+        $agents = [
+            ['name' => 'Tadesse Bekele', 'email' => 'tadesse.agent@example.com', 'phone' => '+251911000001', 'bio' => 'Senior property consultant', 'password' => 'agent123'],
+            ['name' => 'Mekdes Ali', 'email' => 'mekdes.agent@example.com', 'phone' => '+251922000002', 'bio' => 'Investment advisor', 'password' => 'agent123'],
+            ['name' => 'Yohannes Gebre', 'email' => 'yohannes.agent@example.com', 'phone' => '+251933000003', 'bio' => 'Sales manager', 'password' => 'agent123'],
         ];
 
-        foreach ($workers as $worker) {
-            Worker::query()->updateOrCreate(
-                ['email' => $worker['email']],
-                $worker
+        foreach ($agents as $agentData) {
+            $agent = Agent::query()->updateOrCreate(
+                ['email' => $agentData['email']],
+                [
+                    'name' => $agentData['name'],
+                    'phone' => $agentData['phone'],
+                    'bio' => $agentData['bio'],
+                    'password' => $agentData['password'],
+                ]
             );
+
+            $account = User::query()->updateOrCreate(
+                ['email' => $agentData['email']],
+                [
+                    'name' => $agentData['name'],
+                    'role' => 'agent',
+                    'password' => Hash::make($agentData['password']),
+                ]
+            );
+
+            $agent->forceFill(['user_id' => $account->id])->save();
         }
     }
 }

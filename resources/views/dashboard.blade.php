@@ -9,17 +9,21 @@
 <body class="bg-[#f5f0e7] text-slate-800 antialiased scroll-smooth">
     <div class="flex min-h-screen">
         <aside class="w-72 shrink-0 border-r border-[#d9cab3] bg-[#1d3c34] p-6 text-[#f8f3eb]">
-            <a href="{{ route('home') }}" class="text-2xl font-black tracking-tight text-white">
-                Real <span class="text-[#d9cab3]">Estate</span>
+            <a href="{{ route('home') }}" class="flex items-center gap-3">
+                <img src="{{ asset($siteBrand['logo']) }}" alt="{{ $siteBrand['name'] }} Logo" class="h-10 w-10 rounded-xl object-cover ring-2 ring-[#d9cab3]">
+                <span class="text-xl font-black tracking-tight text-white">{{ $siteBrand['name'] }}</span>
             </a>
 
             <nav class="mt-8 space-y-2">
+                <a href="{{ route('home') }}" class="flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Home</a>
                 <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">Overview</a>
                 <a href="#properties" data-target-section="properties" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Properties</a>
+                <a href="#orders" data-target-section="orders" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Orders</a>
                 <a href="#blog-posts" data-target-section="blog-posts" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Blog &amp; News</a>
-                <a href="#workers" data-target-section="workers" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Workers</a>
+                <a href="#job-postings" data-target-section="job-postings" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Job Postings</a>
+                <a href="#agents" data-target-section="agents" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Agents</a>
+                <a href="#settings" data-target-section="settings" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Site Settings</a>
                 <a href="#users" data-target-section="users" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Users</a>
-                <a href="{{ route('home') }}" class="flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Home</a>
             </nav>
 
             <div class="mt-10 rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
@@ -27,13 +31,6 @@
                 <p class="mt-3 text-lg font-bold text-white">{{ auth()->user()->name }}</p>
                 <p class="text-sm text-[#dfeee4]">Administrator</p>
             </div>
-
-            <form method="POST" action="{{ route('logout') }}" class="mt-10">
-                @csrf
-                <button type="submit" class="w-full rounded-xl border border-[#d9cab3] bg-transparent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5">
-                    Logout
-                </button>
-            </form>
         </aside>
 
         <main class="flex-1 px-6 py-12">
@@ -63,19 +60,19 @@
             <div class="mt-8 grid gap-6 md:grid-cols-4">
                 <div class="rounded-[1.5rem] border border-[#d9cab3] bg-white p-5 shadow-sm">
                     <p class="text-sm font-medium text-slate-500">Total Properties</p>
-                    <p class="mt-3 text-3xl font-black text-[#1d3c34]">128</p>
+                    <p class="mt-3 text-3xl font-black text-[#1d3c34]">{{ $overviewStats['totalProperties'] }}</p>
                 </div>
                 <div class="rounded-[1.5rem] border border-[#d9cab3] bg-[#edf3ee] p-5 shadow-sm">
                     <p class="text-sm font-medium text-slate-500">Active Listings</p>
-                    <p class="mt-3 text-3xl font-black text-[#2d5d4d]">94</p>
+                    <p class="mt-3 text-3xl font-black text-[#2d5d4d]">{{ $overviewStats['activeListings'] }}</p>
                 </div>
                 <div class="rounded-[1.5rem] border border-[#d9cab3] bg-[#f4efe7] p-5 shadow-sm">
-                    <p class="text-sm font-medium text-slate-500">Workers</p>
-                    <p class="mt-3 text-3xl font-black text-[#2d5d4d]">{{ $workers->count() }}</p>
+                    <p class="text-sm font-medium text-slate-500">Agents</p>
+                    <p class="mt-3 text-3xl font-black text-[#2d5d4d]">{{ $agents->count() }}</p>
                 </div>
                 <div class="rounded-[1.5rem] border border-[#d9cab3] bg-[#f9ebd8] p-5 shadow-sm">
                     <p class="text-sm font-medium text-slate-500">Pending Reviews</p>
-                    <p class="mt-3 text-3xl font-black text-[#b7842d]">11</p>
+                    <p class="mt-3 text-3xl font-black text-[#b7842d]">{{ $overviewStats['pendingReviews'] }}</p>
                 </div>
             </div>
 
@@ -83,18 +80,23 @@
                 <section class="rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
                     <h2 class="text-2xl font-black text-[#1d3c34]">Recent Properties</h2>
                     <ul class="mt-5 space-y-4">
-                        <li class="flex items-center justify-between border-b border-[#e7ddca] pb-3">
-                            <span class="font-medium text-slate-700">Modern Villa</span>
-                            <span class="rounded-full bg-[#dfeee4] px-2.5 py-1 text-xs font-bold text-[#1d3c34]">Approved</span>
-                        </li>
-                        <li class="flex items-center justify-between border-b border-[#e7ddca] pb-3">
-                            <span class="font-medium text-slate-700">City Apartment</span>
-                            <span class="rounded-full bg-[#f9ecd0] px-2.5 py-1 text-xs font-bold text-[#9b6c17]">Reviewing</span>
-                        </li>
-                        <li class="flex items-center justify-between">
-                            <span class="font-medium text-slate-700">Family Home</span>
-                            <span class="rounded-full bg-[#edf2ee] px-2.5 py-1 text-xs font-bold text-[#2d5d4d]">Published</span>
-                        </li>
+                        @forelse ($recentProperties as $recent)
+                            <li class="flex items-center justify-between border-b border-[#e7ddca] pb-3 last:border-b-0 last:pb-0">
+                                <span class="font-medium text-slate-700">{{ $recent->title }}</span>
+                                @php
+                                    $badge = match ($recent->status) {
+                                        'published' => ['Published', 'bg-[#dfeee4] text-[#1d3c34]'],
+                                        'sold' => ['Sold', 'bg-[#e9efe9] text-[#2d5d4d]'],
+                                        'archived' => ['Archived', 'bg-[#f3ecdb] text-[#9b6c17]'],
+                                        'available' => ['Available', 'bg-[#edf2ee] text-[#2d5d4d]'],
+                                        default => ['Draft', 'bg-[#f9ecd0] text-[#9b6c17]'],
+                                    };
+                                @endphp
+                                <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $badge[1] }}">{{ $badge[0] }}</span>
+                            </li>
+                        @empty
+                            <li class="text-sm text-slate-500">No properties yet. Create your first listing in the Properties section.</li>
+                        @endforelse
                     </ul>
                 </section>
 
@@ -161,6 +163,16 @@
                     </div>
 
                     <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Assigned Agent</label>
+                        <select name="agent_id" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <option value="">— No agent (orders go to admin only) —</option>
+                            @foreach ($agents as $agent)
+                                <option value="{{ $agent->id }}" {{ (string) old('agent_id', $propertyToEdit?->agent_id) === (string) $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
                         <label class="mb-1 block text-sm font-semibold text-slate-700">Bedrooms</label>
                         <input type="number" name="bedrooms" min="0" value="{{ old('bedrooms', $propertyToEdit?->bedrooms) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                     </div>
@@ -198,7 +210,14 @@
 
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-semibold text-slate-700">Property Image</label>
-                        <input type="file" name="image" accept="image/*" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 file:mr-3 file:rounded-full file:border-0 file:bg-[#1d3c34] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        <div class="flex items-center gap-3">
+                            <label for="property-image-input" class="cursor-pointer rounded-full bg-[#1d3c34] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#254d43]">
+                                Property Image
+                            </label>
+                            <span id="property-image-name" class="truncate text-sm text-slate-500">No file chosen</span>
+                        </div>
+                        <input id="property-image-input" type="file" name="image" accept="image/*" class="sr-only"
+                            onchange="document.getElementById('property-image-name').textContent = this.files.length ? this.files[0].name : 'No file chosen';">
                         @if ($propertyToEdit && $propertyToEdit->image_path)
                             <img src="{{ asset('storage/' . $propertyToEdit->image_path) }}" alt="{{ $propertyToEdit->title }}" class="mt-3 h-28 w-full rounded-xl object-cover shadow-sm ring-1 ring-[#d9cab3]">
                         @endif
@@ -220,84 +239,126 @@
             </div>
         </section>
 
-        <section id="workers" data-section="workers" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+        <section id="orders" data-section="orders" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between gap-4">
-                <h2 class="text-2xl font-black text-[#1d3c34]">Workers Management</h2>
-                <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">Local Ethiopia Time</span>
+                <h2 class="text-2xl font-black text-[#1d3c34]">Buy &amp; Rent Orders</h2>
+                <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">{{ $orders->count() }} Total</span>
             </div>
 
-            <div class="mt-6 rounded-[1.25rem] border border-[#d9cab3] bg-[#f9f4ed] p-5">
-                <h3 class="text-xl font-black text-[#1d3c34]">Add Worker</h3>
-                <form method="POST" action="{{ route('dashboard.workers.store') }}" class="mt-5 grid gap-4 md:grid-cols-2">
-                    @csrf
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-slate-700">Name</label>
-                        <input type="text" name="name" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-slate-700">Email</label>
-                        <input type="email" name="email" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-slate-700">Department</label>
-                        <input type="text" name="department" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-slate-700">Phone</label>
-                        <input type="text" name="phone" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" class="rounded-full bg-[#1d3c34] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
-                            Add Worker
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="mt-6 overflow-hidden rounded-[1.25rem] border border-[#e7ddca]">
-                <table class="min-w-full text-left text-sm">
-                    <thead class="bg-[#1d3c34] text-[#f8f3eb]">
-                        <tr>
-                            <th class="px-5 py-4 font-semibold">Name</th>
-                            <th class="px-5 py-4 font-semibold">Department</th>
-                            <th class="px-5 py-4 font-semibold">Phone</th>
-                            <th class="px-5 py-4 font-semibold">Status</th>
-                            <th class="px-5 py-4 font-semibold">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($workers as $worker)
-                            <tr class="border-t border-[#e7ddca] bg-white">
-                                <td class="px-5 py-4 font-semibold text-[#1d3c34]">{{ $worker->name }}</td>
-                                <td class="px-5 py-4 text-slate-600">{{ $worker->department }}</td>
-                                <td class="px-5 py-4 text-slate-600">{{ $worker->phone }}</td>
-                                <td class="px-5 py-4">
-                                    @php
-                                        $status = $worker->latestAttendance?->status ?? 'pending';
-                                    @endphp
-                                    @if ($status === 'present')
-                                        <span class="rounded-full bg-[#dfeee4] px-2.5 py-1 text-xs font-bold text-[#1d3c34]">Present</span>
-                                    @elseif ($status === 'late')
-                                        <span class="rounded-full bg-[#f9ecd0] px-2.5 py-1 text-xs font-bold text-[#9b6c17]">Late</span>
-                                    @elseif ($status === 'absent')
-                                        <span class="rounded-full bg-[#f8ddd9] px-2.5 py-1 text-xs font-bold text-[#a24339]">Absent</span>
-                                    @else
-                                        <span class="rounded-full bg-[#edf2ee] px-2.5 py-1 text-xs font-bold text-[#2d5d4d]">Pending</span>
-                                    @endif
-                                </td>
-                                <td class="px-5 py-4">
-                                    <form method="POST" action="{{ route('workers.recordAttendance', $worker) }}">
-                                        @csrf
-                                        <button type="submit" class="rounded-full bg-[#1d3c34] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#254d43]">
-                                            Record Attendance
-                                        </button>
-                                    </form>
-                                </td>
+            @if ($orders->isNotEmpty())
+                <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca] bg-white">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
+                            <tr>
+                                <th class="px-5 py-4 font-semibold">Client</th>
+                                <th class="px-5 py-4 font-semibold">Property</th>
+                                <th class="px-5 py-4 font-semibold">Type</th>
+                                <th class="px-5 py-4 font-semibold">Status</th>
+                                <th class="px-5 py-4 font-semibold">Agreement</th>
+                                <th class="px-5 py-4 font-semibold">Requested</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach ($orders as $order)
+                                @php
+                                    $orderStatusBadge = match ($order->status) {
+                                        'accepted' => ['Accepted', 'bg-[#dfeee4] text-[#1d3c34]'],
+                                        'rejected' => ['Rejected', 'bg-[#f7e2e2] text-[#8f3b3b]'],
+                                        default => ['Pending', 'bg-[#f9ecd0] text-[#9b6c17]'],
+                                    };
+                                @endphp
+                                <tr class="border-t border-[#e7ddca] align-top">
+                                    <td class="px-5 py-4">
+                                        <p class="font-semibold text-[#1d3c34]">{{ $order->name }}</p>
+                                        <p class="text-xs text-slate-500">{{ $order->email }}</p>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <p class="font-medium text-slate-700">{{ $order->property?->title ?? 'Property removed' }}</p>
+                                        <p class="text-xs text-slate-500">
+                                            {{ $order->isRental() ? 'Rent: $'.number_format($order->offer_amount ?? 0, 2).'/mo' : 'Offer: $'.number_format($order->offer_amount ?? 0, 2) }}
+                                        </p>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $order->isRental() ? 'bg-[#dfeee4] text-[#1d3c34]' : 'bg-[#f2e4cb] text-[#1d3c34]' }}">
+                                            {{ $order->isRental() ? 'For Rent' : 'For Sale' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $orderStatusBadge[1] }}">{{ $orderStatusBadge[0] }}</span>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        @if ($order->hasAgreement())
+                                            <span class="inline-block rounded-full bg-[#dfeee4] px-2.5 py-1 text-xs font-bold text-[#1d3c34]">
+                                                Agreement generated {{ $order->agreed_at?->format('M d, Y') }}
+                                            </span>
+                                            <a href="{{ route('orders.agreement', $order) }}" class="mt-2 block w-fit rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#254d43]">
+                                                Download PDF
+                                            </a>
+                                        @elseif ($order->status === 'accepted')
+                                            <span class="inline-block rounded-full bg-[#f9ecd0] px-2.5 py-1 text-xs font-bold text-[#9b6c17]">Agreement pending</span>
+                                        @else
+                                            <span class="inline-block rounded-full bg-[#f3ecdb] px-2.5 py-1 text-xs font-bold text-slate-500">No agreement yet</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-4 text-slate-600">{{ $order->created_at?->format('M d, Y') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="mt-6 text-sm text-slate-500">No orders yet. Buy and rent requests from clients will appear here.</p>
+            @endif
+        </section>
+
+        <section id="settings" data-section="settings" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-[#f9f4ed] p-6 shadow-sm">
+            <div class="flex items-center justify-between gap-4">
+                <h2 class="text-2xl font-black text-[#1d3c34]">Site Branding &amp; Contact</h2>
+                <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">Admin Access</span>
             </div>
+            <p class="mt-2 text-sm text-slate-600">These values control the logo, site name, and contact details shown in the header, footer, and homepage.</p>
+
+            <form method="POST" action="{{ route('dashboard.settings.update') }}" enctype="multipart/form-data" class="mt-6 grid gap-4 rounded-[1.25rem] border border-[#e7ddca] bg-white p-5 md:grid-cols-2">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Site Name</label>
+                    <input type="text" name="site_name" value="{{ old('site_name', $siteBrand['name']) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Logo</label>
+                    <div class="flex items-center gap-3">
+                        <label for="site-logo-input" class="cursor-pointer rounded-full bg-[#1d3c34] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#254d43]">
+                            Choose Logo
+                        </label>
+                        <span id="site-logo-name" class="truncate text-sm text-slate-500">Current logo in use</span>
+                    </div>
+                    <input id="site-logo-input" type="file" name="site_logo" accept="image/*" class="sr-only"
+                        onchange="document.getElementById('site-logo-name').textContent = this.files.length ? this.files[0].name : 'Current logo in use';">
+                    <img src="{{ asset($siteBrand['logo']) }}" alt="Current logo" class="mt-3 h-12 w-12 rounded-xl object-cover ring-1 ring-[#d9cab3]">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Contact Email</label>
+                    <input type="email" name="contact_email" value="{{ old('contact_email', $siteBrand['email']) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Contact Phone</label>
+                    <input type="text" name="contact_phone" value="{{ old('contact_phone', $siteBrand['phone']) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Address</label>
+                    <input type="text" name="contact_address" value="{{ old('contact_address', $siteBrand['address']) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div class="md:col-span-2">
+                    <button type="submit" class="rounded-full bg-[#1d3c34] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
+                        Save Settings
+                    </button>
+                </div>
+            </form>
         </section>
 
         @php
@@ -309,7 +370,7 @@
             <h2 class="text-2xl font-black text-[#1d3c34]">User Manager</h2>
 
             <div class="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-                <div class="overflow-hidden rounded-[1.25rem] border border-[#e7ddca] bg-white">
+                <div class="overflow-x-auto rounded-[1.25rem] border border-[#e7ddca] bg-white">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
                             <tr>
@@ -385,6 +446,122 @@
                         </div>
                     </form>
                 </div>
+            </div>
+        </section>
+
+        @php
+            $editAgentId = request()->query('edit_agent');
+            $agentToEdit = $editAgentId ? $agents->firstWhere('id', (int) $editAgentId) : null;
+        @endphp
+
+        <section id="agents" data-section="agents" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+            <div class="flex items-center justify-between gap-4">
+                <h2 class="text-2xl font-black text-[#1d3c34]">{{ $agentToEdit ? 'Edit Agent' : 'Agents Management' }}</h2>
+                <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">Shown on Home Page</span>
+            </div>
+
+            <div class="mt-6 rounded-[1.25rem] border border-[#d9cab3] bg-[#f9f4ed] p-5">
+                @if ($agentToEdit)
+                    <div class="mb-4 flex items-center justify-between gap-4">
+                        <h3 class="text-xl font-black text-[#1d3c34]">Editing: {{ $agentToEdit->name }}</h3>
+                        <a href="{{ route('dashboard', ['section' => 'agents']) }}" class="text-sm font-semibold text-[#2d5d4d]">Cancel</a>
+                    </div>
+                @else
+                    <h3 class="text-xl font-black text-[#1d3c34]">Add Agent</h3>
+                @endif
+                <form method="POST" action="{{ $agentToEdit ? route('dashboard.agents.update', $agentToEdit) : route('dashboard.agents.store') }}" enctype="multipart/form-data" class="mt-5 grid gap-4 md:grid-cols-2">
+                    @csrf
+                    @if ($agentToEdit)
+                        @method('PUT')
+                    @endif
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Name</label>
+                        <input type="text" name="name" value="{{ old('name', $agentToEdit?->name) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Email</label>
+                        <input type="email" name="email" value="{{ old('email', $agentToEdit?->email) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Phone</label>
+                        <input type="text" name="phone" value="{{ old('phone', $agentToEdit?->phone) }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Title / Specialty (bio)</label>
+                        <input type="text" name="bio" value="{{ old('bio', $agentToEdit?->bio) }}" placeholder="e.g. Senior property consultant" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Portal {{ $agentToEdit ? 'New Password (optional)' : 'Password (optional)' }}</label>
+                        <input type="password" name="password" minlength="6" placeholder="{{ $agentToEdit ? 'Leave blank to keep current' : 'Leave blank to auto-generate' }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        <p class="mt-1 text-xs text-slate-500">Creates a login account so the agent can sign in to their portal.</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Photo</label>
+                        <input type="file" name="photo" accept="image/png,image/jpeg,image/webp" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        @if ($agentToEdit && $agentToEdit->photo_path)
+                            <img src="{{ asset('storage/'.$agentToEdit->photo_path) }}" alt="{{ $agentToEdit->name }}" class="mt-2 h-16 w-16 rounded-full object-cover ring-1 ring-[#d9cab3]">
+                        @endif
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="rounded-full bg-[#1d3c34] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
+                            {{ $agentToEdit ? 'Update Agent' : 'Add Agent' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-[#1d3c34] text-[#f8f3eb]">
+                        <tr>
+                            <th class="px-5 py-4 font-semibold">Photo</th>
+                            <th class="px-5 py-4 font-semibold">Name</th>
+                            <th class="px-5 py-4 font-semibold">Email</th>
+                            <th class="px-5 py-4 font-semibold">Phone</th>
+                            <th class="px-5 py-4 font-semibold">Title / Specialty</th>
+                            <th class="px-5 py-4 font-semibold">Portal Account</th>
+                            <th class="px-5 py-4 font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($agents as $agent)
+                            <tr class="border-t border-[#e7ddca] bg-white">
+                                <td class="px-5 py-4">
+                                    <img src="{{ $agent->photo_url }}" alt="{{ $agent->name }}" class="h-10 w-10 rounded-full object-cover ring-1 ring-[#d9cab3]">
+                                </td>
+                                <td class="px-5 py-4 font-semibold text-[#1d3c34]">{{ $agent->name }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ $agent->email }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ $agent->phone }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ $agent->bio }}</td>
+                                <td class="px-5 py-4">
+                                    @if ($agent->account)
+                                        <span class="rounded-full bg-[#dfeee4] px-2.5 py-1 text-xs font-bold text-[#1d3c34]">Active</span>
+                                    @else
+                                        <span class="rounded-full bg-[#f9ecd0] px-2.5 py-1 text-xs font-bold text-[#9b6c17]">None</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <a href="{{ route('dashboard', ['edit_agent' => $agent->id, 'section' => 'agents']) }}" class="rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-bold text-white">
+                                            Edit
+                                        </a>
+                                        <form method="POST" action="{{ route('dashboard.agents.destroy', $agent) }}" onsubmit="return confirm('Delete this agent?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="rounded-full border border-[#c86b5c] bg-[#fef3f1] px-3 py-1.5 text-xs font-bold text-[#a24339]">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr class="border-t border-[#e7ddca] bg-white">
+                                <td colspan="7" class="px-5 py-6 text-center text-slate-500">No agents yet. Add one above to feature them on the home page.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -500,6 +677,158 @@
             </section>
         @endif
 
+        @php
+            $editJobId = request()->query('edit_job');
+            $jobToEdit = $editJobId ? $jobs->firstWhere('id', (int) $editJobId) : null;
+        @endphp
+
+        @if (auth()->user()->canCreateContent())
+            <section id="job-postings" data-section="job-postings" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="text-2xl font-black text-[#1d3c34]">{{ $jobToEdit ? 'Edit Job Posting' : 'Job Postings' }}</h2>
+                    <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">
+                        {{ $jobToEdit ? 'Edit Mode' : 'Admin Access' }}
+                    </span>
+                </div>
+
+                <div class="mt-6 rounded-[1.25rem] border border-[#e7ddca] bg-[#f9f4ed] p-5">
+                    <h3 class="text-xl font-black text-[#1d3c34]">{{ $jobToEdit ? 'Edit Job Opening' : 'Post a Job Opening' }}</h3>
+                    <form method="POST" action="{{ $jobToEdit ? route('dashboard.posts.update', $jobToEdit) : route('dashboard.posts.store') }}" class="mt-5 grid gap-4 md:grid-cols-2">
+                        @csrf
+                        @if ($jobToEdit)
+                            @method('PUT')
+                        @endif
+                        <input type="hidden" name="type" value="job">
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Job Title</label>
+                            <input type="text" name="title" value="{{ old('title', $jobToEdit?->title) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Department / Category</label>
+                            <input type="text" name="category" value="{{ old('category', $jobToEdit?->category) }}" placeholder="Sales, Marketing..." class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Location</label>
+                            <input type="text" name="job_location" value="{{ old('job_location', $jobToEdit?->job_location) }}" placeholder="Addis Ababa, Ethiopia" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Employment Type</label>
+                            <select name="job_type" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                @foreach (['Full-time', 'Part-time', 'Contract', 'Internship'] as $employmentType)
+                                    <option value="{{ $employmentType }}" {{ old('job_type', $jobToEdit?->job_type) === $employmentType ? 'selected' : '' }}>{{ $employmentType }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Salary Range</label>
+                            <input type="text" name="salary_range" value="{{ old('salary_range', $jobToEdit?->salary_range) }}" placeholder="ETB 15,000 - 25,000" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Experience Required</label>
+                            <input type="text" name="experience_level" value="{{ old('experience_level', $jobToEdit?->experience_level) }}" placeholder="2+ years" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Education Required</label>
+                            <input type="text" name="education_level" value="{{ old('education_level', $jobToEdit?->education_level) }}" placeholder="Bachelor's Degree in ..." class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Application Deadline</label>
+                            <input type="date" name="application_deadline" value="{{ old('application_deadline', $jobToEdit?->application_deadline?->format('Y-m-d')) }}" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
+                            <select name="status" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                <option value="published" {{ old('status', $jobToEdit?->status ?? 'published') === 'published' ? 'selected' : '' }}>Published</option>
+                                <option value="draft" {{ old('status', $jobToEdit?->status) === 'draft' ? 'selected' : '' }}>Draft</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Apply Link</label>
+                            <input type="url" name="apply_link" value="{{ old('apply_link', $jobToEdit?->apply_link) }}" placeholder="https://... or mailto:hr@realestate.com" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <p class="mt-1 text-xs text-slate-500">Shown as the Apply button on the careers page. Leave empty to default to the contact email.</p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Job Description</label>
+                            <textarea name="content" rows="5" required class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('content', $jobToEdit?->content) }}</textarea>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Requirements</label>
+                            <textarea name="requirements" rows="4" placeholder="One requirement per line..." class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('requirements', $jobToEdit?->requirements) }}</textarea>
+                        </div>
+
+                        <div class="md:col-span-2 flex flex-wrap gap-3">
+                            <button type="submit" class="rounded-full bg-[#1d3c34] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
+                                {{ $jobToEdit ? 'Update Job Posting' : 'Post Job Opening' }}
+                            </button>
+                            @if ($jobToEdit)
+                                <a href="{{ route('dashboard', ['section' => 'job-postings']) }}" class="rounded-full border border-[#d9cab3] bg-white px-5 py-3 text-sm font-bold text-[#1d3c34]">Cancel edit</a>
+                            @endif
+                        </div>
+                    </form>
+                </div>
+
+                <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
+                            <tr>
+                                <th class="px-5 py-4 font-semibold">Title</th>
+                                <th class="px-5 py-4 font-semibold">Location</th>
+                                <th class="px-5 py-4 font-semibold">Deadline</th>
+                                <th class="px-5 py-4 font-semibold">Status</th>
+                                <th class="px-5 py-4 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($jobs as $job)
+                                <tr class="border-t border-[#e7ddca] bg-white">
+                                    <td class="px-5 py-4 font-semibold text-[#1d3c34]">{{ $job->title }}</td>
+                                    <td class="px-5 py-4 text-slate-600">{{ $job->job_location ?? '—' }}</td>
+                                    <td class="px-5 py-4 text-slate-600">{{ $job->application_deadline?->format('M d, Y') ?? '—' }}</td>
+                                    <td class="px-5 py-4">
+                                        <span class="rounded-full {{ $job->status === 'published' ? 'bg-[#dfeee4] text-[#1d3c34]' : 'bg-[#edf2ee] text-[#2d5d4d]' }} px-2.5 py-1 text-xs font-bold">
+                                            {{ ucfirst($job->status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <div class="flex flex-wrap gap-2">
+                                            <a href="{{ route('dashboard', ['edit_job' => $job->id, 'section' => 'job-postings']) }}" class="rounded-full bg-[#1d3c34] px-3 py-2 text-xs font-bold text-white">Edit</a>
+                                            <form method="POST" action="{{ route('dashboard.posts.togglePublish', $job) }}">
+                                                @csrf
+                                                <button type="submit" class="rounded-full border border-[#d9cab3] bg-white px-3 py-2 text-xs font-bold text-[#1d3c34]">
+                                                    {{ $job->status === 'published' ? 'Unpublish' : 'Publish' }}
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('dashboard.posts.delete', $job) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="rounded-full border border-[#d9cab3] bg-[#fff1f0] px-3 py-2 text-xs font-bold text-[#a24339]" onclick="return confirm('Delete this job posting?')">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-5 py-6 text-center text-slate-500">No job postings yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+
         <section class="mt-10 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <h2 class="text-2xl font-black text-[#1d3c34]">Content Library</h2>
@@ -525,7 +854,7 @@
                 <button type="submit" class="rounded-xl bg-[#1d3c34] px-4 py-2.5 text-sm font-bold text-white">Apply filters</button>
             </form>
 
-            <div class="mt-6 overflow-hidden rounded-[1.25rem] border border-[#e7ddca]">
+            <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
                 <table class="min-w-full text-left text-sm">
                     <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
                         <tr>
@@ -580,7 +909,7 @@
                 <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">{{ $properties->count() }} items</span>
             </div>
 
-            <div class="mt-6 overflow-hidden rounded-[1.25rem] border border-[#e7ddca]">
+            <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
                 <table class="min-w-full text-left text-sm">
                     <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
                         <tr>
@@ -611,10 +940,15 @@
                                                 {{ $property->is_active ? 'Unpublish' : 'Publish' }}
                                             </button>
                                         </form>
+                                        @php
+                                            $soldStatus = $property->type === 'rent' ? 'rented' : 'sold';
+                                            $soldLabel = $property->type === 'rent' ? 'Rented' : 'Sold';
+                                            $markLabel = $property->type === 'rent' ? 'Mark Rented' : 'Mark Sold';
+                                        @endphp
                                         <form method="POST" action="{{ route('dashboard.properties.toggleSold', $property) }}">
                                             @csrf
                                             <button type="submit" class="rounded-full border border-[#d9cab3] bg-[#f8f3eb] px-3 py-2 text-xs font-bold text-[#1d3c34]">
-                                                {{ $property->status === 'sold' ? 'Mark Available' : 'Mark Sold' }}
+                                                {{ $property->status === $soldStatus ? 'Mark Available' : $markLabel }}
                                             </button>
                                         </form>
                                         <form method="POST" action="{{ route('dashboard.properties.archive', $property) }}">
@@ -704,6 +1038,7 @@
             const editSection = params.has('edit_user') ? 'users'
                 : params.has('edit_post') ? 'blog-posts'
                 : params.has('edit_property') ? 'properties'
+                : params.has('edit_agent') ? 'agents'
                 : null;
             const initialHash = window.location.hash.replace('#', '');
             const initialSection = initialHash || paramSection || editSection || 'overview';

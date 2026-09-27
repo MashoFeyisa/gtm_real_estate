@@ -11,13 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('workers', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->string('department')->nullable();
-            $table->string('phone')->nullable();
-            $table->timestamps();
+        Schema::table('inquiries', function (Blueprint $table) {
+            $table->foreignId('agent_id')->nullable()->after('status')->constrained()->nullOnDelete();
         });
     }
 
@@ -26,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('workers');
+        Schema::table('inquiries', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('agent_id');
+        });
     }
 };

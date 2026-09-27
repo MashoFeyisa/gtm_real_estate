@@ -22,7 +22,15 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended('/dashboard');
+            $user = Auth::user();
+
+            $destination = match (true) {
+                $user->isAdmin() => '/dashboard',
+                (bool) $user->agentProfile => '/agent-portal',
+                default => '/app',
+            };
+
+            return redirect()->intended($destination);
         }
 
         return back()->withErrors([
