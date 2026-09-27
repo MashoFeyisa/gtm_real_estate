@@ -102,19 +102,24 @@ class WorkerManagementController extends Controller
             'contact_address' => ['required', 'string', 'max:255'],
         ]);
 
+        // Persist basic site settings
         SiteSetting::set('site_name', $validated['site_name']);
         SiteSetting::set('contact_email', $validated['contact_email']);
         SiteSetting::set('contact_phone', $validated['contact_phone']);
         SiteSetting::set('contact_address', $validated['contact_address']);
 
+        // Handle logo upload, storing in the public/images directory
         if ($request->hasFile('site_logo')) {
             $previousLogo = SiteSetting::get('site_logo');
 
-            if ($previousLogo && str_starts_with($previousLogo, 'branding/') && Storage::disk('public')->exists($previousLogo)) {
+            // Delete the old logo if it exists in the images directory
+            if ($previousLogo && str_starts_with($previousLogo, 'images/') && Storage::disk('public')->exists($previousLogo)) {
                 Storage::disk('public')->delete($previousLogo);
             }
 
-            SiteSetting::set('site_logo', $request->file('site_logo')->store('branding', 'public'));
+            // Store the new logo in the images folder on the public disk
+            $newPath = $request->file('site_logo')->store('images', 'public');
+            SiteSetting::set('site_logo', $newPath);
         }
 
         return redirect()->route('dashboard', ['section' => 'settings'])

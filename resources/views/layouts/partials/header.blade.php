@@ -1,7 +1,7 @@
 <header class="sticky top-0 z-50 border-b border-[#d9cab3] bg-[#f8f3eb]/95 backdrop-blur-md shadow-sm">
     <nav class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <a href="{{ route('home') }}" class="flex items-center gap-3">
-            <img src="{{ asset('logo.svg') }}" alt="{{ config('app.name') }} Logo" class="h-12 w-12 rounded-2xl object-cover ring-2 ring-[#d9cab3] shadow-md">
+            <img src="{{ asset('images/logo.svg') }}" alt="{{ config('app.name') }} Logo" class="h-12 w-12 rounded-2xl object-cover ring-2 ring-[#d9cab3] shadow-md">
             <span class="text-2xl font-black tracking-tight text-[#1c3d32]">
                 {{ $siteBrand['name'] }}
             </span>
