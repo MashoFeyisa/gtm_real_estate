@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Mail\OrderConfirmation;
 use App\Mail\OrderReceived;
+use App\Models\Agent;
+use App\Models\Inquiry;
 use App\Models\Order;
 use App\Models\Property;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ class OrderController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'agent_id' => ['nullable', 'exists:agents,id'],
             'offer_amount' => ['nullable', 'numeric', 'min:0'],
             'lease_start' => ['nullable', 'date'],
             'lease_months' => ['nullable', 'integer', 'min:1', 'max:120'],
@@ -28,10 +31,11 @@ class OrderController extends Controller
         ]);
 
         $type = $property->type === 'rent' ? 'rent' : 'sale';
+        $agentId = $validated['agent_id'] ?? $property->agent_id ?? Agent::query()->first()?->id;
 
         $order = Order::create([
             'property_id' => $property->id,
-            'agent_id' => $property->agent_id,
+            'agent_id' => $agentId,
             'type' => $type,
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -42,6 +46,26 @@ class OrderController extends Controller
             'message' => $validated['message'] ?? null,
             'status' => 'pending',
         ]);
+
+        if ($agentId) {
+            $inquiryMessage = 'New '.($type === 'rent' ? 'rental' : 'buy').' request for "'.$property->title.'" from '.$validated['name'].'.';
+            if (! empty($validated['offer_amount'])) {
+                $inquiryMessage .= ' Proposed amount: $'.number_format((float) $validated['offer_amount'], 2).'.';
+            }
+            if (! empty($validated['message'])) {
+                $inquiryMessage .= ' Client note: '.$validated['message'];
+            }
+
+            Inquiry::create([
+                'agent_id' => $agentId,
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'subject' => 'New '.($type === 'rent' ? 'Rental' : 'Buy').' Request: '.$property->title,
+                'message' => $inquiryMessage,
+                'status' => 'pending',
+            ]);
+        }
 
         $order->setRelation('property', $property);
 

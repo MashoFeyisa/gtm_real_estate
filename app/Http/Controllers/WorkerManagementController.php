@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AgentFeedback;
 use App\Models\BlogPost;
 use App\Models\Order;
 use App\Models\Property;
@@ -28,11 +29,21 @@ class WorkerManagementController extends Controller
         $properties = Property::latest()->get();
         $agents = Agent::query()->with('account')->orderBy('name')->get();
         $orders = Order::query()->with(['property', 'agent'])->latest()->get();
+        $agentRequestsToAdmin = Order::query()
+            ->with(['property', 'agent'])
+            ->whereNotNull('submitted_to_admin_at')
+            ->latest('submitted_to_admin_at')
+            ->get();
+        $unreadAdminRequests = $agentRequestsToAdmin->whereNull('admin_viewed_at');
+
+        $testimonials = AgentFeedback::withTrashed()->with('agent')->latest()->get();
+        $trashedTestimonials = AgentFeedback::onlyTrashed()->with('agent')->latest('deleted_at')->get();
 
         $overviewStats = [
             'totalProperties' => $properties->count(),
             'activeListings' => $properties->where('is_active', true)->whereNotIn('status', ['draft', 'archived'])->count(),
             'pendingReviews' => $properties->where('status', 'draft')->count(),
+            'pendingAgentRequests' => $unreadAdminRequests->count(),
         ];
         $recentProperties = $properties->take(3);
 
@@ -59,7 +70,20 @@ class WorkerManagementController extends Controller
         $posts = $postsQuery->get();
         $jobs = BlogPost::query()->where('type', 'job')->latest()->get();
 
-        return view('dashboard', compact('users', 'properties', 'agents', 'orders', 'posts', 'jobs', 'overviewStats', 'recentProperties'));
+        return view('dashboard', compact(
+            'users',
+            'properties',
+            'agents',
+            'orders',
+            'posts',
+            'jobs',
+            'overviewStats',
+            'recentProperties',
+            'agentRequestsToAdmin',
+            'unreadAdminRequests',
+            'testimonials',
+            'trashedTestimonials'
+        ));
     }
 
     public function updateSettings(Request $request)
@@ -143,7 +167,9 @@ class WorkerManagementController extends Controller
         ]);
 
         $data = collect($validated)->except(['photo', 'password'])->all();
-        $data['password'] = filled($validated['password'] ?? null) ? $validated['password'] : $agent->password;
+        if (filled($validated['password'] ?? null)) {
+            $data['password'] = $validated['password'];
+        }
 
         if ($request->hasFile('photo')) {
             if ($agent->photo_path && Storage::disk('public')->exists($agent->photo_path)) {
@@ -211,7 +237,7 @@ class WorkerManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,user'],
+            'role' => ['required', 'in:admin,user,agent'],
         ]);
 
         User::create([
@@ -236,19 +262,183 @@ class WorkerManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'password' => ['nullable', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,user'],
+            'role' => ['required', 'in:admin,user,agent'],
         ]);
 
-        $password = $validated['password'] ?? null;
-
-        $user->update([
+        $userData = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role' => $validated['role'],
-            ...(filled($password) ? ['password' => Hash::make($password)] : []),
+        ];
+
+        if (filled($validated['password'] ?? null)) {
+            $userData['password'] = $validated['password'];
+        }
+
+        $user->update($userData);
+
+        if ($user->agentProfile) {
+            $agentData = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ];
+            if (filled($validated['password'] ?? null)) {
+                $agentData['password'] = $validated['password'];
+            }
+            $user->agentProfile->update($agentData);
+        }
+
+        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'User updated successfully.');
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $currentUser = auth()->user();
+
+        if (! $currentUser || ! $currentUser->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$currentUser->id],
+            'password' => ['nullable', 'string', 'min:6'],
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'User updated successfully.');
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ];
+
+        if (filled($validated['password'] ?? null)) {
+            $userData['password'] = $validated['password'];
+        }
+
+        $currentUser->update($userData);
+
+        return redirect()->route('dashboard', ['section' => 'profile'])->with('success', 'Profile updated successfully.');
+    }
+
+    public function storeTestimonial(Request $request)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'agent_id' => ['nullable', 'exists:agents,id'],
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'message' => ['required', 'string', 'max:2000'],
+            'is_approved' => ['nullable', 'boolean'],
+        ]);
+
+        AgentFeedback::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? 'client@example.com',
+            'agent_id' => $validated['agent_id'] ?? null,
+            'rating' => $validated['rating'],
+            'message' => $validated['message'],
+            'is_approved' => (bool) ($validated['is_approved'] ?? true),
+        ]);
+
+        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial added successfully.');
+    }
+
+    public function updateTestimonial(Request $request, AgentFeedback $testimonial)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'agent_id' => ['nullable', 'exists:agents,id'],
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'message' => ['required', 'string', 'max:2000'],
+            'is_approved' => ['nullable', 'boolean'],
+        ]);
+
+        $testimonial->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? $testimonial->email,
+            'agent_id' => $validated['agent_id'] ?? null,
+            'rating' => $validated['rating'],
+            'message' => $validated['message'],
+            'is_approved' => (bool) ($validated['is_approved'] ?? false),
+        ]);
+
+        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial updated successfully.');
+    }
+
+    public function deleteTestimonial(AgentFeedback $testimonial)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $testimonial->delete();
+
+        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial moved to trash.');
+    }
+
+    public function restoreTestimonial(int $id)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $testimonial = AgentFeedback::onlyTrashed()->findOrFail($id);
+        $testimonial->restore();
+
+        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial restored successfully.');
+    }
+
+    public function toggleTestimonialApproval(AgentFeedback $testimonial)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $testimonial->update([
+            'is_approved' => ! $testimonial->is_approved,
+        ]);
+
+        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Testimonial approval status updated.');
+    }
+
+    public function reviewOrder(Request $request, Order $order)
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            abort(403, 'Admin access required.');
+        }
+
+        $validated = $request->validate([
+            'admin_status' => ['required', 'in:approved,rejected,reviewed'],
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $order->update([
+            'admin_status' => $validated['admin_status'],
+            'admin_viewed_at' => now(),
+            'admin_note' => $validated['admin_note'] ?? null,
+        ]);
+
+        return redirect()->route('dashboard', ['section' => 'orders'])->with('success', 'Agent agreement request was updated by admin.');
     }
 
     public function deleteUser(User $user)

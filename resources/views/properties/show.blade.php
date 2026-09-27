@@ -109,6 +109,20 @@
                         <input id="order-phone" name="phone" type="tel" value="{{ old('phone') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                     </div>
                     <div>
+                        <label for="order-agent" class="mb-1 block text-sm font-semibold">Select Agent</label>
+                        <select id="order-agent" name="agent_id" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            @if (isset($agents) && $agents->isNotEmpty())
+                                @foreach ($agents as $agentOption)
+                                    <option value="{{ $agentOption->id }}" {{ (string) old('agent_id', $property->agent_id) === (string) $agentOption->id ? 'selected' : '' }}>
+                                        {{ $agentOption->name }}{{ $agentOption->bio ? ' — '.$agentOption->bio : '' }}
+                                    </option>
+                                @endforeach
+                            @elseif ($property->agent)
+                                <option value="{{ $property->agent->id }}" selected>{{ $property->agent->name }}</option>
+                            @endif
+                        </select>
+                    </div>
+                    <div>
                         <label for="order-offer" class="mb-1 block text-sm font-semibold">{{ $property->type === 'rent' ? 'Your Proposed Monthly Rent (USD, optional)' : 'Your Offer (USD, optional)' }}</label>
                         <input id="order-offer" name="offer_amount" type="number" step="0.01" min="0" value="{{ old('offer_amount') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                     </div>

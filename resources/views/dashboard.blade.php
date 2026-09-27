@@ -18,12 +18,19 @@
                 <a href="{{ route('home') }}" class="flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Home</a>
                 <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">Overview</a>
                 <a href="#properties" data-target-section="properties" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Properties</a>
-                <a href="#orders" data-target-section="orders" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Orders</a>
+                <a href="#orders" data-target-section="orders" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>Orders</span>
+                    @if (isset($unreadAdminRequests) && $unreadAdminRequests->isNotEmpty())
+                        <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-xs font-bold text-[#9b6c17]">{{ $unreadAdminRequests->count() }} new</span>
+                    @endif
+                </a>
                 <a href="#blog-posts" data-target-section="blog-posts" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Blog &amp; News</a>
                 <a href="#job-postings" data-target-section="job-postings" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Job Postings</a>
                 <a href="#agents" data-target-section="agents" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Agents</a>
+                <a href="#testimonials" data-target-section="testimonials" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Client Testimonials</a>
                 <a href="#settings" data-target-section="settings" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Site Settings</a>
                 <a href="#users" data-target-section="users" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Users</a>
+                <a href="#profile" data-target-section="profile" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">My Profile</a>
             </nav>
 
             <div class="mt-10 rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
@@ -57,6 +64,25 @@
         @endif
 
         <div data-section="overview" class="section-panel">
+            @if (isset($unreadAdminRequests) && $unreadAdminRequests->isNotEmpty())
+                <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#b7842d]/30 bg-[#fef9ec] p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f9ecd0] text-[#9b6c17]">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                        </span>
+                        <div>
+                            <h2 class="font-black text-[#1d3c34]">Agent Agreement Requests Pending Admin Review ({{ $unreadAdminRequests->count() }} new)</h2>
+                            <p class="text-xs text-slate-600">Agents have reached agreement with clients and requested admin confirmation and agreement review.</p>
+                        </div>
+                    </div>
+                    <a href="#orders" data-target-section="orders" class="nav-section-link rounded-full bg-[#1d3c34] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#254d43]">
+                        Review Requests
+                    </a>
+                </div>
+            @endif
+
             <div class="mt-8 grid gap-6 md:grid-cols-4">
                 <div class="rounded-[1.5rem] border border-[#d9cab3] bg-white p-5 shadow-sm">
                     <p class="text-sm font-medium text-slate-500">Total Properties</p>
@@ -245,12 +271,67 @@
                 <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">{{ $orders->count() }} Total</span>
             </div>
 
+            @if (isset($agentRequestsToAdmin) && $agentRequestsToAdmin->isNotEmpty())
+                <div class="mt-6 rounded-2xl border border-[#b7842d]/40 bg-[#fffdf7] p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f9ecd0] text-[#9b6c17]">
+                                🔔
+                            </span>
+                            <div>
+                                <h3 class="font-black text-[#1d3c34]">Agent Agreement Requests Pending Admin Action</h3>
+                                <p class="text-xs text-slate-600">These agreements were negotiated by agents with clients and submitted to Admin.</p>
+                            </div>
+                        </div>
+                        <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-bold text-[#9b6c17]">{{ $agentRequestsToAdmin->count() }} submitted</span>
+                    </div>
+
+                    <div class="mt-4 space-y-3">
+                        @foreach ($agentRequestsToAdmin as $adminOrder)
+                            <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e7ddca] bg-white p-4">
+                                <div class="space-y-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full bg-[#dfeee4] px-2.5 py-0.5 text-xs font-bold text-[#1d3c34]">Agent: {{ $adminOrder->agent?->name ?? 'Unassigned' }}</span>
+                                        <span class="text-xs font-bold text-slate-400">→</span>
+                                        <span class="font-bold text-[#1d3c34]">{{ $adminOrder->name }}</span>
+                                        <span class="text-xs text-slate-500">({{ $adminOrder->email }}{{ $adminOrder->phone ? ' · '.$adminOrder->phone : '' }})</span>
+                                    </div>
+                                    <p class="text-sm font-semibold text-slate-700">Property: {{ $adminOrder->property?->title ?? 'Removed' }} · {{ $adminOrder->isRental() ? 'Rent: $' : 'Offer: $' }}{{ number_format($adminOrder->offer_amount ?? 0, 2) }}</p>
+                                    @if ($adminOrder->agent_note)
+                                        <p class="text-xs italic text-slate-600"><span class="font-bold text-[#1d3c34]">Agent Agreement Note:</span> “{{ $adminOrder->agent_note }}”</p>
+                                    @endif
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @if ($adminOrder->hasAgreement())
+                                        <a href="{{ route('orders.agreement', $adminOrder) }}" class="rounded-full border border-[#1d3c34] px-3 py-1.5 text-xs font-bold text-[#1d3c34] hover:bg-[#edf2ee]">
+                                            Agreement PDF
+                                        </a>
+                                    @endif
+                                    @if ($adminOrder->admin_status !== 'approved')
+                                        <form method="POST" action="{{ route('dashboard.orders.review', $adminOrder) }}">
+                                            @csrf
+                                            <input type="hidden" name="admin_status" value="approved">
+                                            <button type="submit" class="rounded-full bg-[#1d3c34] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#254d43]">
+                                                Approve Request
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="rounded-full bg-[#dfeee4] px-3 py-1.5 text-xs font-bold text-[#1d3c34]">Approved by Admin</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if ($orders->isNotEmpty())
                 <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca] bg-white">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-[#2d5d4d] text-[#f8f3eb]">
                             <tr>
                                 <th class="px-5 py-4 font-semibold">Client</th>
+                                <th class="px-5 py-4 font-semibold">Agent</th>
                                 <th class="px-5 py-4 font-semibold">Property</th>
                                 <th class="px-5 py-4 font-semibold">Type</th>
                                 <th class="px-5 py-4 font-semibold">Status</th>
@@ -271,6 +352,9 @@
                                     <td class="px-5 py-4">
                                         <p class="font-semibold text-[#1d3c34]">{{ $order->name }}</p>
                                         <p class="text-xs text-slate-500">{{ $order->email }}</p>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <span class="font-medium text-slate-700">{{ $order->agent?->name ?? 'None' }}</span>
                                     </td>
                                     <td class="px-5 py-4">
                                         <p class="font-medium text-slate-700">{{ $order->property?->title ?? 'Property removed' }}</p>
@@ -431,6 +515,7 @@
                             <label class="mb-1 block text-sm font-semibold text-slate-700">Role</label>
                             <select name="role" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                                 <option value="user" {{ old('role', $userToEdit?->role) === 'user' ? 'selected' : '' }}>User</option>
+                                <option value="agent" {{ old('role', $userToEdit?->role) === 'agent' ? 'selected' : '' }}>Agent</option>
                                 <option value="admin" {{ old('role', $userToEdit?->role) === 'admin' ? 'selected' : '' }}>Admin</option>
                             </select>
                         </div>
@@ -447,6 +532,40 @@
                     </form>
                 </div>
             </div>
+        </section>
+
+        <section id="profile" data-section="profile" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-[#1d3c34]">My Admin Profile</h2>
+                    <p class="mt-1 text-sm text-slate-600">Update your account name, email address, and login password.</p>
+                </div>
+                <span class="rounded-full bg-[#dfeee4] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">Administrator</span>
+            </div>
+
+            <form method="POST" action="{{ route('dashboard.profile.update') }}" class="mt-6 max-w-xl space-y-4 rounded-[1.25rem] border border-[#e7ddca] bg-[#fdfaf5] p-6">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Full Name</label>
+                    <input type="text" name="name" value="{{ old('name', auth()->user()->name) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Email Address</label>
+                    <input type="email" name="email" value="{{ old('email', auth()->user()->email) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">New Password (optional)</label>
+                    <input type="password" name="password" minlength="6" placeholder="Leave blank to keep your current password" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="rounded-full bg-[#1d3c34] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
+                        Update Profile
+                    </button>
+                </div>
+            </form>
         </section>
 
         @php
@@ -563,6 +682,197 @@
                     </tbody>
                 </table>
             </div>
+        </section>
+
+        @php
+            $editTestimonialId = request()->query('edit_testimonial');
+            $testimonialToEdit = $editTestimonialId ? $testimonials->firstWhere('id', (int) $editTestimonialId) : null;
+        @endphp
+
+        <section id="testimonials" data-section="testimonials" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-[#1d3c34]">{{ $testimonialToEdit ? 'Edit Client Testimonial' : 'Client Testimonials Management' }}</h2>
+                    <p class="mt-1 text-sm text-slate-600">Add, edit, approve, delete, and restore client testimonials displayed on the homepage.</p>
+                </div>
+                <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[#1d3c34]">{{ $testimonials->whereNull('deleted_at')->count() }} Active</span>
+            </div>
+
+            <div class="mt-6 rounded-[1.25rem] border border-[#d9cab3] bg-[#f9f4ed] p-5">
+                @if ($testimonialToEdit)
+                    <div class="mb-4 flex items-center justify-between gap-4">
+                        <h3 class="text-xl font-black text-[#1d3c34]">Editing Testimonial from: {{ $testimonialToEdit->name }}</h3>
+                        <a href="{{ route('dashboard', ['section' => 'testimonials']) }}" class="text-sm font-semibold text-[#2d5d4d]">Cancel</a>
+                    </div>
+                @else
+                    <h3 class="text-xl font-black text-[#1d3c34]">Add Client Testimonial</h3>
+                @endif
+
+                <form method="POST" action="{{ $testimonialToEdit ? route('dashboard.testimonials.update', $testimonialToEdit) : route('dashboard.testimonials.store') }}" class="mt-5 grid gap-4 md:grid-cols-2">
+                    @csrf
+                    @if ($testimonialToEdit)
+                        @method('PUT')
+                    @endif
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Client Name</label>
+                        <input type="text" name="name" value="{{ old('name', $testimonialToEdit?->name) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Client Email (optional)</label>
+                        <input type="email" name="email" value="{{ old('email', $testimonialToEdit?->email) }}" placeholder="client@example.com" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Assigned Agent (optional)</label>
+                        <select name="agent_id" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <option value="">General Agency Testimonial (No specific agent)</option>
+                            @foreach ($agents as $agent)
+                                <option value="{{ $agent->id }}" {{ (string) old('agent_id', $testimonialToEdit?->agent_id) === (string) $agent->id ? 'selected' : '' }}>
+                                    {{ $agent->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Rating</label>
+                        <select name="rating" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            @foreach ([5 => '★★★★★ (5 Stars)', 4 => '★★★★☆ (4 Stars)', 3 => '★★★☆☆ (3 Stars)', 2 => '★★☆☆☆ (2 Stars)', 1 => '★☆☆☆☆ (1 Star)'] as $val => $label)
+                                <option value="{{ $val }}" {{ (int) old('rating', $testimonialToEdit?->rating ?? 5) === $val ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Testimonial Message</label>
+                        <textarea name="message" rows="3" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('message', $testimonialToEdit?->message) }}</textarea>
+                    </div>
+
+                    <div class="md:col-span-2 flex items-center gap-2">
+                        <input type="checkbox" id="testimonial-approved" name="is_approved" value="1" {{ old('is_approved', $testimonialToEdit?->is_approved ?? true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#dfeee4]">
+                        <label for="testimonial-approved" class="text-sm font-semibold text-slate-700">Approved (Show on home page)</label>
+                    </div>
+
+                    <div class="md:col-span-2 flex items-center gap-3">
+                        <button type="submit" class="rounded-full bg-[#1d3c34] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#254d43]">
+                            {{ $testimonialToEdit ? 'Update Testimonial' : 'Save Testimonial' }}
+                        </button>
+                        @if ($testimonialToEdit)
+                            <a href="{{ route('dashboard', ['section' => 'testimonials']) }}" class="rounded-full border border-[#d9cab3] bg-white px-5 py-2.5 text-sm font-bold text-[#1d3c34]">
+                                Cancel
+                            </a>
+                        @endif
+                    </div>
+                </form>
+            </div>
+
+            {{-- Active Testimonials Table --}}
+            <div class="mt-8 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-[#1d3c34] text-[#f8f3eb]">
+                        <tr>
+                            <th class="px-5 py-4 font-semibold">Client</th>
+                            <th class="px-5 py-4 font-semibold">Agent</th>
+                            <th class="px-5 py-4 font-semibold">Rating</th>
+                            <th class="px-5 py-4 font-semibold">Message</th>
+                            <th class="px-5 py-4 font-semibold">Status</th>
+                            <th class="px-5 py-4 font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($testimonials->whereNull('deleted_at') as $item)
+                            <tr class="border-t border-[#e7ddca] bg-white">
+                                <td class="px-5 py-4">
+                                    <p class="font-semibold text-[#1d3c34]">{{ $item->name }}</p>
+                                    <p class="text-xs text-slate-500">{{ $item->email }}</p>
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    {{ $item->agent?->name ?? 'General / Agency' }}
+                                </td>
+                                <td class="px-5 py-4 font-bold text-[#9b6c17]">
+                                    {{ str_repeat('★', $item->rating) }}
+                                </td>
+                                <td class="max-w-xs px-5 py-4 text-slate-600">
+                                    <p class="line-clamp-2 text-xs leading-5">“{{ $item->message }}”</p>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <form method="POST" action="{{ route('dashboard.testimonials.toggleApproval', $item) }}">
+                                        @csrf
+                                        <button type="submit" class="rounded-full px-2.5 py-1 text-xs font-bold {{ $item->is_approved ? 'bg-[#dfeee4] text-[#1d3c34]' : 'bg-[#f9ecd0] text-[#9b6c17]' }}">
+                                            {{ $item->is_approved ? 'Approved' : 'Pending' }}
+                                        </button>
+                                    </form>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <a href="{{ route('dashboard', ['edit_testimonial' => $item->id, 'section' => 'testimonials']) }}" class="rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#254d43]">
+                                            Edit
+                                        </a>
+                                        <form method="POST" action="{{ route('dashboard.testimonials.destroy', $item) }}" onsubmit="return confirm('Delete this testimonial? You can restore it later.');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="rounded-full border border-[#c86b5c] bg-[#fef3f1] px-3 py-1.5 text-xs font-bold text-[#a24339] transition hover:bg-[#fbe4e0]">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr class="border-t border-[#e7ddca] bg-white">
+                                <td colspan="6" class="px-5 py-6 text-center text-slate-500">No active testimonials yet. Add one above.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- Trashed / Deleted Testimonials Table with Restore Action --}}
+            @if ($trashedTestimonials->isNotEmpty())
+                <div class="mt-8 rounded-[1.25rem] border border-[#d9cab3] bg-[#fffaf2] p-5">
+                    <div class="flex items-center justify-between gap-4">
+                        <h3 class="text-lg font-black text-[#1d3c34]">Deleted Testimonials (Trash)</h3>
+                        <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-bold text-[#9b6c17]">{{ $trashedTestimonials->count() }} Trashed</span>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-600">These testimonials have been deleted and are hidden from the public website. You can restore them anytime.</p>
+
+                    <div class="mt-4 overflow-x-auto rounded-xl border border-[#e7ddca] bg-white">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="bg-[#9b6c17] text-[#f8f3eb]">
+                                <tr>
+                                    <th class="px-4 py-3 font-semibold">Client</th>
+                                    <th class="px-4 py-3 font-semibold">Agent</th>
+                                    <th class="px-4 py-3 font-semibold">Rating</th>
+                                    <th class="px-4 py-3 font-semibold">Message</th>
+                                    <th class="px-4 py-3 font-semibold">Deleted At</th>
+                                    <th class="px-4 py-3 font-semibold">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($trashedTestimonials as $trashed)
+                                    <tr class="border-t border-[#e7ddca]">
+                                        <td class="px-4 py-3 font-semibold text-[#1d3c34]">{{ $trashed->name }}</td>
+                                        <td class="px-4 py-3 text-slate-600">{{ $trashed->agent?->name ?? 'General' }}</td>
+                                        <td class="px-4 py-3 font-bold text-[#9b6c17]">{{ str_repeat('★', $trashed->rating) }}</td>
+                                        <td class="max-w-xs px-4 py-3 text-xs text-slate-600 truncate">{{ $trashed->message }}</td>
+                                        <td class="px-4 py-3 text-xs text-slate-500">{{ $trashed->deleted_at?->format('M d, Y H:i') }}</td>
+                                        <td class="px-4 py-3">
+                                            <form method="POST" action="{{ route('dashboard.testimonials.restore', $trashed->id) }}">
+                                                @csrf
+                                                <button type="submit" class="rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#254d43]">
+                                                    Restore
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
         </section>
 
         @php
@@ -1039,6 +1349,7 @@
                 : params.has('edit_post') ? 'blog-posts'
                 : params.has('edit_property') ? 'properties'
                 : params.has('edit_agent') ? 'agents'
+                : params.has('edit_testimonial') ? 'testimonials'
                 : null;
             const initialHash = window.location.hash.replace('#', '');
             const initialSection = initialHash || paramSection || editSection || 'overview';

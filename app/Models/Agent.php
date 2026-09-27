@@ -55,7 +55,13 @@ class Agent extends Model
 
     public function setPasswordAttribute(?string $value): void
     {
-        $this->attributes['password'] = $value !== null ? Hash::make($value) : null;
+        if ($value === null || $value === '') {
+            $this->attributes['password'] = null;
+
+            return;
+        }
+
+        $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
     }
 
     public function getPhotoUrlAttribute(): string

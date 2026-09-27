@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Agent;
 use App\Models\Property;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -39,12 +40,15 @@ class PropertyController extends Controller
     public function show(string $slug)
     {
         $property = Property::query()
+            ->with('agent')
             ->where('slug', $slug)
             ->where('is_active', true)
             ->whereNotIn('status', ['draft', 'archived'])
             ->firstOrFail();
 
-        return view('properties.show', compact('property'));
+        $agents = Agent::orderBy('name')->get();
+
+        return view('properties.show', compact('property', 'agents'));
     }
 
     public function store(Request $request)

@@ -222,6 +222,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/dashboard/posts/{post}/toggle-publish', [WorkerManagementController::class, 'togglePublish'])->name('dashboard.posts.togglePublish');
     Route::delete('/dashboard/posts/{post}', [WorkerManagementController::class, 'deleteBlogPost'])->name('dashboard.posts.delete');
     Route::post('/dashboard/settings', [WorkerManagementController::class, 'updateSettings'])->name('dashboard.settings.update');
+    Route::post('/dashboard/profile', [WorkerManagementController::class, 'updateProfile'])->name('dashboard.profile.update');
+    Route::post('/dashboard/testimonials', [WorkerManagementController::class, 'storeTestimonial'])->name('dashboard.testimonials.store');
+    Route::put('/dashboard/testimonials/{testimonial}', [WorkerManagementController::class, 'updateTestimonial'])->name('dashboard.testimonials.update');
+    Route::delete('/dashboard/testimonials/{testimonial}', [WorkerManagementController::class, 'deleteTestimonial'])->name('dashboard.testimonials.destroy');
+    Route::post('/dashboard/testimonials/{id}/restore', [WorkerManagementController::class, 'restoreTestimonial'])->name('dashboard.testimonials.restore');
+    Route::post('/dashboard/testimonials/{testimonial}/toggle-approval', [WorkerManagementController::class, 'toggleTestimonialApproval'])->name('dashboard.testimonials.toggleApproval');
+    Route::post('/dashboard/orders/{order}/review', [WorkerManagementController::class, 'reviewOrder'])->name('dashboard.orders.review');
     Route::post('/dashboard/properties', [PropertyController::class, 'store'])->name('dashboard.properties.store');
     Route::put('/dashboard/properties/{property}', [PropertyController::class, 'update'])->name('dashboard.properties.update');
     Route::post('/dashboard/properties/{property}/toggle-publish', [PropertyController::class, 'togglePublish'])->name('dashboard.properties.togglePublish');
@@ -233,6 +240,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware('agent')->group(function () {
     Route::get('/agent-portal', [AgentPortalController::class, 'index'])->name('agent.portal');
     Route::patch('/agent-portal/orders/{order}/status', [AgentPortalController::class, 'updateOrderStatus'])->name('agent.orders.status');
+    Route::put('/agent-portal/profile', [AgentPortalController::class, 'updateProfile'])->name('agent.profile.update');
 });
 
 Route::get('/properties', [PropertyController::class, 'index'])->name('properties.index');

@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Services\AgreementPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class AgentPortalController extends Controller
@@ -43,7 +44,7 @@ class AgentPortalController extends Controller
     }
 
     /**
-     * Accept or reject a buy/rent request. Accepting generates the branded agreement PDF.
+     * Accept or reject a buy/rent request. Accepting sends request to admin and generates agreement.
      */
     public function updateOrderStatus(Request $request, Order $order)
     {
@@ -56,10 +57,18 @@ class AgentPortalController extends Controller
             'agent_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $order->update([
+        $updateData = [
             'status' => $validated['status'],
             'agent_note' => $validated['agent_note'] ?? null,
-        ]);
+        ];
+
+        if ($validated['status'] === 'accepted') {
+            $updateData['submitted_to_admin_at'] = now();
+            $updateData['admin_status'] = 'pending';
+            $updateData['agreed_at'] = now();
+        }
+
+        $order->update($updateData);
 
         if ($validated['status'] === 'accepted') {
             $this->agreements->generate($order);
@@ -73,6 +82,53 @@ class AgentPortalController extends Controller
         return redirect()
             ->route('agent.portal')
             ->with('success', $message);
+    }
+
+    /**
+     * Update the authenticated agent's profile details.
+     */
+    public function updateProfile(Request $request)
+    {
+        $agent = $request->user()->agentProfile;
+        abort_unless($agent, 403, 'Agent profile not found.');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:agents,email,'.$agent->id, 'unique:users,email,'.$agent->user_id],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'bio' => ['nullable', 'string', 'max:1000'],
+            'password' => ['nullable', 'string', 'min:6'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        $data = collect($validated)->except(['photo', 'password'])->all();
+
+        if (filled($validated['password'] ?? null)) {
+            $data['password'] = $validated['password'];
+        }
+
+        if ($request->hasFile('photo')) {
+            if ($agent->photo_path && Storage::disk('public')->exists($agent->photo_path)) {
+                Storage::disk('public')->delete($agent->photo_path);
+            }
+            $data['photo_path'] = $request->file('photo')->store('agent-photos', 'public');
+        }
+
+        $agent->update($data);
+
+        // Keep linked login account in sync
+        if ($agent->account) {
+            $accountData = [
+                'name' => $agent->name,
+                'email' => $agent->email,
+            ];
+            if (filled($validated['password'] ?? null)) {
+                $accountData['password'] = $validated['password'];
+            }
+            $agent->account->update($accountData);
+        }
+
+        return redirect()->route('agent.portal')->with('success', 'Your profile was updated successfully.');
     }
 
     /**
