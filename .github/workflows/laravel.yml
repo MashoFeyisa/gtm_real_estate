@@ -18,17 +18,18 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-     - name: Setup PHP
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_mysql, bcmath, intl, fileinfo, iconv, ctype
+          coverage: none
           tools: composer:v2
 
       - name: Verify PHP Version
@@ -44,7 +45,7 @@ jobs:
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
       - name: Install Dependencies
-        run: composer update --no-interaction --prefer-dist --no-progress --ignore-platform-reqs
+        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Generate App Key
         run: php artisan key:generate
