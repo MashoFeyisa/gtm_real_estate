@@ -29,7 +29,10 @@ jobs:
         with:
           php-version: '8.3'
           extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath
-          coverage: none
+          tools: composer:v2
+
+      - name: Verify PHP Version
+        run: php -v
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,8 +43,8 @@ jobs:
       - name: Copy .env.example
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
-      - name: Install Composer Dependencies
-        run: composer install -q --no-interaction --no-scripts --prefer-dist --ignore-platform-reqs
+      - name: Install Dependencies
+        run: composer update --no-interaction --prefer-dist --no-progress
 
       - name: Generate App Key
         run: php artisan key:generate
