@@ -14,7 +14,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_DATABASE: gtm-real_estate
+          MYSQL_DATABASE: gtm_real_estate
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
@@ -41,7 +41,7 @@ jobs:
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
       - name: Install Composer Dependencies
-        run: composer install -q --no-interaction --no-scripts --prefer-dist
+        run: composer install -q --no-interaction --no-scripts --prefer-dist --ignore-platform-reqs
 
       - name: Generate App Key
         run: php artisan key:generate
@@ -49,7 +49,7 @@ jobs:
       - name: Set Permissions
         run: chmod -R 777 storage bootstrap/cache
 
-      - name: Install NPM & Build
+      - name: Install NPM & Build Assets
         run: |
           npm ci
           npm run build
