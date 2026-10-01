@@ -25,3 +25,11 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Python & Virtual Environments
+venv/
+ai_agents_env/
+dev_team.py
+*.swp
+*.pyc
+__pycache__/

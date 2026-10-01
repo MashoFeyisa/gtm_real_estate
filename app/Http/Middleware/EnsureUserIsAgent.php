@@ -17,8 +17,8 @@ class EnsureUserIsAgent
     {
         $user = $request->user();
 
-        if (! $user || ! $user->agentProfile) {
-            abort(403, 'Agent access required.');
+        if (! $user || ! $user->agentProfile || ! $user->agentProfile->is_active) {
+            abort(403, 'Your agent account is currently deactivated. Please contact an administrator.');
         }
 
         return $next($request);

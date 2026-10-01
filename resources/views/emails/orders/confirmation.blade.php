@@ -17,7 +17,7 @@
             </tr>
             <tr>
                 <td style="border: 1px solid #e7ddca; font-weight: bold;">{{ $order->isRental() ? 'Monthly rent' : 'Offer' }}</td>
-                <td style="border: 1px solid #e7ddca;">${{ number_format($order->offer_amount ?? 0, 2) }}@if ($order->isRental()) per month @endif</td>
+                <td style="border: 1px solid #e7ddca;">ETB {{ number_format($order->offer_amount ?? 0, 2) }}@if ($order->isRental()) per month @endif</td>
             </tr>
         </table>
 

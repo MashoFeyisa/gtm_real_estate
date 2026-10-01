@@ -15,14 +15,30 @@ class AgreementPdfService
      */
     public function generate(Order $order): Order
     {
-        $order->loadMissing(['property', 'agent']);
+        $order->loadMissing(['property.agent', 'agent']);
 
-        $pdf = Pdf::loadView('agreements.document', [
+        $template = $order->isRental()
+            ? 'agreements.rental-amharic'
+            : 'agreements.purchase-amharic';
+
+        $company = $this->company();
+        $poster = $order->property?->agent ?? $order->agent;
+
+        $seller = [
+            'name' => $poster?->name ?? $company['name'],
+            'phone' => $poster?->phone ?: $company['phone'],
+            'email' => $poster?->email ?: $company['email'],
+            'address' => ($order->property?->city ? ($order->property->city.' · '.$order->property->address) : null) ?: $company['address'],
+        ];
+
+        $pdf = Pdf::loadView($template, [
             'order' => $order,
             'property' => $order->property,
             'agent' => $order->agent,
-            'company' => $this->company(),
+            'seller' => $seller,
+            'company' => $company,
             'signature' => $this->signature($order),
+            'overrides' => $order->agreement_content ?? [],
         ]);
 
         $path = 'agreements/order-'.$order->id.'-'.now()->format('YmdHis').'.pdf';
@@ -77,6 +93,64 @@ class AgreementPdfService
             'phone' => SiteSetting::get('contact_phone', '+251 993722346'),
             'address' => SiteSetting::get('contact_address', 'Harar, Ethiopia'),
             'logo' => public_path(SiteSetting::get('site_logo', 'images/logo1.jpg')),
+        ];
+    }
+
+    /**
+     * Build the editable content fields with defaults from order/property data.
+     *
+     * Used to pre-populate the admin edit form before generating the PDF.
+     *
+     * @return array<string, string|null>
+     */
+    public function getEditableContent(Order $order): array
+    {
+        $order->loadMissing(['property.agent', 'agent']);
+
+        $company = $this->company();
+        $poster = $order->property?->agent ?? $order->agent;
+
+        $sellerName = $poster?->name ?? $company['name'];
+        $sellerPhone = $poster?->phone ?: $company['phone'];
+        $sellerEmail = $poster?->email ?: $company['email'];
+        $sellerAddress = ($order->property?->city ? ($order->property->city.' · '.$order->property->address) : null) ?: $company['address'];
+
+        $buyerName = $order->name;
+        $buyerEmail = $order->email;
+        $buyerPhone = $order->phone ?? '';
+
+        $propertyTitle = $order->property?->title ?? '';
+        $propertyCity = $order->property?->city ?? '';
+        $propertyAddress = trim(($order->property?->city ?? '').' '.($order->property?->address ?? ''));
+        $propertyCategory = ucfirst($order->property?->property_category ?? 'ቤት');
+        $bedrooms = (string) ($order->property?->bedrooms ?? '');
+        $bathrooms = (string) ($order->property?->bathrooms ?? '');
+        $area = $order->property?->area ? number_format($order->property->area) : '';
+
+        $offerAmount = number_format($order->offer_amount ?? $order->property?->price ?? 0, 2);
+        $leaseMonths = (string) ($order->lease_months ?? 12);
+
+        $specialTerms = $order->message ?? '';
+
+        return [
+            'seller_name' => $sellerName,
+            'seller_phone' => $sellerPhone,
+            'seller_email' => $sellerEmail,
+            'seller_address' => $sellerAddress,
+            'buyer_name' => $buyerName,
+            'buyer_email' => $buyerEmail,
+            'buyer_phone' => $buyerPhone,
+            'property_title' => $propertyTitle,
+            'property_city' => $propertyCity,
+            'property_address' => $propertyAddress,
+            'property_category' => $propertyCategory,
+            'bedrooms' => $bedrooms,
+            'bathrooms' => $bathrooms,
+            'area' => $area,
+            'offer_amount' => $offerAmount,
+            'lease_months' => $leaseMonths,
+            'special_terms' => $specialTerms,
+            'agent_note' => $order->agent_note ?? '',
         ];
     }
 }

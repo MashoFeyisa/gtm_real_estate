@@ -187,7 +187,7 @@ test('admin can edit and delete a user from the user manager board', function ()
             'email' => 'updated-user@example.com',
             'role' => 'admin',
         ])
-        ->assertRedirect('/dashboard');
+        ->assertRedirect(route('dashboard', ['section' => 'users']));
 
     $user->refresh();
     expect($user->name)->toBe('Updated User');
@@ -898,7 +898,7 @@ test('admin can edit an agent from the agents management section', function () {
             'email' => 'edited.agent@example.com',
             'phone' => '+251900111333',
             'bio' => 'Senior consultant',
-            'password' => 'portal123',
+            'password' => 'Portal123!',
         ])
         ->assertRedirect('/dashboard?section=agents')
         ->assertSessionHas('success', 'Agent updated successfully.');
@@ -911,7 +911,7 @@ test('admin can edit an agent from the agents management section', function () {
     expect($account)->not->toBeNull();
     expect($account->email)->toBe('edited.agent@example.com');
     expect($account->role)->toBe('agent');
-    expect(Hash::check('portal123', $account->password))->toBeTrue();
+    expect(Hash::check('Portal123!', $account->password))->toBeTrue();
 });
 
 test('creating an agent with a password creates a portal login account', function () {
@@ -928,7 +928,7 @@ test('creating an agent with a password creates a portal login account', functio
             'email' => 'portal.agent@example.com',
             'phone' => '+251955000111',
             'bio' => 'Portal tester',
-            'password' => 'agentpass1',
+            'password' => 'AgentPass1!',
         ])
         ->assertRedirect('/dashboard?section=agents')
         ->assertSessionHas('success', 'Agent created successfully.');
@@ -936,7 +936,7 @@ test('creating an agent with a password creates a portal login account', functio
     $agent = Agent::query()->where('email', 'portal.agent@example.com')->first();
     expect($agent->account)->not->toBeNull();
     expect($agent->account->role)->toBe('agent');
-    expect(Hash::check('agentpass1', $agent->account->password))->toBeTrue();
+    expect(Hash::check('AgentPass1!', $agent->account->password))->toBeTrue();
 });
 
 test('agent can log in and see their portal with notifications and buy requests', function () {
@@ -1004,7 +1004,7 @@ test('agent can log in and see their portal with notifications and buy requests'
         ->assertSee('Portal Viewer')
         ->assertSee('Buy Requests')
         ->assertSee('Client Two')
-        ->assertSee('$300,000', false)
+        ->assertSee('ETB 300,000', false)
         ->assertSee('Client Messages')
         ->assertSee('Client One')
         ->assertSee('Viewing request');
@@ -1240,4 +1240,141 @@ test('property listing page loads and shows a property', function () {
 
     $response->assertOk();
     $response->assertSee('Modern City Apartment');
+});
+
+test('admin can manage developments and featured projects via site settings', function () {
+    $admin = User::create([
+        'name' => 'Admin User',
+        'email' => 'projects-admin@example.com',
+        'password' => Hash::make('secret123'),
+        'role' => 'admin',
+    ]);
+
+    // Check defaults first
+    $defaultResponse = $this->get('/');
+    $defaultResponse->assertOk()
+        ->assertSee('Developments')
+        ->assertSee('Featured Projects')
+        ->assertSee('Emerald Heights')
+        ->assertSee('Harar Square')
+        ->assertSee('Oakland Park');
+
+    // Admin updates settings
+    $response = $this->actingAs($admin)
+        ->post(route('dashboard.settings.update'), [
+            'site_name' => 'GTP Real Estate',
+            'contact_email' => 'gtmrealstate@gmail.com',
+            'contact_phone' => '+251 993722346',
+            'contact_address' => 'Harar, Ethiopia',
+            'developments_badge' => 'Flagship Developments',
+            'developments_title' => 'Mega Projects',
+            'developments_link_text' => 'View all projects',
+            'developments_link_url' => '/projects',
+            'project_1_tag' => 'Ultra Luxury',
+            'project_1_title' => 'Grand Palace Heights',
+            'project_1_description' => 'Exclusive royal apartments with panoramic sunset views.',
+            'project_2_tag' => 'Retail & Offices',
+            'project_2_title' => 'City Mall Plaza',
+            'project_2_description' => 'Premium shopping and office spaces in the financial district.',
+            'project_3_tag' => 'Eco Living',
+            'project_3_title' => 'Sunrise Eco Village',
+            'project_3_description' => 'Sustainable homes powered by renewable clean solar energy.',
+        ]);
+
+    $response->assertRedirect(route('dashboard', ['section' => 'settings']));
+
+    // Verify on home page
+    $homeResponse = $this->get('/');
+    $homeResponse->assertOk()
+        ->assertSee('Flagship Developments')
+        ->assertSee('Mega Projects')
+        ->assertSee('View all projects')
+        ->assertSee('Grand Palace Heights')
+        ->assertSee('Ultra Luxury')
+        ->assertSee('City Mall Plaza')
+        ->assertSee('Sunrise Eco Village');
+
+    // Verify on /projects page
+    $projectsResponse = $this->get('/projects');
+    $projectsResponse->assertOk()
+        ->assertSee('Grand Palace Heights')
+        ->assertSee('City Mall Plaza')
+        ->assertSee('Sunrise Eco Village');
+});
+
+test('login page shows dynamic real agent number and job posting apply link', function () {
+    Agent::create(['name' => 'Agent Alpha', 'email' => 'alpha@gtm.com']);
+    Agent::create(['name' => 'Agent Beta', 'email' => 'beta@gtm.com']);
+    Agent::create(['name' => 'Agent Gamma', 'email' => 'gamma@gtm.com']);
+
+    Property::create([
+        'title' => 'Test Published Property',
+        'slug' => 'test-published-prop',
+        'price' => 100000,
+        'bedrooms' => 2,
+        'bathrooms' => 1,
+        'area' => 80,
+        'type' => 'sale',
+        'status' => 'published',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create();
+
+    BlogPost::create([
+        'user_id' => $user->id,
+        'title' => 'Senior Real Estate Consultant',
+        'slug' => 'senior-real-estate-consultant',
+        'summary' => 'We are hiring a consultant to join our team.',
+        'content' => 'Join our growing real estate team.',
+        'type' => 'job',
+        'status' => 'published',
+        'is_published' => true,
+        'apply_link' => 'https://careers.gtm.et/apply/senior-consultant',
+    ]);
+
+    $response = $this->get('/login');
+    $response->assertOk();
+
+    // Verify dynamic agent count and listing count are rendered
+    $response->assertSee('3');
+    $response->assertSee('Agents');
+    $response->assertSee('1');
+    $response->assertSee('Listings');
+
+    // Verify job posting apply link is NOT displayed on login page
+    $response->assertDontSee('Now Hiring');
+    $response->assertDontSee('Senior Real Estate Consultant');
+    $response->assertDontSee('https://careers.gtm.et/apply/senior-consultant');
+    $response->assertDontSee('Apply Now');
+});
+
+test('client can submit rental order with custom written lease duration', function () {
+    $property = Property::create([
+        'title' => 'Downtown Modern Flat',
+        'slug' => 'downtown-modern-flat',
+        'price' => 25000,
+        'bedrooms' => 2,
+        'bathrooms' => 1,
+        'area' => 90,
+        'type' => 'rent',
+        'status' => 'published',
+        'is_active' => true,
+    ]);
+
+    $response = $this->post(route('orders.store', $property), [
+        'name' => 'Kassahun Tenant',
+        'email' => 'kassahun@example.com',
+        'phone' => '+251911334455',
+        'offer_amount' => 25000,
+        'lease_months' => 18,
+        'message' => 'Looking for an 18-month lease starting next month.',
+    ]);
+
+    $response->assertRedirect(route('properties.show', $property->slug));
+
+    $order = Order::where('email', 'kassahun@example.com')->first();
+    expect($order)->not->toBeNull();
+    expect($order->type)->toBe('rent');
+    expect($order->lease_months)->toBe(18);
 });

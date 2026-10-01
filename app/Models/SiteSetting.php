@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class SiteSetting extends Model
 {
@@ -44,5 +45,31 @@ class SiteSetting extends Model
         return Cache::rememberForever(self::CACHE_KEY, fn (): array => self::query()
             ->pluck('value', 'key')
             ->all());
+    }
+
+    /**
+     * Resolve a public URL for a configured image key with a default asset fallback.
+     */
+    public static function imageUrl(string $key, string $defaultAssetPath): string
+    {
+        $value = self::get($key);
+
+        if (! $value) {
+            return asset($defaultAssetPath);
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        if (Storage::disk('public')->exists($value)) {
+            return Storage::disk('public')->url($value);
+        }
+
+        if (is_file(public_path($value))) {
+            return asset($value);
+        }
+
+        return asset($value);
     }
 }

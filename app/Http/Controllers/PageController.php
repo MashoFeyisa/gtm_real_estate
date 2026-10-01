@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BlogPost;
 use Illuminate\View\View;
 
 class PageController extends Controller
@@ -32,6 +33,15 @@ class PageController extends Controller
         ];
 
         $page = $pages[$slug] ?? ['title' => ucfirst(str_replace('-', ' ', $slug)), 'intro' => 'Explore our page content.', 'page' => $slug];
+
+        if (in_array($slug, ['careers', 'job-details', 'jobs', 'job'], true)) {
+            $page['jobs'] = BlogPost::query()
+                ->where('type', 'job')
+                ->where('status', 'published')
+                ->latest('published_at')
+                ->get();
+            $page['page'] = 'careers';
+        }
 
         return view('public.page', $page);
     }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -21,6 +22,7 @@ class Order extends Model
         'status',
         'agent_note',
         'agreement_path',
+        'agreement_content',
         'agreed_at',
         'submitted_to_admin_at',
         'admin_viewed_at',
@@ -36,6 +38,7 @@ class Order extends Model
             'lease_start' => 'date',
             'submitted_to_admin_at' => 'datetime',
             'admin_viewed_at' => 'datetime',
+            'agreement_content' => 'array',
         ];
     }
 
@@ -62,5 +65,10 @@ class Order extends Model
     public function isSubmittedToAdmin(): bool
     {
         return $this->submitted_to_admin_at !== null;
+    }
+
+    public function commission(): HasOne
+    {
+        return $this->hasOne(Commission::class);
     }
 }

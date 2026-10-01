@@ -16,6 +16,7 @@
     </main>
 
     @include('layouts.partials.footer')
+    @include('layouts.partials.property-sidebar-drawer')
 
     @stack('scripts')
 </body>

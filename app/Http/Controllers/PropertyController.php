@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Agent;
+use App\Http\Requests\PropertyFormRequest;
 use App\Models\Property;
+use App\Models\PropertyImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -14,9 +15,7 @@ class PropertyController extends Controller
     {
         $category = strtolower((string) ($category ?? $request->query('category', 'all')));
 
-        $propertiesQuery = Property::query()
-            ->where('is_active', true)
-            ->whereNotIn('status', ['draft', 'archived']);
+        $propertiesQuery = Property::query()->publicVisible();
 
         if (in_array($category, ['villa', 'home', 'apartment'], true)) {
             $matches = match ($category) {
@@ -29,11 +28,36 @@ class PropertyController extends Controller
             $propertiesQuery->whereIn('property_category', $matches);
         }
 
+        if ($request->filled('search')) {
+            $search = trim((string) $request->query('search'));
+            $propertiesQuery->where(function ($query) use ($search) {
+                $query->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhere('address', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('type') && in_array($request->query('type'), ['sale', 'rent'], true)) {
+            $propertiesQuery->where('type', $request->query('type'));
+        }
+
+        if ($request->filled('location')) {
+            $location = trim((string) $request->query('location'));
+            $propertiesQuery->where(function ($query) use ($location) {
+                $query->where('city', 'like', "%{$location}%")
+                    ->orWhere('address', 'like', "%{$location}%");
+            });
+        }
+
         $properties = $propertiesQuery->latest()->get();
 
         return view('properties.index', [
             'properties' => $properties,
             'selectedCategory' => $category,
+            'searchQuery' => $request->query('search', ''),
+            'selectedType' => $request->query('type', ''),
+            'selectedLocation' => $request->query('location', ''),
         ]);
     }
 
@@ -42,50 +66,25 @@ class PropertyController extends Controller
         $property = Property::query()
             ->with('agent')
             ->where('slug', $slug)
-            ->where('is_active', true)
-            ->whereNotIn('status', ['draft', 'archived'])
+            ->publicVisible()
             ->firstOrFail();
 
-        $agents = Agent::orderBy('name')->get();
-
-        return view('properties.show', compact('property', 'agents'));
+        return view('properties.show', compact('property'));
     }
 
-    public function store(Request $request)
+    public function store(PropertyFormRequest $request)
     {
         $this->authorizeAdmin();
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'bedrooms' => ['required', 'integer', 'min:0'],
-            'bathrooms' => ['required', 'integer', 'min:0'],
-            'area' => ['required', 'integer', 'min:0'],
-            'type' => ['required', 'in:sale,rent'],
-            'category' => ['nullable', 'in:villa,home,apartment'],
-            'status' => ['required', 'in:draft,published,archived,available,sold,rented'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'featured' => ['nullable', 'boolean'],
-            'agent_id' => ['nullable', 'exists:agents,id'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-        ]);
+        $validated = $request->validationData();
 
-        $slug = Str::slug($validated['title']);
-        $baseSlug = $slug;
-        $counter = 1;
-
-        while (Property::where('slug', $slug)->exists()) {
-            $slug = $baseSlug.'-'.$counter;
-            $counter++;
-        }
+        $slug = $this->uniqueSlug($validated['title']);
 
         $property = Property::create([
             'title' => $validated['title'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
-            'image_path' => $this->storePropertyImage($request),
+            'image_path' => $request->storeImage(),
             'price' => $validated['price'],
             'bedrooms' => $validated['bedrooms'],
             'bathrooms' => $validated['bathrooms'],
@@ -100,56 +99,24 @@ class PropertyController extends Controller
             'is_active' => in_array($validated['status'], ['published', 'available', 'sold', 'rented'], true),
         ]);
 
+        $request->syncPropertyImages($property);
+
         return redirect()->route('dashboard')->with('success', 'Property "'.$property->title.'" created successfully.');
     }
 
-    public function update(Request $request, Property $property)
+    public function update(PropertyFormRequest $request, Property $property)
     {
         $this->authorizeAdmin();
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'bedrooms' => ['required', 'integer', 'min:0'],
-            'bathrooms' => ['required', 'integer', 'min:0'],
-            'area' => ['required', 'integer', 'min:0'],
-            'type' => ['required', 'in:sale,rent'],
-            'category' => ['nullable', 'in:villa,home,apartment'],
-            'status' => ['required', 'in:draft,published,archived,available,sold,rented'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'featured' => ['nullable', 'boolean'],
-            'agent_id' => ['nullable', 'exists:agents,id'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-        ]);
+        $validated = $request->validationData();
 
-        $slug = Str::slug($validated['title']);
-        if ($slug !== $property->slug) {
-            $baseSlug = $slug;
-            $counter = 1;
-
-            while (Property::where('slug', $slug)->whereKeyNot($property->id)->exists()) {
-                $slug = $baseSlug.'-'.$counter;
-                $counter++;
-            }
-        }
-
-        $imagePath = $property->image_path;
-
-        if ($request->hasFile('image')) {
-            if ($property->image_path && Storage::disk('public')->exists($property->image_path)) {
-                Storage::disk('public')->delete($property->image_path);
-            }
-
-            $imagePath = $this->storePropertyImage($request);
-        }
+        $slug = $this->uniqueSlug($validated['title'], $property->id);
 
         $property->update([
             'title' => $validated['title'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
-            'image_path' => $imagePath,
+            'image_path' => $request->storeImage($property->image_path),
             'price' => $validated['price'],
             'bedrooms' => $validated['bedrooms'],
             'bathrooms' => $validated['bathrooms'],
@@ -163,6 +130,8 @@ class PropertyController extends Controller
             'agent_id' => $validated['agent_id'] ?? null,
             'is_active' => in_array($validated['status'], ['published', 'available', 'sold', 'rented'], true),
         ]);
+
+        $request->syncPropertyImages($property);
 
         return redirect()->route('dashboard')->with('success', 'Property updated successfully.');
     }
@@ -214,9 +183,101 @@ class PropertyController extends Controller
     {
         $this->authorizeAdmin();
 
+        foreach ($property->images as $image) {
+            if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
+                Storage::disk('public')->delete($image->image_path);
+            }
+        }
+
+        if ($property->image_path && Storage::disk('public')->exists($property->image_path)) {
+            Storage::disk('public')->delete($property->image_path);
+        }
+
         $property->delete();
 
         return redirect()->route('dashboard')->with('success', 'Property deleted successfully.');
+    }
+
+    public function deleteImage(Property $property, PropertyImage $image)
+    {
+        $this->authorizeAdmin();
+
+        abort_unless($image->property_id === $property->id, 404);
+
+        if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
+            Storage::disk('public')->delete($image->image_path);
+        }
+
+        $image->delete();
+
+        if ($property->image_path === $image->image_path) {
+            $next = $property->images()->first();
+            $property->update(['image_path' => $next?->image_path]);
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('success', 'Image removed successfully.');
+    }
+
+    public function setCoverImage(Request $request, Property $property, PropertyImage $image)
+    {
+        $this->authorizeAdmin();
+
+        abort_unless($image->property_id === $property->id, 404);
+
+        $property->update(['image_path' => $image->image_path]);
+        $image->update(['sort_order' => 1]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'message' => 'Cover image updated successfully.',
+                'image_id' => $image->id,
+                'image_path' => $image->image_path,
+                'image_url' => $image->image_url,
+            ]);
+        }
+
+        return back()->with('success', 'Cover image updated successfully.');
+    }
+
+    public function setCoverPreset(Request $request, Property $property)
+    {
+        $this->authorizeAdmin();
+
+        $preset = $request->validate([
+            'preset' => ['required', 'string', 'in:hero-skyline,luxury-towers,central-plaza,panoramic-park,retail-boulevard'],
+        ])['preset'];
+
+        $path = 'images/luxury/'.$preset.'.jpg';
+        $property->update(['image_path' => $path]);
+
+        $existing = $property->images()->where('image_path', $path)->first();
+        if (! $existing) {
+            $property->images()->create([
+                'image_path' => $path,
+                'sort_order' => 1,
+            ]);
+        } else {
+            $existing->update(['sort_order' => 1]);
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'preset' => $preset,
+                'message' => 'Luxury background preset set as cover.',
+                'image_path' => $path,
+                'image_url' => asset($path),
+            ]);
+        }
+
+        return back()->with('success', 'Luxury background preset set as cover.');
     }
 
     protected function categoryKeywords(string $category): ?array
@@ -227,6 +288,32 @@ class PropertyController extends Controller
             'apartment', 'apartments', 'apartment-suite', 'apartment suite' => ['apartment', 'apartments', 'flat', 'flats', 'suite'],
             default => null,
         };
+    }
+
+    protected function uniqueSlug(string $title, ?int $ignoreId = null): string
+    {
+        $slug = Str::slug($title);
+        $baseSlug = $slug;
+        $counter = 1;
+
+        $query = Property::query()->where('slug', $slug);
+
+        if ($ignoreId !== null) {
+            $query->whereKeyNot($ignoreId);
+        }
+
+        while ($query->exists()) {
+            $slug = $baseSlug.'-'.$counter;
+            $counter++;
+
+            $query = Property::query()->where('slug', $slug);
+
+            if ($ignoreId !== null) {
+                $query->whereKeyNot($ignoreId);
+            }
+        }
+
+        return $slug;
     }
 
     protected function storePropertyImage(Request $request): ?string

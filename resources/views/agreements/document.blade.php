@@ -221,8 +221,8 @@
             <td>
                 <div class="party-card">
                     <div class="label">The Landlord / Seller</div>
-                    <div class="value">{{ $company['name'] }}</div>
-                    <div class="value" style="font-size: 10px; color: #587165;">Represented by {{ $agent?->name ?? 'the assigned agent' }}{{ $agent?->phone ? ' · '.$agent->phone : '' }}</div>
+                    <div class="value">{{ $seller['name'] }}</div>
+                    <div class="value" style="font-size: 10px; color: #587165;">{{ $seller['email'] }}{{ $seller['phone'] ? ' · '.$seller['phone'] : '' }}</div>
                 </div>
             </td>
             <td>
@@ -247,7 +247,7 @@
         <tr>
             <th>{{ $order->isRental() ? 'Monthly Rent' : 'Agreed Price' }}</th>
             <td>
-                USD ${{ number_format($order->offer_amount ?? $property->price, 2) }}{{ $order->isRental() ? ' per month' : '' }}
+                ETB {{ number_format($order->offer_amount ?? $property->price, 2) }}{{ $order->isRental() ? ' per month' : '' }}
             </td>
         </tr>
         @if ($order->isRental())
@@ -301,8 +301,8 @@
         <tr>
             <td>
                 <div class="sig-line">
-                    For {{ $company['name'] }}<br>
-                    {{ $agent?->name ?? 'Authorized Agent' }} — {{ now()->format('M d, Y') }}
+                    {{ $seller['name'] }}<br>
+                    Authorized Signature — {{ now()->format('M d, Y') }}
                 </div>
             </td>
             <td>
@@ -319,9 +319,9 @@
         <tr>
             <td>
                 <div class="digital-sig">
-                    <div class="ds-title">{{ $company['name'] }} — {{ $order->isRental() ? 'Landlord' : 'Seller' }}</div>
+                    <div class="ds-title">{{ $seller['name'] }} — {{ $order->isRental() ? 'Landlord' : 'Seller' }}</div>
                     <div><span class="ds-verified">SIGNED</span> · {{ $signature['method'] }}</div>
-                    <div>Signatory: {{ $agent?->name ?? 'Authorized Agent' }}{{ $agent?->email ? ' ('.$agent->email.')' : '' }}</div>
+                    <div>Signatory: {{ $seller['name'] }}{{ $seller['email'] ? ' ('.$seller['email'].')' : '' }}</div>
                     <div>Signed at: {{ $signature['signed_at']->format('F j, Y · H:i') }} EAT</div>
                     <div>Verification code: <span class="ds-code">{{ $signature['verification'] }}</span></div>
                     <div>Document ref: GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>

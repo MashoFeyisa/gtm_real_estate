@@ -11,8 +11,8 @@
         <div class="grid w-full overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_80px_rgba(29,60,52,0.18)] ring-1 ring-[#d9cab3] lg:grid-cols-[1.05fr_0.95fr]">
             <div class="bg-gradient-to-br from-[#1d3c34] via-[#2a4c42] to-[#6e7d68] p-6 text-[#f9f3e9] sm:p-10">
                 <div class="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-3 py-2">
-                    <img src="{{ asset('images/logo1.jpg') }}" alt="Real Estate Logo" class="h-10 w-10 rounded-xl object-cover ring-2 ring-[#d9cab3]">
-                    <span class="text-sm font-bold uppercase tracking-[0.22em]">Real Estate</span>
+                    <img src="{{ $siteBrand['logoUrl'] }}" alt="{{ $siteBrand['name'] }} Logo" class="h-10 w-10 rounded-xl object-contain ring-2 ring-[#d9cab3] bg-white/60">
+                    <span class="text-sm font-bold uppercase tracking-[0.22em]">{{ $siteBrand['name'] ?: 'Real Estate' }}</span>
                 </div>
                 <h1 class="mt-8 text-4xl font-black">Welcome back</h1>
                 <p class="mt-4 max-w-sm text-base leading-7 text-[#e7efe8]">
@@ -22,7 +22,7 @@
                     <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#d9cab3]">Operations</p>
                     <div class="mt-4 grid grid-cols-3 gap-3 text-center">
                         <div class="rounded-xl bg-white/5 p-3">
-                            <div class="text-xl font-black">128</div>
+                            <div class="text-xl font-black">{{ $listingsCount ?? \App\Models\Property::count() }}</div>
                             <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Listings</div>
                         </div>
                         <div class="rounded-xl bg-white/5 p-3">
@@ -30,7 +30,7 @@
                             <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Support</div>
                         </div>
                         <div class="rounded-xl bg-white/5 p-3">
-                            <div class="text-xl font-black">18</div>
+                            <div class="text-xl font-black">{{ $agentsCount ?? \App\Models\Agent::count() }}</div>
                             <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Agents</div>
                         </div>
                     </div>
