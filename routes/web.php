@@ -12,6 +12,7 @@ use App\Http\Controllers\ClientPortalController;
 use App\Http\Controllers\CompanyDashboardController;
 use App\Http\Controllers\CompanyListingController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CorporateTenancyController;
 use App\Http\Controllers\CustomerSupportDashboardController;
 use App\Http\Controllers\DeveloperPortalController;
 use App\Http\Controllers\DevelopmentController;
@@ -628,3 +629,15 @@ Route::middleware('auth')->group(function () {
 Route::get('/experiences', [ExperienceController::class, 'index'])->name('experiences.index');
 Route::get('/experiences/{experience:slug}', [ExperienceController::class, 'show'])->name('experiences.show');
 Route::post('/experiences/{experience}/book', [ExperienceController::class, 'book'])->name('experiences.book');
+
+// Corporate Tenancy & Workforce Housing Management
+Route::middleware('auth')->group(function () {
+    Route::get('/corporate-portal', [CorporateTenancyController::class, 'portal'])->name('corporate.portal');
+    Route::post('/corporate-portal/employees', [CorporateTenancyController::class, 'storeEmployee'])->name('corporate.employees.store');
+    Route::post('/corporate-portal/assign-lease', [CorporateTenancyController::class, 'assignLease'])->name('corporate.assign-lease');
+    Route::get('/corporate-portal/{tenant}/statement', [CorporateTenancyController::class, 'billingStatement'])->name('corporate.billing-statement');
+
+    // Developer Milestone Escrow Disbursements
+    Route::post('/projects/{project}/escrow-disbursement', [CorporateTenancyController::class, 'requestEscrowDisbursement'])->name('developer.escrow.request');
+    Route::post('/escrow-disbursements/{disbursement}/approve', [CorporateTenancyController::class, 'approveEscrowDisbursement'])->name('developer.escrow.approve');
+});

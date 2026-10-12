@@ -1,7 +1,7 @@
 # GTM Real Estate - SRS Section Audit & Gap Report
 
 > **Audit Date**: 2026-10-12 | **SRS Coverage**: 223/223 Sections (100%)
-> **Executive Summary**: **200 DONE** | **16 PARTIAL** | **7 MISSING** | **Total: 223 Sections**
+> **Executive Summary**: **202 DONE** | **14 PARTIAL** | **7 MISSING** | **Total: 223 Sections**
 
 This document provides a comprehensive audit of the `gtm_real_estate` platform evaluated strictly against the 223 sections of `docs/SRS.md`. Each requirement is cataloged with verified evidence (migrations, models, routes, views, controllers, seeders, and tests) and actionable specifications for all incomplete or missing capabilities.
 
@@ -20,7 +20,7 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 | Moderation/Fraud | 8 | 6 | 2 | 0 | 87.5% |
 | Stay/Booking/Calendar | 31 | 31 | 0 | 0 | 100.0% |
 | Payments/Ledger/Payouts | 10 | 10 | 0 | 0 | 100.0% |
-| Rental/Lease | 9 | 7 | 2 | 0 | 88.9% |
+| Rental/Lease | 9 | 9 | 0 | 0 | 100.0% |
 | Developer/Projects/Units | 10 | 10 | 0 | 0 | 100.0% |
 | Agent CRM/Company | 8 | 8 | 0 | 0 | 100.0% |
 | Messaging/Inquiry/Offers | 8 | 8 | 0 | 0 | 100.0% |
@@ -197,8 +197,8 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 | §88 | RENTAL PAYMENTS | **DONE** | `app/Models/LeaseRenewalRequest.php, resources/views/dashboards/tenant.blade.php` | None. Formal lease extension and renewal request workflow between tenant and landlord. |
 | §196 | PROPERTY MANAGEMENT DASHBOARD | **DONE** | `app/Models/RentalDepositHold.php, database/migrations/2026_10_03_000032_create_rental_deposit_holds_table.php` | None. Tenant security deposit holding account with deduction itemization. |
 | §197 | ENTERPRISE PROPERTY MANAGEMENT | **DONE** | `app/Models/EvictionNotice.php, database/migrations/2026_10_03_000033_create_eviction_notices_table.php` | None. Formal legal notice tracking compliant with Ethiopian Civil Code lease regulations. |
-| §198 | MULTI-TENANCY | **PARTIAL** | `app/Models/CorporateTenantProfile.php` | Corporate tenant billing fields present; dedicated multi-employee tenancy portal missing. |
-| §199 | WHITE-LABEL CAPABILITY | **PARTIAL** | `app/Models/PropertyManagerCompany.php` | Property manager assignment implemented; sub-domain white-labeled portal branding missing. |
+| §198 | MULTI-TENANCY | **DONE** | `app/Models/CorporateTenant.php, app/Models/CorporateEmployee.php, app/Models/CorporateLeaseAssignment.php, app/Http/Controllers/CorporateTenancyController.php, resources/views/corporate/portal.blade.php, CorporateTenancyAndDeveloperEscrowTest.php` | None. Dedicated multi-employee corporate tenancy portal, workforce housing allocations, and consolidated billing statements. |
+| §199 | WHITE-LABEL CAPABILITY | **DONE** | `app/Models/CompanyWhiteLabel.php, database/migrations/2026_10_12_140000_create_corporate_tenancy_and_whitelabel_tables.php, CorporateTenancyAndDeveloperEscrowTest.php` | None. Enterprise white-label capabilities with custom domain and subdomain branding resolution. |
 
 ## Module: Developer/Projects/Units
 

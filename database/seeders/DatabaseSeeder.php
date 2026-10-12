@@ -293,6 +293,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call(ShortStayHostSeeder::class);
         $this->call(ExperienceSeeder::class);
+        $this->call(CorporateTenancySeeder::class);
         $this->call(CampaignSeeder::class);
     }
 }
