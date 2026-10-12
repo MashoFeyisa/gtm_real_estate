@@ -15,6 +15,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerSupportDashboardController;
 use App\Http\Controllers\DeveloperPortalController;
 use App\Http\Controllers\DevelopmentController;
+use App\Http\Controllers\ExperienceController;
 use App\Http\Controllers\FinancialReportingController;
 use App\Http\Controllers\GuestDashboardController;
 use App\Http\Controllers\HostDashboardController;
@@ -48,6 +49,7 @@ use App\Http\Controllers\SavedCollectionController;
 use App\Http\Controllers\SellerDashboardController;
 use App\Http\Controllers\SiteSettingsController;
 use App\Http\Controllers\StayBookingController;
+use App\Http\Controllers\StayCalendarSyncController;
 use App\Http\Controllers\SubcityBoundaryController;
 use App\Http\Controllers\TenantDashboardController;
 use App\Http\Controllers\UserManagementController;
@@ -613,3 +615,16 @@ Route::get('/locale/{lang}', function (string $lang, Request $request) {
 
 // GIS Subcity Polygon Boundaries GeoJSON Export
 Route::get('/api/geo/subcities/boundaries', [SubcityBoundaryController::class, 'index'])->name('geo.subcities.boundaries');
+
+// Stay iCal Calendar Synchronization
+Route::get('/stays/{property}/calendar.ics', [StayCalendarSyncController::class, 'export'])->name('stays.calendar.ics');
+Route::middleware('auth')->group(function () {
+    Route::post('/host/properties/{property}/calendar-feeds', [StayCalendarSyncController::class, 'storeFeed'])->name('host.calendar-feeds.store');
+    Route::post('/host/calendar-feeds/{feed}/sync', [StayCalendarSyncController::class, 'syncFeed'])->name('host.calendar-feeds.sync');
+    Route::delete('/host/calendar-feeds/{feed}', [StayCalendarSyncController::class, 'destroyFeed'])->name('host.calendar-feeds.destroy');
+});
+
+// Ethiopian Cultural Experiences & Tour Marketplace
+Route::get('/experiences', [ExperienceController::class, 'index'])->name('experiences.index');
+Route::get('/experiences/{experience:slug}', [ExperienceController::class, 'show'])->name('experiences.show');
+Route::post('/experiences/{experience}/book', [ExperienceController::class, 'book'])->name('experiences.book');

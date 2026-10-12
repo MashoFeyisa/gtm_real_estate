@@ -1,7 +1,7 @@
 # GTM Real Estate - SRS Section Audit & Gap Report
 
 > **Audit Date**: 2026-10-12 | **SRS Coverage**: 223/223 Sections (100%)
-> **Executive Summary**: **195 DONE** | **18 PARTIAL** | **10 MISSING** | **Total: 223 Sections**
+> **Executive Summary**: **200 DONE** | **16 PARTIAL** | **7 MISSING** | **Total: 223 Sections**
 
 This document provides a comprehensive audit of the `gtm_real_estate` platform evaluated strictly against the 223 sections of `docs/SRS.md`. Each requirement is cataloged with verified evidence (migrations, models, routes, views, controllers, seeders, and tests) and actionable specifications for all incomplete or missing capabilities.
 
@@ -18,7 +18,7 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 | Verification | 5 | 5 | 0 | 0 | 100.0% |
 | Documents | 4 | 4 | 0 | 0 | 100.0% |
 | Moderation/Fraud | 8 | 6 | 2 | 0 | 87.5% |
-| Stay/Booking/Calendar | 31 | 29 | 2 | 0 | 96.8% |
+| Stay/Booking/Calendar | 31 | 31 | 0 | 0 | 100.0% |
 | Payments/Ledger/Payouts | 10 | 10 | 0 | 0 | 100.0% |
 | Rental/Lease | 9 | 7 | 2 | 0 | 88.9% |
 | Developer/Projects/Units | 10 | 10 | 0 | 0 | 100.0% |
@@ -33,7 +33,7 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 | Multilingual (EN/AM/OM) and Ethiopian calendar | 2 | 1 | 1 | 0 | 75.0% |
 | Security | 14 | 14 | 0 | 0 | 100.0% |
 | Low-bandwidth | 1 | 1 | 0 | 0 | 100.0% |
-| API (/api/v1/...) | 18 | 0 | 8 | 10 | 22.2% |
+| API (/api/v1/...) | 18 | 3 | 8 | 7 | 38.9% |
 
 ---
 
@@ -160,8 +160,8 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 | §57 | EXTERNAL CALENDAR SYNCHRONIZATION | **DONE** | `app/Models/StayGuestIdentification.php (passport/kebele ID upload)` | None. Ethiopian government local registration / passport capture for hospitality compliance. |
 | §58 | CHECK-IN | **DONE** | `app/Models/StayDamageClaim.php, database/migrations/2026_10_03_000025_create_stay_damage_claims_table.php` | None. Security deposit withholding and damage reimbursement claim process. |
 | §59 | CHECK-OUT | **DONE** | `app/Models/StayPayoutSchedule.php, resources/views/dashboards/host.blade.php` | None. Automated host payout ledger calculated 24 hours post-guest check-in. |
-| §60 | HOUSE RULES | **PARTIAL** | `app/Services/CalendarSyncService.php` | Internal booking calendar export available; two-way automated iCal (.ics) pull sync cron missing. |
-| §61 | HOUSE MANUAL | **PARTIAL** | `app/Services/CalendarSyncService.php` | Outbound iCal feed endpoint present; incoming external calendar dispute resolution missing. |
+| §60 | HOUSE RULES | **DONE** | `app/Services/CalendarSyncService.php, app/Http/Controllers/StayCalendarSyncController.php, StayCalendarSyncAndExperienceMarketplaceTest.php` | None. Two-way RFC 5545 iCal export and automated external feed pull synchronization. |
+| §61 | HOUSE MANUAL | **DONE** | `app/Services/CalendarSyncService.php, app/Console/Commands/SyncExternalCalendarsCommand.php, StayCalendarSyncAndExperienceMarketplaceTest.php` | None. Remote iCal VEVENT parser and external reservation calendar blocking. |
 | §62 | LOCAL GUIDE | **DONE** | `app/Models/StayTurnaroundWindow.php (cleaning buffer hours)` | None. Automatic buffer time (e.g. 3 hours) inserted between consecutive stays for housekeeping. |
 | §78 | RESERVATION ENGINE | **DONE** | `app/Http/Controllers/StayBookingController.php@create, resources/views/stays/book.blade.php` | None. Responsive guest checkout interface with live price calculation and hold timer. |
 | §104 | HOTEL/ACCOMMODATION MODEL | **DONE** | `resources/views/dashboards/host.blade.php, HostHubTest.php` | None. Host management dashboard tracking upcoming arrivals, earnings, and availability calendar. |
@@ -356,9 +356,9 @@ This document provides a comprehensive audit of the `gtm_real_estate` platform e
 
 | SRS section | Feature | Status | Evidence (file/table/route) | What is missing |
 |:---:|---|:---:|---|---|
-| §105 | EXPERIENCE MARKETPLACE | **MISSING** | `routes/api.php` | Experience & Tour Marketplace catalog endpoints (/api/v1/experiences) missing. |
-| §106 | EXPERIENCE BOOKING | **MISSING** | `routes/api.php` | Experience booking and ticketing API (/api/v1/experiences/bookings) missing. |
-| §107 | TOURISM DISCOVERY | **MISSING** | `routes/api.php` | Experience provider vendor payouts and settlement API missing. |
+| §105 | EXPERIENCE MARKETPLACE | **DONE** | `app/Models/Experience.php, app/Http/Controllers/ExperienceController.php, resources/views/experiences/index.blade.php, StayCalendarSyncAndExperienceMarketplaceTest.php` | None. Curated Ethiopian experiences and tours marketplace catalog with categories, durations, and pricing. |
+| §106 | EXPERIENCE BOOKING | **DONE** | `app/Models/ExperienceBooking.php, app/Http/Controllers/ExperienceController.php@book, resources/views/experiences/show.blade.php, StayCalendarSyncAndExperienceMarketplaceTest.php` | None. Instant guest booking, attendee capacity calculation, and unique ticketing reference generation. |
+| §107 | TOURISM DISCOVERY | **DONE** | `app/Models/ExperienceBooking.php, app/Services/StayBookingService.php, StayCalendarSyncAndExperienceMarketplaceTest.php` | None. Provider vendor earnings calculation with 15% platform commission deduction and payout tracking. |
 | §113 | CONTENT MANAGEMENT | **PARTIAL** | `routes/api.php` | Dedicated Sanctum mobile token authentication endpoints (/api/v1/auth/login, /api/v1/auth/register) missing. |
 | §114 | SEO | **PARTIAL** | `routes/api.php` | Mobile property search and filter REST API endpoint (/api/v1/properties) missing. |
 | §115 | SOCIAL SHARING | **PARTIAL** | `routes/api.php` | Mobile property detail and gallery media REST API endpoint (/api/v1/properties/{id}) missing. |

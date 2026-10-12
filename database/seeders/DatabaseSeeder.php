@@ -292,6 +292,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ActorSeedDataSeeder::class);
 
         $this->call(ShortStayHostSeeder::class);
+        $this->call(ExperienceSeeder::class);
         $this->call(CampaignSeeder::class);
     }
 }
