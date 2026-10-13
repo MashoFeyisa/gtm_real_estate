@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -15,5 +16,67 @@
 .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+}
+
+/* Completely hide Google Translate floating translation icons, popups, banners & badges */
+.goog-te-banner-frame,
+.goog-te-balloon-frame,
+#goog-gt-tt,
+#goog-gt-vt,
+.goog-tooltip,
+.goog-tooltip:hover,
+.VIpgJd-yAWdhb-hvhgl-bN9Mbe,
+.VIpgJd-yAWdhb-hvhgl-bN9Mbe-wrapper,
+.VIpgJd-yAWdhb-mNsxBe,
+.VIpgJd-yAWdhb-mNsxBe-wrapper,
+.VIpgJd-yAWdhb-L7lbkb,
+.VIpgJd-yAWdhb-s2AGkc,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+div[class*="VIpgJd"],
+iframe[class*="VIpgJd"],
+iframe.goog-te-banner-frame,
+.goog-logo-link,
+.goog-te-gadget,
+.skiptranslate,
+#google_translate_element,
+#mobile_google_translate_element {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Ensure translated text retains clean original styling */
+.goog-text-highlight {
+    background-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Prevent Google Translate from adding margin/top offset to body */
+body {
+    top: 0px !important;
+    position: static !important;
+}
+
+/* Standalone scroll area for all dashboard sidebars */
+.dashboard-sidebar,
+aside.sidebar-scroll-area {
+    position: sticky !important;
+    top: 0 !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    scroll-behavior: auto !important;
+}
+
+.dashboard-sidebar nav,
+aside.sidebar-scroll-area nav {
+    min-height: 420px;
 }
 

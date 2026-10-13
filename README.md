@@ -41,18 +41,50 @@ php artisan boost:install
 
 Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
-## Contributing
+## Real Estate Marketplace — 17 Dedicated Dashboards & RBAC
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+This application implements 17 permission-driven dashboards for each target actor in the Ethiopian Real Estate Marketplace ecosystem, fully supported with granular RBAC, audit logging, and permission-gated media.
 
-## Code of Conduct
+### Seeding & Demo Commands
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- **Seed All Marketplace Data & Roles**:
+  ```bash
+  php artisan db:seed
+  ```
+- **Reset & Re-seed (Dev Only)**:
+  ```bash
+  php artisan migrate:fresh --seed
+  ```
+- **Execute Factor & Feature Test Matrix**:
+  ```bash
+  vendor/bin/pest tests/Feature/SeventeenUserDashboardsMatrixTest.php
+  ```
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Demo Accounts & Credentials (Password: `secret123`)
+
+| # | User Type | Email | Dashboard Route | Core Workflow Focus |
+|---|-----------|-------|-----------------|---------------------|
+| 1 | **Buyer** | `buyer@realestate.com` | `/dashboard/buyer` | Saved properties, saved search alerts, inquiries, viewings, formal offers |
+| 2 | **Tenant / Renter** | `tenant@realestate.com` | `/dashboard/tenant` | Active leases, rent payment schedule, maintenance tickets, tenancy documents |
+| 3 | **Guest (Short-Stay)** | `traveler@realestate.com` | `/dashboard/guest` | Bookings (pending/confirmed/completed), check-in details, reviews, saved stays |
+| 4 | **Investor** | `investor@realestate.com` | `/dashboard/investor` | Portfolio assets, yield estimates (gross/net), rental cash flow, market indicators |
+| 5 | **Seller / Landlord** | `owner@realestate.com` | `/dashboard/seller` | Properties, published listings, lead inquiries, quality scores |
+| 6 | **Host (Short-Stay)** | `host@realestate.com` | `/dashboard/host` | Short-stay properties, upcoming check-ins/outs, occupancy %, payouts |
+| 7 | **Agent / Broker** | `agent@realestate.com` | `/agent-portal` | CRM pipeline (New Lead → Closed), viewings, offers, commission splits |
+| 8 | **Company / Branch Manager** | `company@realestate.com` | `/company` | Branches, team agents, verified listings, company performance & revenue |
+| 9 | **Developer** | `developer@realestate.com` | `/developer-portal` | Construction projects, buildings, units (Available/Reserved/Sold), payment plans |
+| 10 | **Property Manager** | `propertymanager@realestate.com` | `/dashboard/property-manager` | Managed properties, tenant/guest queues, rent tracking, cleaning dispatch |
+| 11 | **Professional** (Valuer/Lawyer) | `service@realestate.com` | `/dashboard/professional` | Service requests, appointment calendar, report submissions, earnings |
+| 12 | **Cleaner / Housekeeping** | `cleaner@realestate.com` | `/dashboard/cleaner` | Assigned tasks, turnaround checklist (Assigned → In Progress → Inspection → Ready) |
+| 13 | **Super Admin** | `admin@realestate.com` | `/dashboard` | Users, roles & permission matrix, platform metrics, security audit log |
+| 14 | **Verification Officer** | `verification@realestate.com` | `/dashboard/verification-officer` | Title deed cartas, site plan mapas, company licenses, developer credentials |
+| 15 | **Moderator** | `moderator@realestate.com` | `/dashboard/moderator` | Listing review queue, report triage (fraud/duplicates), review moderation |
+| 16 | **Finance Officer** | `finance@realestate.com` | `/finance` | Payments, financial ledger, refunds, agent commission settlements, vouchers |
+| 17 | **Customer Support** | `support@realestate.com` | `/dashboard/customer-support` | Inbound support tickets, non-sensitive customer lookup, dispute resolution |
+
+---
 
 ## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+The application is open-sourced software licensed under the MIT license.

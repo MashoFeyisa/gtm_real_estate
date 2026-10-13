@@ -3,6 +3,28 @@
 @section('title', $siteBrand['name'].' — Premium Living Spaces')
 @section('description', \App\Models\SiteSetting::get('hero_description', 'Find luxury villas, modern apartments, and smart investments in trusted neighborhoods with a team that knows the market deeply.'))
 
+@push('json_ld')
+    <script type="application/ld+json">
+    {!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'RealEstateAgent',
+        'name' => $siteBrand['name'] ?? 'GTM Real Estate',
+        'image' => asset('images/luxury/hero-skyline.jpg'),
+        'url' => route('home'),
+        'telephone' => \App\Models\SiteSetting::get('company_phone', '+251 91 123 4567'),
+        'email' => \App\Models\SiteSetting::get('company_email', 'info@gtmrealestate.com'),
+        'address' => [
+            '@type' => 'PostalAddress',
+            'streetAddress' => \App\Models\SiteSetting::get('company_address', 'Bole Medhanialem, Premium Tower'),
+            'addressLocality' => 'Addis Ababa',
+            'addressCountry' => 'ET',
+        ],
+        'priceRange' => '$$$$',
+        'openingHours' => 'Mo-Sa 08:30-18:00',
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+    </script>
+@endpush
+
 @section('content')
     @php
         $getPropertyCategory = fn ($property) => strtolower((string) ($property->property_category ?? $property->category ?? 'home'));
@@ -55,33 +77,33 @@
                 <div>
                     <div class="inline-flex items-center gap-2.5 rounded-full border border-[#c5a059]/40 bg-[#c5a059]/15 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.25em] text-[#e7d8b7] backdrop-blur-md shadow-lg shadow-black/20">
                         <span class="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse"></span>
-                        {{ \App\Models\SiteSetting::get('hero_badge', 'Premium living spaces') }}
+                        <span data-i18n="Premium living spaces">{{ \App\Models\SiteSetting::get('hero_badge', 'Premium living spaces') }}</span>
                     </div>
 
-                    <h1 class="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.12]">
+                    <h1 class="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.12]" data-i18n="Discover homes that feel like your next chapter.">
                         {{ \App\Models\SiteSetting::get('hero_title', 'Discover homes that feel like your next chapter.') }}
                     </h1>
 
-                    <p class="mt-6 max-w-xl text-lg leading-relaxed text-[#d7e5dc] font-normal">
+                    <p class="mt-6 max-w-xl text-lg leading-relaxed text-[#d7e5dc] font-normal" data-i18n="Find luxury villas, modern apartments, and smart investments in trusted neighborhoods with a team that knows the market deeply.">
                         {{ \App\Models\SiteSetting::get('hero_description', 'Find luxury villas, modern apartments, and smart investments in trusted neighborhoods with a team that knows the market deeply.') }}
                     </p>
 
                     <div class="mt-8 flex flex-wrap items-center gap-4">
                         <a href="{{ route('properties.index') }}" class="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#d4af37] via-[#c5a059] to-[#b38e46] px-7 py-3.5 text-sm font-bold uppercase tracking-[0.14em] text-[#0c1f1a] shadow-xl shadow-[#d4af37]/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-[#d4af37]/35">
-                            <span>{{ \App\Models\SiteSetting::get('hero_primary_button_text', 'Explore Listings') }}</span>
+                            <span data-i18n="Explore Listings">{{ \App\Models\SiteSetting::get('hero_primary_button_text', 'Explore Listings') }}</span>
                             <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
                         </a>
                         <a href="{{ url('/app#contact') }}" class="inline-flex items-center gap-2 rounded-full border border-[#e7d8b7]/40 bg-white/10 px-7 py-3.5 text-sm font-semibold text-[#f4efe7] backdrop-blur-md transition-all duration-200 hover:bg-white/20 hover:border-[#e7d8b7]">
-                            <span>{{ \App\Models\SiteSetting::get('hero_secondary_button_text', 'Book a Visit') }}</span>
+                            <span data-i18n="Book a Visit">{{ \App\Models\SiteSetting::get('hero_secondary_button_text', 'Book a Visit') }}</span>
                         </a>
                         <a href="{{ route('careers') }}" class="inline-flex items-center text-xs font-semibold uppercase tracking-[0.18em] text-[#e7d8b7] hover:underline underline-offset-4">
                             {!! \App\Models\SiteSetting::get('hero_careers_link_text', 'Careers &rarr;') !!}
                         </a>
                         <a href="#safety-advisory" class="inline-flex items-center gap-1.5 rounded-full border border-[#d4af37]/50 bg-[#d4af37]/15 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#e7d8b7] backdrop-blur-md transition hover:bg-[#d4af37]/25">
                             <span class="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse"></span>
-                            <span>{{ 'Safety & Direct Deal' }}</span>
+                            <span data-i18n="Safety & Direct Deal">{{ 'Safety & Direct Deal' }}</span>
                         </a>
                     </div>
 
@@ -89,17 +111,17 @@
                     <div class="mt-10 flex flex-wrap items-center gap-6 sm:gap-8 border-t border-white/15 pt-6 text-sm text-[#cbdad0]">
                         <div class="flex flex-col">
                             <span id="happy-buyers-count" class="text-3xl font-black text-[#e7d8b7] tracking-tight">{{ number_format($homeStats['happy_buyers'] ?? 0) }}</span>
-                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]">{{ \App\Models\SiteSetting::get('hero_stat_1_label', 'happy buyers') }}</span>
+                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]" data-i18n="happy buyers">{{ \App\Models\SiteSetting::get('hero_stat_1_label', 'happy buyers') }}</span>
                         </div>
                         <div class="h-9 w-px bg-white/20 hidden sm:block"></div>
                         <div class="flex flex-col">
                             <span class="text-3xl font-black text-white tracking-tight">{{ $homeStats['sold'] ?? 0 }}</span>
-                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]">{{ \App\Models\SiteSetting::get('hero_stat_2_label', 'properties sold') }}</span>
+                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]" data-i18n="properties sold">{{ \App\Models\SiteSetting::get('hero_stat_2_label', 'properties sold') }}</span>
                         </div>
                         <div class="h-9 w-px bg-white/20 hidden sm:block"></div>
                         <div class="flex flex-col">
                             <span class="text-3xl font-black text-[#e7d8b7] tracking-tight">{{ \App\Models\SiteSetting::get('hero_stat_3_value', '18 yrs') }}</span>
-                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]">{{ \App\Models\SiteSetting::get('hero_stat_3_label', 'market expertise') }}</span>
+                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#a4b8ad]" data-i18n="market expertise">{{ \App\Models\SiteSetting::get('hero_stat_3_label', 'market expertise') }}</span>
                         </div>
                     </div>
                 </div>
@@ -176,16 +198,15 @@
                                     <h2 class="mt-4 text-2xl font-black">
                                         <a href="{{ route('properties.show', $heroProperty->slug) }}" class="transition hover:text-[#e7d8b7]">{{ $heroProperty->title }}</a>
                                     </h2>
-                                    <p class="mt-1 text-sm text-[#cbdad0]">{{ $heroProperty->bedrooms }} bed • {{ $heroProperty->bathrooms }} bath • {{ number_format($heroProperty->area) }} sqm (ካሬ)</p>
-
+                                    <p class="mt-1 text-sm text-[#cbdad0]">{{ $heroProperty->bedrooms }} bed • {{ $heroProperty->bathrooms }} bath • {{ number_format($heroProperty->area) }} sqm</p>
                                     <div class="mt-5 rounded-2xl bg-white/90 p-4 text-[#102b25] backdrop-blur-md shadow-lg">
                                         <div class="flex items-end justify-between">
                                             <div>
                                                 <p class="text-xs uppercase tracking-[0.2em] text-[#617466]">{{ $heroProperty->type === 'rent' ? 'Starting at' : 'Price' }}</p>
-                                                <p class="mt-1 text-2xl font-black text-[#102b25]">ETB {{ number_format($heroProperty->price) }}{{ $heroProperty->type === 'rent' ? '/mo' : '' }}</p>
+                                                <p class="mt-1 text-2xl font-black text-[#102b25] currency-price" data-base-price="{{ $heroProperty->price }}" {{ $heroProperty->type === 'rent' ? 'data-price-suffix="/mo"' : '' }}>ETB {{ number_format($heroProperty->price) }}{{ $heroProperty->type === 'rent' ? '/mo' : '' }}</p>
                                             </div>
                                             <div class="flex items-center gap-2">
-                                                <button type="button" data-quickview-btn class="rounded-full border border-[#102b25] bg-transparent px-3.5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#102b25] transition hover:bg-[#102b25] hover:text-[#e7d8b7] cursor-pointer">Preview</button>
+                                                <button type="button" data-quickview-btn class="rounded-full border border-[#102b25] bg-[#102b25] px-3.5 py-2 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#1a4037] cursor-pointer whitespace-nowrap">Preview</button>
                                                 <a href="{{ route('properties.show', $heroProperty->slug) }}" class="rounded-full bg-[#102b25] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#e7d8b7] transition hover:bg-[#1a4037]">Details</a>
                                             </div>
                                         </div>
@@ -199,12 +220,13 @@
                                     </div>
                                 </div>
                                 <h2 class="mt-4 text-2xl font-black">Greenview Residence</h2>
-                                <p class="mt-1 text-sm text-[#cbdad0]">4 bed • 3 bath • 280 sqm (ካሬ)</p>
+                                <p class="mt-1 text-sm text-[#cbdad0]">4 bed • 3 bath • 280 sqm</p>
+
                                 <div class="mt-5 rounded-2xl bg-white/90 p-4 text-[#102b25] backdrop-blur-md shadow-lg">
                                     <div class="flex items-end justify-between">
                                         <div>
                                             <p class="text-xs uppercase tracking-[0.2em] text-[#617466]">Starting at</p>
-                                            <p class="mt-1 text-2xl font-black text-[#102b25]">ETB 480k</p>
+                                            <p class="mt-1 text-2xl font-black text-[#102b25] currency-price" data-base-price="480000">ETB 480k</p>
                                         </div>
                                         <div class="rounded-full bg-[#102b25] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#e7d8b7]">Prime location</div>
                                     </div>
@@ -235,28 +257,32 @@
             <div class="mt-12 rounded-[2rem] border border-white/20 bg-white/10 p-4 sm:p-5 backdrop-blur-xl shadow-2xl">
                 <form method="GET" action="{{ route('properties.index') }}" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-center">
                     <div>
-                        <label for="filter-category" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_category_label', 'Residence Category') }}</label>
+                        <label for="filter-category" data-i18n="Residence Category" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_category_label', 'Residence Category') }}</label>
                         <select id="filter-category" name="category" class="w-full rounded-xl border border-white/20 bg-[#0f2821]/80 px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[#d4af37]">
-                            <option value="all">All Residences</option>
-                            <option value="villa">Villas</option>
-                            <option value="home">Homes & Townhouses</option>
-                            <option value="apartment">Modern Apartments</option>
+                            <option value="all" data-i18n="All Residences">All Residences</option>
+                            <option value="villa" data-i18n="Villas">Villas</option>
+                            <option value="home" data-i18n="Homes & Townhouses">Homes &amp; Townhouses</option>
+                            <option value="apartment" data-i18n="Modern Apartments">Modern Apartments</option>
+                            <option value="condominium" data-i18n="Condominiums">Condominiums</option>
+                            <option value="guest_house" data-i18n="Guest Houses">Guest Houses</option>
+                            <option value="hotel" data-i18n="Hotels">Hotels</option>
+                            <option value="office" data-i18n="Offices">Offices</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="filter-type" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_type_label', 'Ownership Type') }}</label>
+                        <label for="filter-type" data-i18n="Ownership Type" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_type_label', 'Ownership Type') }}</label>
                         <select id="filter-type" name="type" class="w-full rounded-xl border border-white/20 bg-[#0f2821]/80 px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[#d4af37]">
-                            <option value="">Any Status</option>
-                            <option value="sale">For Sale (Freehold)</option>
-                            <option value="rent">For Lease / Rent</option>
+                            <option value="" data-i18n="Any Status">Any Status</option>
+                            <option value="sale" data-i18n="For Sale (Freehold)">For Sale (Freehold)</option>
+                            <option value="rent" data-i18n="For Lease / Rent">For Lease / Rent</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="filter-location" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_location_label', 'Preferred Location') }}</label>
+                        <label for="filter-location" data-i18n="Preferred Location" class="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#e7d8b7] mb-1">{{ \App\Models\SiteSetting::get('filter_location_label', 'Preferred Location') }}</label>
                         <select id="filter-location" name="location" class="w-full rounded-xl border border-white/20 bg-[#0f2821]/80 px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[#d4af37]">
-                            <option value="">All Prime Districts</option>
+                            <option value="" data-i18n="All Prime Districts">All Prime Districts</option>
                             <option value="harar">Harar Central</option>
                             <option value="bole">Addis Ababa / Bole</option>
                             <option value="kazanchis">Kazanchis Diplomatic Zone</option>
@@ -269,7 +295,7 @@
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            <span>{{ \App\Models\SiteSetting::get('filter_button_text', 'Search Properties') }}</span>
+                            <span data-i18n="Search Properties">{{ \App\Models\SiteSetting::get('filter_button_text', 'Search Properties') }}</span>
                         </button>
                     </div>
                 </form>
@@ -351,7 +377,7 @@
         <div class="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {{-- Amenity 1: Jogging & Walking Tracks --}}
             <div class="group rounded-3xl border border-[#d9cab3] bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-[#c5a059]">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf4ef] text-[#1d3c34] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5ede0] text-[#9b6c17] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
@@ -377,7 +403,7 @@
 
             {{-- Amenity 3: Retail & Fine Dining Boulevard --}}
             <div class="group rounded-3xl border border-[#d9cab3] bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-[#c5a059]">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf4ef] text-[#1d3c34] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5ede0] text-[#9b6c17] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
@@ -403,7 +429,7 @@
 
             {{-- Amenity 5: Kids Play & Adventure Areas --}}
             <div class="group rounded-3xl border border-[#d9cab3] bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-[#c5a059]">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf4ef] text-[#1d3c34] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5ede0] text-[#9b6c17] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -429,7 +455,7 @@
 
             {{-- Amenity 7: Wellness & Infinity Fitness Club --}}
             <div class="group rounded-3xl border border-[#d9cab3] bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-[#c5a059]">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf4ef] text-[#1d3c34] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5ede0] text-[#9b6c17] transition-colors group-hover:bg-[#102b25] group-hover:text-[#e7d8b7]">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
@@ -484,7 +510,7 @@
             </div>
         </div>
 
-        <div data-carousel="featured-properties" class="relative mt-8">
+        <div data-carousel="featured-properties" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
             <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
                 @forelse ($featuredProperties as $property)
                     @php
@@ -534,11 +560,12 @@
                                 </div>
 
                                 {{-- Quickview Sidebar Trigger Button on top right --}}
-                                <div class="absolute top-3.5 right-3.5 z-20">
+                                <div class="absolute top-3.5 right-3.5 z-20 flex flex-col items-end gap-1.5">
                                     <button type="button" data-quickview-btn title="Open photo gallery preview sidebar" class="flex items-center gap-1.5 rounded-full border border-white/25 bg-black/65 px-2.5 py-1 text-[11px] font-bold text-[#e7d8b7] backdrop-blur-md shadow-md transition-all hover:bg-[#d4af37] hover:text-[#0c1f1a] hover:border-[#d4af37] active:scale-95 cursor-pointer">
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                         <span>Sidebar ({{ count($cardGallery) }})</span>
                                     </button>
+                                    @include('properties.partials.interaction-buttons', ['property' => $property, 'size' => 'sm'])
                                 </div>
 
                                 {{-- Bottom row with details & counter --}}
@@ -556,15 +583,15 @@
                                 <h3 class="text-xl font-bold text-[#102b25] group-hover:text-[#9b6c17] transition-colors line-clamp-1">
                                     <a href="{{ route('properties.show', $property->slug) }}">{{ $property->title }}</a>
                                 </h3>
-                                <p class="mt-2 text-sm text-slate-600">{{ $property->bedrooms }} bed • {{ $property->bathrooms }} bath • {{ number_format($property->area) }} sqm (ካሬ)</p>
+                                <p class="mt-2 text-sm text-slate-600">{{ $property->bedrooms }} bed • {{ $property->bathrooms }} bath • {{ number_format($property->area) }} sqm</p>
                                 
                                 <div class="mt-auto pt-5 flex items-center justify-between border-t border-[#f0e8dc]">
                                     <div>
                                         <p class="text-[11px] uppercase tracking-wider text-slate-500">{{ $property->type === 'rent' ? 'Rental' : 'Asking Price' }}</p>
-                                        <span class="text-xl font-black text-[#102b25]">ETB {{ number_format($property->price) }}{{ $property->type === 'rent' ? '/mo' : '' }}</span>
+                                        <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="{{ $property->price }}" {{ $property->type === 'rent' ? 'data-price-suffix="/mo"' : '' }}>ETB {{ number_format($property->price) }}{{ $property->type === 'rent' ? '/mo' : '' }}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" data-quickview-btn class="rounded-full border border-[#d9cab3] bg-[#fffaf2] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#102b25] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer">
+                                        <button type="button" data-quickview-btn class="rounded-full bg-[#f5ede0] px-3 py-1.5 text-sm font-black uppercase tracking-wider text-[#9b6c17] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer whitespace-nowrap">
                                             Preview
                                         </button>
                                         <a href="{{ route('properties.show', $property->slug) }}" class="rounded-full bg-[#f5ede0] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#9b6c17] group-hover:bg-[#102b25] group-hover:text-[#e7d8b7] transition-colors">
@@ -584,9 +611,9 @@
                             <div class="flex flex-col flex-1 p-6">
                                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#9b6c17]">For Sale</p>
                                 <h3 class="mt-2 text-xl font-bold text-[#102b25]">Verona Heights</h3>
-                                <p class="mt-2 text-sm text-slate-600">3 bed • 2 bath • 180 sqm (ካሬ)</p>
+                                <p class="mt-2 text-sm text-slate-600">3 bed • 2 bath • 180 sqm</p>
                                 <div class="mt-auto pt-5 flex items-center justify-between border-t border-[#f0e8dc]">
-                                    <span class="text-xl font-black text-[#102b25]">ETB 410,000</span>
+                                    <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="410000">ETB 410,000</span>
                                     <span class="text-sm font-semibold text-slate-500">Harar</span>
                                 </div>
                             </div>
@@ -601,9 +628,9 @@
                             <div class="flex flex-col flex-1 p-6">
                                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#9b6c17]">For Rent</p>
                                 <h3 class="mt-2 text-xl font-bold text-[#102b25]">Aster Luxury Apartments</h3>
-                                <p class="mt-2 text-sm text-slate-600">2 bed • 2 bath • 120 sqm (ካሬ)</p>
+                                <p class="mt-2 text-sm text-slate-600">2 bed • 2 bath • 120 sqm</p>
                                 <div class="mt-auto pt-5 flex items-center justify-between border-t border-[#f0e8dc]">
-                                    <span class="text-xl font-black text-[#102b25]">ETB 1,200/mo</span>
+                                    <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="1200" data-price-suffix="/mo">ETB 1,200/mo</span>
                                     <span class="text-sm font-semibold text-slate-500">City Center</span>
                                 </div>
                             </div>
@@ -618,9 +645,9 @@
                             <div class="flex flex-col flex-1 p-6">
                                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#9b6c17]">Investment</p>
                                 <h3 class="mt-2 text-xl font-bold text-[#102b25]">Cedar Grove Villa</h3>
-                                <p class="mt-2 text-sm text-slate-600">4 bed • 3 bath • 260 sqm (ካሬ)</p>
+                                <p class="mt-2 text-sm text-slate-600">4 bed • 3 bath • 260 sqm</p>
                                 <div class="mt-auto pt-5 flex items-center justify-between border-t border-[#f0e8dc]">
-                                    <span class="text-xl font-black text-[#102b25]">ETB 540,000</span>
+                                    <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="540000">ETB 540,000</span>
                                     <span class="text-sm font-semibold text-slate-500">Bole</span>
                                 </div>
                             </div>
@@ -673,14 +700,52 @@
                 <p class="text-xs font-bold uppercase tracking-[0.25em] text-[#9b6c17]">{{ \App\Models\SiteSetting::get('developments_badge', 'Developments') }}</p>
                 <h2 class="mt-2 text-3xl font-black text-[#102b25] tracking-tight">{{ \App\Models\SiteSetting::get('developments_title', 'Featured Projects') }}</h2>
             </div>
-            <a href="{{ \App\Models\SiteSetting::get('developments_link_url', route('projects')) }}" class="group inline-flex items-center gap-1.5 text-sm font-bold text-[#102b25] hover:text-[#9b6c17] transition">
-                <span>{{ \App\Models\SiteSetting::get('developments_link_text', 'Explore projects') }}</span>
+            <a href="{{ \App\Models\SiteSetting::get('developments_link_url', route('developments.index')) }}" class="group inline-flex items-center gap-1.5 text-sm font-bold text-[#102b25] hover:text-[#9b6c17] transition">
+                <span>{{ \App\Models\SiteSetting::get('developments_link_text', 'Explore developments') }}</span>
                 <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
             </a>
         </div>
 
         <div class="mt-8 grid gap-8 md:grid-cols-3">
-            @if ($featuredProjects->isNotEmpty() && ! \App\Models\SiteSetting::get('project_1_title') && ! \App\Models\SiteSetting::get('project_2_title') && ! \App\Models\SiteSetting::get('project_3_title'))
+            @if (isset($featuredDevelopments) && $featuredDevelopments->isNotEmpty())
+                @foreach ($featuredDevelopments as $project)
+                    <a href="{{ route('developments.show', $project->slug) }}" class="group block overflow-hidden rounded-[2rem] border border-[#d9cab3] bg-white shadow-lg transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl">
+                        <div class="relative h-48 w-full overflow-hidden bg-slate-900">
+                            <img src="{{ $project->primary_image_url }}" alt="{{ $project->name }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                            <span class="absolute top-4 left-4 rounded-full bg-[#102b25] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#d4af37]">
+                                {{ ucfirst(str_replace('_', ' ', $project->project_type ?? 'Development')) }}
+                            </span>
+                            <span class="absolute top-4 right-4 rounded-full bg-white/90 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-bold text-[#1d3c34]">
+                                {{ $project->overall_completion_percentage }}% Built
+                            </span>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between text-xs text-[#587165] font-bold mb-1">
+                                <span class="truncate max-w-[150px]">🏗️ {{ $project->developer_name }}</span>
+                                <span>{{ $project->subcity ?? $project->city }}</span>
+                            </div>
+                            <h3 class="text-xl font-black text-[#102b25] group-hover:text-[#9b6c17] transition line-clamp-1">
+                                {{ $project->name }}
+                            </h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">
+                                {{ $project->description ?? 'Modern master development with luxury residential units and guaranteed infrastructure.' }}
+                            </p>
+
+                            <div class="mt-4 pt-4 border-t border-[#f0e8dc] flex items-center justify-between">
+                                <div>
+                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Starting From</span>
+                                    <span class="text-sm font-black text-[#1d3c34] currency-price" data-base-price="{{ $project->starting_price }}">{{ $project->formatted_starting_price }}</span>
+                                </div>
+                                <span class="inline-flex items-center gap-1 rounded-full bg-[#102b25] px-3 py-1 text-xs font-bold text-white group-hover:bg-[#9b6c17] transition">
+                                    <span>Explore</span>
+                                    <span>&rarr;</span>
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                @endforeach
+            @elseif ($featuredProjects->isNotEmpty() && ! \App\Models\SiteSetting::get('project_1_title') && ! \App\Models\SiteSetting::get('project_2_title') && ! \App\Models\SiteSetting::get('project_3_title'))
                 @foreach ($featuredProjects as $project)
                     <div class="group overflow-hidden rounded-[2rem] border border-[#d9cab3] bg-gradient-to-br from-[#102b25] to-[#1d3c34] text-white shadow-lg transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl">
                         <div class="p-8">
@@ -782,7 +847,7 @@
             </div>
         </div>
 
-        <div data-carousel="latest-properties" class="relative mt-8">
+        <div data-carousel="latest-properties" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
             <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
                 @forelse ($latestProperties as $property)
                     @php
@@ -834,11 +899,12 @@
                                 </div>
 
                                 {{-- Quickview Sidebar Trigger Button on top right --}}
-                                <div class="absolute top-3.5 right-3.5 z-20">
+                                <div class="absolute top-3.5 right-3.5 z-20 flex flex-col items-end gap-1.5">
                                     <button type="button" data-quickview-btn title="Open photo gallery preview sidebar" class="flex items-center gap-1.5 rounded-full border border-white/25 bg-black/65 px-2.5 py-1 text-[11px] font-bold text-[#e7d8b7] backdrop-blur-md shadow-md transition-all hover:bg-[#d4af37] hover:text-[#0c1f1a] hover:border-[#d4af37] active:scale-95 cursor-pointer">
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                         <span>Sidebar ({{ count($latestGallery) }})</span>
                                     </button>
+                                    @include('properties.partials.interaction-buttons', ['property' => $property, 'size' => 'sm'])
                                 </div>
 
                                 {{-- Bottom row with details & counter --}}
@@ -856,15 +922,15 @@
                                 <h3 class="text-xl font-bold text-[#102b25] group-hover:text-[#9b6c17] transition-colors line-clamp-1">
                                     <a href="{{ route('properties.show', $property->slug) }}">{{ $property->title }}</a>
                                 </h3>
-                                <p class="mt-2 text-sm text-slate-600">{{ $property->bedrooms }} bed • {{ $property->bathrooms }} bath • {{ number_format($property->area) }} sqm (ካሬ)</p>
+                                <p class="mt-2 text-sm text-slate-600">{{ $property->bedrooms }} bed • {{ $property->bathrooms }} bath • {{ number_format($property->area) }} sqm</p>
                                 
                                 <div class="mt-auto pt-5 flex items-center justify-between border-t border-[#f0e8dc]">
                                     <div>
                                         <p class="text-[11px] uppercase tracking-wider text-slate-500">{{ $property->type === 'rent' ? 'Rental' : 'Asking Price' }}</p>
-                                        <span class="text-xl font-black text-[#102b25]">ETB {{ number_format($property->price) }}{{ $property->type === 'rent' ? '/mo' : '' }}</span>
+                                        <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="{{ $property->price }}" {{ $property->type === 'rent' ? 'data-price-suffix="/mo"' : '' }}>ETB {{ number_format($property->price) }}{{ $property->type === 'rent' ? '/mo' : '' }}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" data-quickview-btn class="rounded-full border border-[#d9cab3] bg-[#fffaf2] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#102b25] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer">
+                                        <button type="button" data-quickview-btn class="rounded-full border border-[#d9cab3] bg-white px-3 py-1.5 text-sm font-black uppercase tracking-wider text-[#102b25] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer whitespace-nowrap">
                                             Preview
                                         </button>
                                         <a href="{{ route('properties.show', $property->slug) }}" class="rounded-full bg-[#f5ede0] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#9b6c17] group-hover:bg-[#102b25] group-hover:text-[#e7d8b7] transition-colors">
@@ -970,7 +1036,7 @@
             </div>
         </div>
 
-        <div data-carousel="news" class="relative mt-8">
+        <div data-carousel="news" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
             <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
                 @forelse ($posts as $post)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
@@ -1092,14 +1158,15 @@
                                             </div>
                                         @endif
 
-                                        <a href="{{ $applyUrl }}" target="{{ $post->apply_link ? '_blank' : '_self' }}" rel="noopener"
-                                           class="flex items-center justify-center gap-2 w-full rounded-lg py-2.5 text-sm font-black uppercase tracking-wider transition-all duration-200 hover:scale-[1.03] active:scale-95"
+                                        <button type="button"
+                                           onclick="openJobApplicationModal({ id: {{ $post->id }}, title: @js($post->title), category: @js($post->category), location: @js($post->job_location) })"
+                                           class="flex items-center justify-center gap-2 w-full rounded-lg py-2.5 text-sm font-black uppercase tracking-wider transition-all duration-200 hover:scale-[1.03] active:scale-95 cursor-pointer shadow-md"
                                            style="background: #d4af37; color: #102b25;">
                                             <span>Apply Now</span>
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                             </svg>
-                                        </a>
+                                        </button>
 
                                         <div class="mt-2 text-center">
                                             <a href="{{ route('careers') }}" class="text-[11px] font-semibold transition hover:underline" style="color: #8ab89e;">
@@ -1220,7 +1287,7 @@
             </div>
         </div>
 
-        <div data-carousel="testimonials" class="relative mt-8">
+        <div data-carousel="testimonials" data-carousel-autoplay="true" data-carousel-interval="3000" class="relative mt-8">
             <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
                 @forelse ($testimonials as $testimonial)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
@@ -1304,7 +1371,7 @@
             </div>
         </div>
 
-        <div data-carousel="agents" class="relative mt-8">
+        <div data-carousel="agents" data-carousel-autoplay="true" data-carousel-interval="3000" class="relative mt-8">
             <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
                 @forelse ($agents ?? collect() as $index => $agent)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
@@ -1479,45 +1546,6 @@
     </section>
 
     {{-- ========================================================================= --}}
-    {{-- NEWSLETTER & LIVE SUBSCRIBER INCREMENT --}}
-    {{-- ========================================================================= --}}
-    <section id="newsletter" class="mx-auto max-w-7xl px-6 py-12 lg:px-8">
-        <div class="rounded-[2.5rem] bg-[#102b25] p-8 text-white shadow-2xl lg:p-12 border border-[#d9cab3]/20">
-            <div class="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.25em] text-[#d4af37]">{{ \App\Models\SiteSetting::get('newsletter_badge', 'Stay informed') }}</p>
-                    <h2 class="mt-2 text-3xl font-black text-white">{{ \App\Models\SiteSetting::get('newsletter_title', 'Newsletter') }}</h2>
-                    <p class="mt-2 text-sm text-[#cbdad0] max-w-md">
-                        {{ \App\Models\SiteSetting::get('newsletter_description', 'Receive exclusive off-market previews, masterplan phase launches, and quarterly Ethiopian property intelligence.') }}
-                    </p>
-                </div>
-
-                <div class="w-full max-w-xl">
-                    @if (session('newsletter_success'))
-                        <div class="mb-3 rounded-xl border border-[#d9cab3]/40 bg-[#1d3c34] px-4 py-3 text-sm font-semibold text-[#f4ecdf]">
-                            {{ session('newsletter_success') }}
-                        </div>
-                    @endif
-                    @if ($errors->hasBag('newsletter') && $errors->newsletter->any())
-                        <div class="mb-3 rounded-xl border border-red-400/40 bg-[#632323] px-4 py-3 text-sm font-semibold text-red-100">
-                            {{ $errors->newsletter->first() }}
-                        </div>
-                    @endif
-                    <div id="newsletter-ajax-feedback" class="hidden mb-3 rounded-xl border px-4 py-3 text-sm font-semibold"></div>
-
-                    <form id="newsletter-form" method="POST" action="{{ route('newsletter.subscribe') }}" class="flex w-full flex-col gap-3 sm:flex-row">
-                        @csrf
-                        <input id="newsletter-email" type="email" name="email" value="{{ old('email') }}" required placeholder="{{ \App\Models\SiteSetting::get('newsletter_placeholder', 'Enter your email') }}" class="w-full rounded-full border border-[#d9cab3] bg-white px-5 py-3.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#d4af37]">
-                        <button type="submit" id="newsletter-submit-btn" class="rounded-full bg-[#d4af37] px-8 py-3.5 text-sm font-bold uppercase tracking-[0.14em] text-[#102b25] transition hover:bg-[#e7d8b7] cursor-pointer whitespace-nowrap shadow-lg">
-                            {{ \App\Models\SiteSetting::get('newsletter_button_text', 'Subscribe') }}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {{-- ========================================================================= --}}
     {{-- SAFETY & DIRECT DEAL WARNING & ADVISORY NOTICE (ABOVE FOOTER) --}}
     {{-- ========================================================================= --}}
     <section id="safety-advisory" class="relative z-20 mx-auto max-w-7xl px-6 pb-14 lg:px-8 scroll-mt-24">
@@ -1600,74 +1628,4 @@
             <span>{{ \App\Models\SiteSetting::get('concierge_button_text', 'VIP Tour') }}</span>
         </a>
     </div>
-
-    {{-- Newsletter Live AJAX Script --}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const form = document.getElementById('newsletter-form');
-            if (!form) return;
-
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-
-                const emailInput = document.getElementById('newsletter-email');
-                const submitBtn = document.getElementById('newsletter-submit-btn');
-                const feedbackEl = document.getElementById('newsletter-ajax-feedback');
-                const happyBuyersCountEl = document.getElementById('happy-buyers-count');
-
-                const email = emailInput ? emailInput.value.trim() : '';
-                if (!email) return;
-
-                const tokenEl = form.querySelector('input[name="_token"]');
-                const token = tokenEl ? tokenEl.value : '';
-
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                    submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
-                }
-
-                fetch(form.action, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': token,
-                    },
-                    body: JSON.stringify({ email: email })
-                })
-                .then(async (response) => {
-                    const data = await response.json();
-                    if (!response.ok) {
-                        const errorMsg = data.errors?.email?.[0] || data.message || 'Something went wrong. Please check your email.';
-                        throw new Error(errorMsg);
-                    }
-                    return data;
-                })
-                .then((data) => {
-                    if (feedbackEl) {
-                        feedbackEl.textContent = data.message;
-                        feedbackEl.className = 'mb-3 rounded-xl border border-[#d9cab3]/40 bg-[#1d3c34] px-4 py-3 text-sm font-semibold text-[#f4ecdf] block';
-                    }
-                    if (happyBuyersCountEl && typeof data.count !== 'undefined') {
-                        happyBuyersCountEl.textContent = Number(data.count).toLocaleString();
-                    }
-                    if (emailInput && data.is_new) {
-                        emailInput.value = '';
-                    }
-                })
-                .catch((err) => {
-                    if (feedbackEl) {
-                        feedbackEl.textContent = err.message || 'Could not complete subscription. Please try again.';
-                        feedbackEl.className = 'mb-3 rounded-xl border border-red-400/40 bg-[#632323] px-4 py-3 text-sm font-semibold text-red-100 block';
-                    }
-                })
-                .finally(() => {
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-                    }
-                });
-            });
-        });
-    </script>
 @endsection

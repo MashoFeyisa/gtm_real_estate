@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Lease;
 use App\Models\Order;
 use App\Models\SiteSetting;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -33,6 +34,7 @@ class AgreementPdfService
 
         $pdf = Pdf::loadView($template, [
             'order' => $order,
+            'lease' => null,
             'property' => $order->property,
             'agent' => $order->agent,
             'seller' => $seller,
@@ -56,6 +58,70 @@ class AgreementPdfService
         ])->save();
 
         return $order->refresh();
+    }
+
+    /**
+     * Generate a branded rental agreement PDF for a Lease record using the existing rental-amharic template.
+     */
+    public function generateLease(Lease $lease): Lease
+    {
+        $lease->loadMissing(['property.agent', 'agent', 'schedules']);
+
+        $company = $this->company();
+        $poster = $lease->property?->agent ?? $lease->agent;
+
+        $seller = [
+            'name' => $poster?->name ?? $company['name'],
+            'phone' => $poster?->phone ?: $company['phone'],
+            'email' => $poster?->email ?: $company['email'],
+            'address' => ($lease->property?->city ? ($lease->property->city.' · '.$lease->property->address) : null) ?: $company['address'],
+        ];
+
+        $pdf = Pdf::loadView('agreements.rental-amharic', [
+            'lease' => $lease,
+            'order' => null,
+            'property' => $lease->property,
+            'agent' => $lease->agent,
+            'seller' => $seller,
+            'company' => $company,
+            'signature' => $this->leaseSignature($lease),
+            'overrides' => [],
+        ]);
+
+        $path = 'agreements/lease-'.$lease->id.'-'.now()->format('YmdHis').'.pdf';
+
+        Storage::disk('local')->put($path, $pdf->output());
+
+        if ($lease->agreement_document_path && $lease->agreement_document_path !== $path) {
+            Storage::disk('local')->delete($lease->agreement_document_path);
+        }
+
+        $lease->forceFill([
+            'agreement_document_path' => $path,
+        ])->save();
+
+        return $lease->refresh();
+    }
+
+    private function leaseSignature(Lease $lease): array
+    {
+        $fingerprint = implode('|', [
+            $lease->id,
+            $lease->lease_code,
+            $lease->tenant_email,
+            $lease->property_id,
+            $lease->monthly_rent,
+            $lease->agent_id,
+        ]);
+
+        $verification = strtoupper(substr(hash('sha256', $fingerprint), 0, 20));
+        $verification = implode('-', str_split($verification, 5));
+
+        return [
+            'signed_at' => $lease->created_at ?? now(),
+            'verification' => $verification,
+            'method' => 'Electronic acceptance on the '.SiteSetting::get('site_name', 'GTP Real Estate').' portal',
+        ];
     }
 
     /**

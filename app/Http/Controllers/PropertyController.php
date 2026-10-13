@@ -6,6 +6,7 @@ use App\Http\Requests\PropertyFormRequest;
 use App\Models\Property;
 use App\Models\PropertyImage;
 use App\Services\EthiopianGeoService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -420,10 +421,18 @@ class PropertyController extends Controller
         return $this->propertyRedirect('Property deleted successfully.');
     }
 
-    protected function propertyRedirect(string $message): RedirectResponse
+    protected function propertyRedirect(string $message, string $section = 'properties'): RedirectResponse|JsonResponse
     {
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => $section,
+            ]);
+        }
+
         $user = auth()->user();
-        $target = route('dashboard');
+        $target = route('dashboard').'#'.$section;
 
         if ($user) {
             if ($user->isCompany()) {
@@ -437,7 +446,8 @@ class PropertyController extends Controller
             } elseif ($user->role === 'developer') {
                 $target = route('developer.portal');
             } else {
-                $target = $user->dashboard_url;
+                $dashboardUrl = $user->dashboard_url;
+                $target = $dashboardUrl === route('dashboard') ? route('dashboard').'#'.$section : $dashboardUrl;
             }
         }
 

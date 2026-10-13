@@ -63,6 +63,14 @@ class AgentController extends Controller
      */
     public function storeFeedback(Request $request, Agent $agent)
     {
+        if (! auth()->check()) {
+            return $this->redirectGuestToSignup(
+                $request,
+                route('agents.show', $agent),
+                'Register / Login to continue: Create a client account or sign in before leaving agent feedback.'
+            );
+        }
+
         $validated = $request->validateWithBag('feedback', [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],

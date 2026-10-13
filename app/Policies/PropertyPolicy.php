@@ -73,17 +73,7 @@ class PropertyPolicy
             return true;
         }
 
-        return in_array($user->role, [
-            'seller',
-            'property_owner',
-            'landlord',
-            'host',
-            'agent',
-            'developer',
-            'company_admin',
-            'branch_manager',
-            'real_estate_company',
-        ], true);
+        return false;
     }
 
     /**

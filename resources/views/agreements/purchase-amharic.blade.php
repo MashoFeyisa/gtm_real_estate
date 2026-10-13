@@ -280,7 +280,8 @@
     <table class="property-summary">
         <tr>
             <th>የንብረቱ አይነት</th>
-            <td>{{ $o['property_category'] ?? ucfirst($property->property_category ?? 'መኖሪያ ቤት') }}</td>
+
+            <td>{{ $o['property_category'] ?? ucwords(str_replace('_', ' ', (string) ($property->property_category ?? 'መኖሪያ ቤት'))) }}</td>
         </tr>
         <tr>
             <th>ክልል/ከተማ</th>
@@ -440,7 +441,7 @@
                     <div>የፊርማ ሰው፦ {{ $o['seller_name'] ?? $seller['name'] }}{{ ($o['seller_email'] ?? $seller['email']) ? ' ('.($o['seller_email'] ?? $seller['email']).')' : '' }}</div>
                     <div>የተፈረመበት ጊዜ፦ {{ $signature['signed_at']->format('d/m/Y · H:i') }}</div>
                     <div>የማረጋገጫ ኮድ፦ <span class="ds-code">{{ $signature['verification'] }}</span></div>
-                    <div>የሰነድ ማጣቀሻ፦ GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
+                    <div>የሰነድ ማጣቀሻ፦ GTM-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
                 </div>
             </td>
             <td>
@@ -450,7 +451,7 @@
                     <div>የፊርማ ሰው፦ {{ $o['buyer_name'] ?? $order->name }} ({{ $o['buyer_email'] ?? $order->email }})</div>
                     <div>የተፈረመበት ጊዜ፦ {{ $signature['signed_at']->format('d/m/Y · H:i') }}</div>
                     <div>የማረጋገጫ ኮድ፦ <span class="ds-code">{{ $signature['verification'] }}</span></div>
-                    <div>የሰነድ ማጣቀሻ፦ GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
+                    <div>የሰነድ ማጣቀሻ፦ GTM-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
                 </div>
             </td>
         </tr>

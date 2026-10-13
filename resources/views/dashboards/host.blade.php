@@ -7,71 +7,44 @@
     <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">
         <span>📊 Overview</span>
     </a>
-    <a href="#bookings" data-target-section="bookings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>📅</span>
-            <span>Bookings & Arrivals</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $upcomingBookings->count() }}</span>
-    </a>
-    <a href="#accommodations" data-target-section="accommodations" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>🏡</span>
-            <span>Accommodations</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $properties->count() }}</span>
-    </a>
-    <a href="#reviews-payouts" data-target-section="reviews-payouts" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>💰</span>
-            <span>Reviews & Payouts</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $reviews->count() }}</span>
-    </a>
+    @if (auth()->user()->hasAnyPermission(['bookings.view', 'bookings.manage', 'stays.view', 'stays.booking_view']))
+        <a href="#bookings" data-target-section="bookings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>📅</span>
+                <span>Bookings & Arrivals</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $upcomingBookings->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['stays.listing_create', 'stays.listing_update', 'properties.create', 'properties.view']))
+        <a href="#accommodations" data-target-section="accommodations" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>🏡</span>
+                <span>Accommodations</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $properties->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['reviews.view', 'reviews.reply', 'payouts.view', 'stays.payouts']))
+        <a href="#reviews-payouts" data-target-section="reviews-payouts" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>💰</span>
+                <span>Reviews & Payouts</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $reviews->count() }}</span>
+        </a>
+    @endif
 @endsection
 
 @section('content')
 <div x-data="{ openStayModal: false }" class="space-y-8">
-    {{-- Banner --}}
-    <div id="overview" class="scroll-mt-6 rounded-3xl border border-[#d9cab3] bg-gradient-to-r from-[#1d3c34] to-[#2d5d4d] p-6 text-white shadow-sm md:p-8">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <span class="rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-3 py-1 text-xs font-bold text-[#f8e7b9] uppercase tracking-wider">Short-Stay Host</span>
-                <h1 class="mt-2 text-2xl md:text-3xl font-black text-white">Host Operations &amp; Hospitality Desk</h1>
-                <p class="mt-1 text-sm text-slate-200">Manage your short-stay listings, guest check-in calendar, occupancy rates, earnings, payouts, and reviews.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <button @click="openStayModal = true" type="button" class="rounded-full bg-emerald-500 hover:bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white transition shadow-sm flex items-center gap-1.5">
-                    <span>+</span> Register Short Stay
-                </button>
-                <a href="{{ route('stays.index') }}" class="rounded-full bg-[#d4af37] px-5 py-2.5 text-xs font-bold text-[#1d3c34] hover:bg-[#b7842d] transition shadow-sm">
-                    Short Stays Feed &rarr;
-                </a>
-            </div>
-        </div>
-
-        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-white/20 pt-6">
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Managed Stays</p>
-                <p class="text-2xl font-black text-white">{{ $properties->count() }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Total Bookings</p>
-                <p class="text-2xl font-black text-white">{{ $bookings->count() }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Est. Occupancy</p>
-                <p class="text-2xl font-black text-[#f8e7b9]">{{ $occupancyRate }}%</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Gross Revenue (ETB)</p>
-                <p class="text-2xl font-black text-emerald-300">{{ number_format($totalRevenue) }}</p>
-            </div>
-        </div>
+    {{-- Overview Analytics --}}
+    <div id="overview" data-section="overview" class="section-panel scroll-mt-6 space-y-8">
+        @include('dashboards.partials.analytics-charts')
     </div>
 
     {{-- 1. Upcoming & Checked-In Bookings --}}
-    <div id="bookings" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="bookings" data-section="bookings" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <h2 class="text-xl font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">Upcoming &amp; Live Bookings</h2>
         <div class="mt-4 overflow-x-auto">
             <table class="min-w-full divide-y divide-[#e7ddca] text-sm">
@@ -110,7 +83,7 @@
     </div>
 
     {{-- 2. Short-Stay Properties & Calendar Status --}}
-    <div id="accommodations" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="accommodations" data-section="accommodations" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <h2 class="text-xl font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">My Accommodations &amp; Calendar Availability</h2>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @forelse ($properties as $prop)
@@ -160,7 +133,7 @@
     </div>
 
     {{-- 3. Guest Reviews & Payout History --}}
-    <div id="reviews-payouts" class="scroll-mt-6 grid gap-6 md:grid-cols-2">
+    <div id="reviews-payouts" data-section="reviews-payouts" class="section-panel hidden scroll-mt-6 grid gap-6 md:grid-cols-2">
         <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
             <h3 class="text-lg font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">Guest Reviews &amp; Replies</h3>
             <div class="mt-4 space-y-4">

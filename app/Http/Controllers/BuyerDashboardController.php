@@ -19,6 +19,10 @@ class BuyerDashboardController extends Controller
     {
         $user = $request->user();
 
+        if ($user?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot open individual client dashboards.');
+        }
+
         $hasBuyerPerm = $user?->hasAnyPermission([
             'properties.browse',
             'searches.save',
@@ -28,7 +32,7 @@ class BuyerDashboardController extends Controller
             'property.view',
         ]);
 
-        if ($user?->status === 'suspended' || (! in_array($user?->role, ['buyer', 'client', 'user', 'guest'], true) && ! $user?->isAdmin() && ! $hasBuyerPerm)) {
+        if ($user?->status === 'suspended' || (! in_array($user?->role, ['buyer', 'client', 'user', 'guest'], true) && ! $hasBuyerPerm)) {
             abort(403, 'Permission denied: Property browsing access required.');
         }
 

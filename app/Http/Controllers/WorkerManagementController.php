@@ -47,6 +47,19 @@ use Illuminate\View\View;
 
 class WorkerManagementController extends Controller
 {
+    protected function dashboardSectionRedirect(string $section, string $message): RedirectResponse|JsonResponse
+    {
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => $section,
+            ]);
+        }
+
+        return redirect()->to(route('dashboard').'#'.$section)->with('success', $message);
+    }
+
     public function dashboard(Request $request)
     {
         $user = auth()->user();
@@ -57,6 +70,12 @@ class WorkerManagementController extends Controller
             'platform.audit_view',
             'platform.users_manage',
             'platform.settings_manage',
+            'users.view',
+            'users.update',
+            'users.manage',
+            'users.create',
+            'users.delete',
+            'users.suspend',
         ]);
 
         if (! $user || (! $user->isAdmin() && ! $hasAdminPerm)) {
@@ -228,6 +247,14 @@ class WorkerManagementController extends Controller
 
         $roles = Role::with('permissions')->orderBy('name')->get();
         $auditLogs = AuditLog::with('user')->latest()->paginate(15, ['*'], 'audit_logs_page')->withQueryString();
+        $developmentActivities = AuditLog::with('user')
+            ->where(function ($q) {
+                $q->where('action', 'like', 'development.%')
+                    ->orWhere('entity_type', Project::class);
+            })
+            ->latest()
+            ->take(15)
+            ->get();
 
         return view('dashboard', compact(
             'users',
@@ -280,7 +307,8 @@ class WorkerManagementController extends Controller
             'allPermissions',
             'roleGrantsByPersona',
             'roles',
-            'auditLogs'
+            'auditLogs',
+            'developmentActivities'
         ));
     }
 
@@ -326,7 +354,7 @@ class WorkerManagementController extends Controller
 
         $this->syncAgentAccount($agent, $validated['password'] ?? null);
 
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'Agent created successfully.');
+        return $this->dashboardSectionRedirect('users', 'Agent created successfully.');
     }
 
     public function updateAgent(Request $request, Agent $agent)
@@ -370,7 +398,7 @@ class WorkerManagementController extends Controller
         $agent->update($data);
         $this->syncAgentAccount($agent, $validated['password'] ?? null);
 
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'Agent updated successfully.');
+        return $this->dashboardSectionRedirect('users', 'Agent updated successfully.');
     }
 
     /**
@@ -389,8 +417,7 @@ class WorkerManagementController extends Controller
 
         $status = $agent->is_active ? 'activated' : 'deactivated';
 
-        return redirect()->route('dashboard', ['section' => 'users'])
-            ->with('success', "Agent {$agent->name} has been {$status}.");
+        return $this->dashboardSectionRedirect('users', "Agent {$agent->name} has been {$status}.");
     }
 
     /**
@@ -430,7 +457,7 @@ class WorkerManagementController extends Controller
 
         $agent->delete();
 
-        return redirect()->route('dashboard')->with('success', 'Agent deleted successfully.');
+        return $this->dashboardSectionRedirect('users', 'Agent deleted successfully.');
     }
 
     public function storeUser(Request $request)
@@ -482,7 +509,7 @@ class WorkerManagementController extends Controller
 
         $currentUser->update($userData);
 
-        return redirect()->route('dashboard', ['section' => 'profile'])->with('success', 'Profile updated successfully.');
+        return $this->dashboardSectionRedirect('profile', 'Profile updated successfully.');
     }
 
     public function updateTestimonial(Request $request, AgentFeedback $testimonial)
@@ -511,7 +538,7 @@ class WorkerManagementController extends Controller
             'is_approved' => (bool) ($validated['is_approved'] ?? false),
         ]);
 
-        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial updated successfully.');
+        return $this->dashboardSectionRedirect('testimonials', 'Client testimonial updated successfully.');
     }
 
     public function deleteTestimonial(AgentFeedback $testimonial)
@@ -524,7 +551,7 @@ class WorkerManagementController extends Controller
 
         $testimonial->delete();
 
-        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial moved to trash.');
+        return $this->dashboardSectionRedirect('testimonials', 'Client testimonial moved to trash.');
     }
 
     public function restoreTestimonial(int $id)
@@ -538,7 +565,7 @@ class WorkerManagementController extends Controller
         $testimonial = AgentFeedback::onlyTrashed()->findOrFail($id);
         $testimonial->restore();
 
-        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Client testimonial restored successfully.');
+        return $this->dashboardSectionRedirect('testimonials', 'Client testimonial restored successfully.');
     }
 
     public function toggleTestimonialApproval(AgentFeedback $testimonial)
@@ -553,7 +580,7 @@ class WorkerManagementController extends Controller
             'is_approved' => ! $testimonial->is_approved,
         ]);
 
-        return redirect()->route('dashboard', ['section' => 'testimonials'])->with('success', 'Testimonial approval status updated.');
+        return $this->dashboardSectionRedirect('testimonials', 'Testimonial approval status updated.');
     }
 
     public function reviewOrder(Request $request, Order $order)
@@ -686,11 +713,9 @@ class WorkerManagementController extends Controller
             default => 'Your '.$validated['type'].' was posted successfully.',
         };
 
-        if ($request->filled('section')) {
-            return redirect()->route('dashboard', ['section' => $request->input('section')])->with('success', $message);
-        }
+        $targetSection = $request->input('section', 'blog-posts');
 
-        return redirect()->route('dashboard')->with('success', $message);
+        return $this->dashboardSectionRedirect($targetSection, $message);
     }
 
     public function updateBlogPost(Request $request, BlogPost $post)
@@ -749,11 +774,9 @@ class WorkerManagementController extends Controller
 
         $message = 'The '.$post->type.' post was updated successfully.';
 
-        if ($request->filled('section')) {
-            return redirect()->route('dashboard', ['section' => $request->input('section')])->with('success', $message);
-        }
+        $targetSection = $request->input('section', 'blog-posts');
 
-        return redirect()->route('dashboard')->with('success', $message);
+        return $this->dashboardSectionRedirect($targetSection, $message);
     }
 
     public function togglePublish(BlogPost $post)
@@ -776,7 +799,7 @@ class WorkerManagementController extends Controller
             ]);
         }
 
-        return redirect()->route('dashboard')->with('success', 'The post publication status was updated.');
+        return $this->dashboardSectionRedirect('blog-posts', 'The post publication status was updated.');
     }
 
     public function deleteBlogPost(BlogPost $post)
@@ -797,11 +820,9 @@ class WorkerManagementController extends Controller
 
         $post->delete();
 
-        if (request()->filled('section')) {
-            return redirect()->route('dashboard', ['section' => request()->input('section')])->with('success', 'The post was deleted successfully.');
-        }
+        $targetSection = request()->input('section', 'blog-posts');
 
-        return redirect()->route('dashboard')->with('success', 'The post was deleted successfully.');
+        return $this->dashboardSectionRedirect($targetSection, 'The post was deleted successfully.');
     }
 
     /**
@@ -1273,11 +1294,10 @@ class WorkerManagementController extends Controller
 
         Branch::create($validated);
 
-        return redirect()->route('dashboard', ['section' => 'branches'])
-            ->with('success', 'Branch created successfully.');
+        return $this->dashboardSectionRedirect('branches', 'Branch created successfully.');
     }
 
-    public function updateBranch(Request $request, Branch $branch): RedirectResponse
+    public function updateBranch(Request $request, Branch $branch): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -1299,15 +1319,13 @@ class WorkerManagementController extends Controller
 
         $branch->update($validated);
 
-        return redirect()->route('dashboard', ['section' => 'branches'])
-            ->with('success', 'Branch updated successfully.');
+        return $this->dashboardSectionRedirect('branches', 'Branch updated successfully.');
     }
 
-    public function deleteBranch(Branch $branch): RedirectResponse
+    public function deleteBranch(Branch $branch): RedirectResponse|JsonResponse
     {
         $branch->delete();
 
-        return redirect()->route('dashboard', ['section' => 'branches'])
-            ->with('success', 'Branch deleted successfully.');
+        return $this->dashboardSectionRedirect('branches', 'Branch deleted successfully.');
     }
 }

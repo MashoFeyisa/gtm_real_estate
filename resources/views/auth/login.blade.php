@@ -3,79 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login</title>
+    <title>Sign In &bull; {{ $siteBrand['name'] ?? 'GTM Real Estate' }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('layouts.partials.theme-styles')
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        }
+        .font-serif-luxury {
+            font-family: 'Playfair Display', Georgia, serif;
+        }
+        @keyframes auth-panel-in {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .auth-panel-in {
+            animation: auth-panel-in 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+    </style>
 </head>
-<body class="bg-[#f6f1e8] text-slate-800 antialiased">
-    <div class="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-10 sm:px-6 lg:py-12">
-        <div class="grid w-full overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_80px_rgba(29,60,52,0.18)] ring-1 ring-[#d9cab3] lg:grid-cols-[1.05fr_0.95fr]">
-            <div class="bg-gradient-to-br from-[#1d3c34] via-[#2a4c42] to-[#6e7d68] p-6 text-[#f9f3e9] sm:p-10">
-                <div class="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-3 py-2">
-                    <img src="{{ $siteBrand['logoUrl'] }}" alt="{{ $siteBrand['name'] }} Logo" class="h-10 w-10 rounded-xl object-contain ring-2 ring-[#d9cab3] bg-white/60">
-                    <span class="text-sm font-bold uppercase tracking-[0.22em]">{{ $siteBrand['name'] ?: 'Real Estate' }}</span>
-                </div>
-                <h1 class="mt-8 text-4xl font-black">Welcome back</h1>
-                <p class="mt-4 max-w-sm text-base leading-7 text-[#e7efe8]">
-                    Sign in to manage properties, review client requests, and run your real-estate operations with confidence.
-                </p>
-                <div class="mt-10 rounded-[1.5rem] border border-white/20 bg-white/5 p-5 backdrop-blur-sm">
-                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#d9cab3]">Operations</p>
-                    <div class="mt-4 grid grid-cols-3 gap-3 text-center">
-                        <div class="rounded-xl bg-white/5 p-3">
-                            <div class="text-xl font-black">{{ $listingsCount ?? \App\Models\Property::count() }}</div>
-                            <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Listings</div>
-                        </div>
-                        <div class="rounded-xl bg-white/5 p-3">
-                            <div class="text-xl font-black">24/7</div>
-                            <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Support</div>
-                        </div>
-                        <div class="rounded-xl bg-white/5 p-3">
-                            <div class="text-xl font-black">{{ $agentsCount ?? \App\Models\Agent::count() }}</div>
-                            <div class="text-[10px] uppercase tracking-[0.18em] text-[#dfeee4]">Agents</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<body class="min-h-screen bg-[#f5f0e7] text-slate-800 antialiased flex flex-col justify-between selection:bg-[#1d3c34] selection:text-white">
+    {{-- Top Utility Header --}}
+    <header class="w-full px-5 py-4 sm:px-8">
+        <div class="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <a href="{{ route('home') }}" class="group inline-flex items-center gap-3 transition">
+                <img src="{{ $siteBrand['logoUrl'] }}" alt="{{ $siteBrand['name'] }} Logo" class="h-11 w-11 rounded-xl bg-white object-contain ring-2 ring-[#d9cab3] shadow-xs group-hover:scale-105 transition-transform">
+                <span class="leading-tight">
+                    <span class="block text-base font-extrabold tracking-tight text-[#1d3c34]">{{ $siteBrand['name'] ?: 'GTM Real Estate' }}</span>
+                    <span class="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#9b6c17]">Ethiopian Prime Properties</span>
+                </span>
+            </a>
 
-            <div class="p-6 sm:p-10">
-                <h2 class="text-3xl font-black text-[#1d3c34]">Sign In</h2>
-                <p class="mt-2 text-sm text-slate-600">Admins go to the dashboard. Agents go to their portal.</p>
-
-                @if ($errors->any())
-                    <div class="mt-5 rounded-xl border border-[#efc9c4] bg-[#fff2f1] px-4 py-3 text-sm text-[#9e3f3a]">
-                        {{ $errors->first() }}
-                    </div>
-                @endif
-
-                <form method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">
-                    @csrf
-
-                    <div>
-                        <label for="email" class="mb-2 block text-sm font-semibold text-slate-700">Email address</label>
-                        <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus
-                            class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-4 py-3 text-slate-900 outline-none transition focus:border-[#2d5d4d] focus:ring-4 focus:ring-[#dfeee4]">
-                    </div>
-
-                    <div>
-                        <label for="password" class="mb-2 block text-sm font-semibold text-slate-700">Password</label>
-                        <input id="password" name="password" type="password" required
-                            class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-4 py-3 text-slate-900 outline-none transition focus:border-[#2d5d4d] focus:ring-4 focus:ring-[#dfeee4]">
-                    </div>
-
-                    <div class="flex items-center justify-between text-sm">
-                        <label class="flex items-center gap-2 text-slate-600">
-                            <input type="checkbox" name="remember" class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#2d5d4d]">
-                            Remember me
-                        </label>
-                        <a href="{{ route('home') }}" class="font-semibold text-[#2d5d4d] hover:text-[#1d3c34]">Back home</a>
-                    </div>
-
-                    <button type="submit" class="w-full rounded-xl bg-[#1d3c34] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#1d3c34]/20 transition hover:bg-[#244d42]">
-                        Sign in
-                    </button>
-                </form>
-            </div>
+            <a href="{{ route('home') }}" class="group inline-flex items-center gap-1.5 rounded-full border border-[#d9cab3] bg-white px-4 py-2 text-xs font-bold text-[#1d3c34] shadow-2xs transition hover:border-[#1d3c34] hover:bg-[#fdfbf7]">
+                <svg class="h-4 w-4 text-[#9b6c17] group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                <span>Back to Home</span>
+            </a>
         </div>
-    </div>
+    </header>
+
+    {{-- Main Auth Workspace --}}
+    <main class="mx-auto flex w-full max-w-6xl flex-1 items-center px-4 py-6 sm:px-6 md:py-10">
+        <div class="auth-panel-in my-auto grid w-full overflow-hidden rounded-[2rem] border border-[#d9cab3]/80 bg-white shadow-[0_25px_70px_rgba(29,60,52,0.14)] lg:grid-cols-12">
+
+            {{-- Left Column: Hero Client Key Handover Showcase --}}
+            <section class="group relative flex min-h-[430px] flex-col overflow-hidden bg-[#102b25] text-white lg:col-span-5 lg:min-h-[700px]">
+                <img src="{{ asset('images/auth-client-key.jpg') }}" alt="Client receiving keys to their dream luxury house" class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-1000 ease-out group-hover:scale-105">
+
+                {{-- Dual Gradient Masks for High Contrast & Readability --}}
+                <div class="absolute inset-0 bg-gradient-to-b from-[#102b25]/90 via-[#102b25]/45 to-[#102b25]/90 pointer-events-none"></div>
+                <div class="absolute inset-y-0 right-0 hidden w-px bg-gradient-to-b from-transparent via-[#d4af37]/60 to-transparent lg:block pointer-events-none"></div>
+
+                <div class="relative z-10 flex flex-1 flex-col justify-between gap-10 p-6 sm:p-9">
+                    {{-- Top: Badges + Heading --}}
+                    <div class="space-y-5">
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <span class="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-3.5 py-1.5 text-xs font-bold text-[#f4ebd9] backdrop-blur-md">
+                                <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Verified Client Portal
+                            </span>
+
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#102b25]">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg>
+                                Key Handover Certified
+                            </span>
+                        </div>
+
+                        <div class="space-y-2.5">
+                            <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-[#d4af37]">Homeownership &bull; Guaranteed Security</p>
+                            <h1 class="font-serif-luxury text-[1.75rem] font-semibold leading-[1.15] text-white drop-shadow-md sm:text-4xl lg:text-[2.5rem]">
+                                The Moment You Receive the Keys.
+                            </h1>
+                            <p class="max-w-sm text-sm leading-relaxed text-[#dfeee4]">
+                                A private client portal for saved homes, private viewings and verified offers across Ethiopia.
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- Bottom: Escrow Assurance Badge --}}
+                    <span class="inline-flex items-center gap-1.5 self-start rounded-2xl border border-white/20 bg-black/45 px-3.5 py-2 text-xs font-semibold text-[#f4ebd9] backdrop-blur-md">
+                        <svg class="h-4 w-4 text-[#d4af37]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/></svg>
+                        Verified Escrow
+                    </span>
+                </div>
+            </section>
+
+            {{-- Right Column: Modern Authentication Form --}}
+            <section class="flex flex-col justify-center bg-white p-6 sm:p-9 lg:col-span-7 lg:p-12">
+                <div class="mx-auto w-full max-w-lg">
+                    {{-- Mode Switch: Sign In / Create Account --}}
+                    <div class="flex items-center justify-between gap-3">
+                        <nav class="inline-flex rounded-full border border-[#d9cab3] bg-[#f5f0e7] p-1" aria-label="Authentication">
+                            <a href="{{ route('login') }}" aria-current="page" class="rounded-full bg-[#1d3c34] px-5 py-2 text-xs font-extrabold text-white shadow-sm transition">Sign In</a>
+                            <a href="{{ route('register') }}" id="btn-goto-signup" class="rounded-full px-5 py-2 text-xs font-bold text-[#587165] transition hover:text-[#1d3c34]">Create Account</a>
+                        </nav>
+
+                        <span class="hidden items-center gap-1.5 text-[11px] font-bold text-[#587165] sm:inline-flex">
+                            <svg class="h-3.5 w-3.5 text-[#9b6c17]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                            Secure Sign In
+                        </span>
+                    </div>
+
+                    {{-- Form Header --}}
+                    <div class="mt-8">
+                        <p class="text-[11px] font-black uppercase tracking-[0.25em] text-[#9b6c17]">Account Access</p>
+                        <h2 class="mt-2 font-serif-luxury text-3xl font-semibold text-[#102b25] sm:text-[2.1rem]">Welcome Back</h2>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-500">Sign in to manage saved properties, private viewings and active offers.</p>
+                        <div class="mt-5 h-px bg-gradient-to-r from-[#d4af37] via-[#d9cab3] to-transparent"></div>
+                    </div>
+
+                    {{-- Session Alerts --}}
+                    @if (session('signin_prompt'))
+                        <div role="alert" class="mt-6 flex items-start gap-2.5 rounded-2xl border border-[#d4af37]/60 bg-[#fff9ea] p-4 text-xs text-[#715418]">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-[#9b6c17]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" clip-rule="evenodd"/></svg>
+                            <p class="font-semibold leading-relaxed">{{ session('signin_prompt') }}</p>
+                        </div>
+                    @endif
+
+                    @if (session('signup_prompt'))
+                        <div role="alert" class="mt-6 flex items-start gap-2.5 rounded-2xl border border-[#d4af37]/60 bg-[#fff9ea] p-4 text-xs text-[#715418]">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-[#9b6c17]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" clip-rule="evenodd"/></svg>
+                            <div>
+                                <span class="block font-black text-xs uppercase tracking-wider text-[#9b6c17] mb-0.5">Register / Login to continue</span>
+                                <p class="font-semibold leading-relaxed">{{ session('signup_prompt') }}</p>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if (session('status'))
+                        <div role="status" class="mt-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <p class="leading-relaxed">{{ session('status') }}</p>
+                        </div>
+                    @endif
+
+                    @if (session('warning'))
+                        <div role="alert" class="mt-6 flex items-start gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                            <p class="leading-relaxed">{{ session('warning') }}</p>
+                        </div>
+                    @endif
+
+                    @if ($errors->any())
+                        <div role="alert" class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">
+                            <div class="flex items-center gap-2 font-bold">
+                                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 1110 2a8 8 0 018 8zm-7 4a1 1 0 100-2 1 1 0 000 2zm1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                <span>Sign In Error</span>
+                            </div>
+                            <p class="mt-1 font-medium leading-relaxed text-rose-700">{{ $errors->first() }}</p>
+                        </div>
+                    @endif
+
+                    {{-- The Sign In Form --}}
+                    <form method="POST" action="{{ route('login') }}" class="mt-7 space-y-4">
+                        @csrf
+
+                        {{-- Email Input --}}
+                        <div>
+                            <label for="email" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">Email Address <span class="text-[#9b6c17]">*</span></label>
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"/></svg>
+                                </span>
+                                <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus
+                                    autocomplete="email"
+                                    placeholder="client@example.com"
+                                    class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfbf7] py-3 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1d3c34] focus:bg-white focus:ring-4 focus:ring-[#1d3c34]/20">
+                            </div>
+                        </div>
+
+                        {{-- Password Input with Toggle --}}
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label for="password" class="block text-xs font-bold uppercase tracking-wider text-slate-600">Password <span class="text-[#9b6c17]">*</span></label>
+                                <span class="text-[11px] font-semibold text-slate-400">Case-sensitive</span>
+                            </div>
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </span>
+                                <input id="password" name="password" type="password" required
+                                    autocomplete="current-password"
+                                    placeholder="Enter your account password"
+                                    class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfbf7] py-3 pl-11 pr-11 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1d3c34] focus:bg-white focus:ring-4 focus:ring-[#1d3c34]/20">
+
+                                <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-[#1d3c34] focus:outline-none transition cursor-pointer" aria-label="Toggle password visibility" title="Show or hide password">
+                                    <svg id="eye-icon" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    <svg id="eye-slash-icon" class="hidden h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Remember Me & Account Recovery --}}
+                        <div class="flex items-center justify-between gap-3 text-xs pt-1">
+                            <label class="flex items-center gap-2 font-medium text-slate-600 cursor-pointer">
+                                <input type="checkbox" name="remember" class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                <span>Remember me</span>
+                            </label>
+                            <a href="{{ route('password.request') }}" class="font-bold text-[#9b6c17] hover:text-[#1d3c34] transition hover:underline">
+                                Forgot password?
+                            </a>
+                        </div>
+
+                        {{-- Submit Button: Sign In --}}
+                        <button type="submit" id="btn-submit-signin" class="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1d3c34] px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_30px_-10px_rgba(29,60,52,0.55)] transition hover:-translate-y-0.5 hover:bg-[#254d43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#d4af37] active:translate-y-0">
+                            <span>Sign In</span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12l-7.5 7.5M21 12H3"/></svg>
+                        </button>
+
+                        {{-- Security Footnote --}}
+                        <p class="flex items-center justify-center gap-1.5 pt-1 text-[11px] font-semibold text-slate-400">
+                            <svg class="h-3.5 w-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                            <span>Protected by 256-bit SSL encryption</span>
+                        </p>
+                    </form>
+
+                    {{-- 1-Click Demo Account Quick Fill --}}
+                    <div class="mt-6 border-t border-[#e7ddca] pt-5">
+                        <details class="group rounded-2xl border border-[#d9cab3] bg-[#fbf9f5] p-3.5 text-xs">
+                            <summary class="flex cursor-pointer items-center justify-between font-bold text-[#1d3c34] select-none">
+                                <span class="flex items-center gap-2">
+                                    <span>🔑</span>
+                                    <span>Demo Accounts &bull; 1-Click Quick Fill (Password: secret123)</span>
+                                </span>
+                                <span class="text-[10px] font-black uppercase text-[#9b6c17] transition-transform group-open:rotate-180">▼</span>
+                            </summary>
+                            <p class="mt-2 text-[11px] text-slate-500">Click any role below to auto-populate the sign-in form:</p>
+
+                            @php
+                                $demoAccounts = [
+                                    ['role' => 'Administrator', 'email' => 'admin@realestate.com'],
+                                    ['role' => 'Company (GTM)', 'email' => 'company@realestate.com'],
+                                    ['role' => 'Agent / Broker', 'email' => 'agent@realestate.com'],
+                                    ['role' => 'Buyer', 'email' => 'buyer@realestate.com'],
+                                    ['role' => 'Tenant', 'email' => 'tenant@realestate.com'],
+                                    ['role' => 'Guest / Traveler', 'email' => 'traveler@realestate.com'],
+                                    ['role' => 'Property Owner', 'email' => 'owner@realestate.com'],
+                                    ['role' => 'Host', 'email' => 'host@realestate.com'],
+                                    ['role' => 'Landlord', 'email' => 'landlord@realestate.com'],
+                                    ['role' => 'Developer', 'email' => 'developer@realestate.com'],
+                                    ['role' => 'Property Manager', 'email' => 'propertymanager@realestate.com'],
+                                    ['role' => 'Finance Officer', 'email' => 'finance@realestate.com'],
+                                    ['role' => 'Front Desk / Rec.', 'email' => 'receptionist@realestate.com'],
+                                    ['role' => 'Customer Support', 'email' => 'support@realestate.com'],
+                                    ['role' => 'Cleaner / Housek.', 'email' => 'cleaner@realestate.com'],
+                                    ['role' => 'Investor', 'email' => 'investor@realestate.com'],
+                                    ['role' => 'Campaign Officer', 'email' => 'campaign@realestate.com'],
+                                    ['role' => 'Moderator', 'email' => 'moderator@realestate.com'],
+                                    ['role' => 'Verification Off.', 'email' => 'verification@realestate.com'],
+                                    ['role' => 'Verification Co.', 'email' => 'verifycompany@realestate.com'],
+                                    ['role' => 'Professional Serv.', 'email' => 'service@realestate.com'],
+                                ];
+                            @endphp
+                            <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-60 overflow-y-auto pr-1">
+                                @foreach ($demoAccounts as $acc)
+                                    <button type="button" onclick="fillDemoAccount('{{ $acc['email'] }}', 'secret123')" class="flex flex-col text-left rounded-xl border border-[#e7ddca] bg-white p-2 hover:border-[#1d3c34] hover:bg-[#f3eadc] transition cursor-pointer">
+                                        <span class="text-[11px] font-bold text-[#1d3c34] leading-tight">{{ $acc['role'] }}</span>
+                                        <span class="text-[9px] text-slate-400 font-mono truncate">{{ $acc['email'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    {{-- Bottom Footnote --}}
+    <footer class="w-full px-5 py-5">
+        <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-xs text-slate-500 sm:flex-row">
+            <p>
+                &copy; {{ date('Y') }} {{ $siteBrand['name'] ?: 'GTM Real Estate' }}. All rights reserved.
+                <span class="mx-1 text-slate-300">&bull;</span>
+                <span class="font-bold text-[#587165]">{{ $listingsCount ?? \App\Models\Property::count() }} Live Listings <span class="text-slate-300">&bull;</span> {{ $agentsCount ?? \App\Models\Agent::count() }} Verified Agents</span>
+            </p>
+            <nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 font-semibold">
+                <a href="{{ route('home') }}" class="transition hover:text-[#1d3c34]">Browse Listings</a>
+                <a href="{{ route('terms') }}" class="transition hover:text-[#1d3c34]">Terms of Service</a>
+                <a href="{{ route('privacy-policy') }}" class="transition hover:text-[#1d3c34]">Privacy Policy</a>
+            </nav>
+        </div>
+    </footer>
+
+    {{-- Toggle Password Visibility Script & Demo Filler --}}
+    <script>
+        function fillDemoAccount(email, password) {
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            if (emailInput && passwordInput) {
+                emailInput.value = email;
+                passwordInput.value = password;
+                emailInput.classList.add('ring-2', 'ring-[#1d3c34]');
+                passwordInput.classList.add('ring-2', 'ring-[#1d3c34]');
+                setTimeout(() => {
+                    emailInput.classList.remove('ring-2', 'ring-[#1d3c34]');
+                    passwordInput.classList.remove('ring-2', 'ring-[#1d3c34]');
+                }, 600);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const togglePasswordBtn = document.getElementById('toggle-password');
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            const eyeSlashIcon = document.getElementById('eye-slash-icon');
+
+            if (togglePasswordBtn && passwordInput) {
+                togglePasswordBtn.addEventListener('click', function () {
+                    const isPassword = passwordInput.getAttribute('type') === 'password';
+                    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+                    if (eyeIcon && eyeSlashIcon) {
+                        eyeIcon.classList.toggle('hidden', isPassword);
+                        eyeSlashIcon.classList.toggle('hidden', !isPassword);
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

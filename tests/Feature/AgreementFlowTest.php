@@ -80,7 +80,7 @@ test('request on a rent property stores type rent with lease details', function 
     expect($order->lease_start)->not->toBeNull();
 });
 
-test('accepting an order generates a branded agreement pdf', function () {
+test('agent acceptance submits an order for admin review without generating the agreement', function () {
     Storage::fake('local');
     Mail::fake();
 
@@ -96,27 +96,23 @@ test('accepting an order generates a branded agreement pdf', function () {
         'status' => 'pending',
     ]);
 
-    $this->actingAs($account)
+    $response = $this->actingAs($account)
         ->patch('/agent-portal/orders/'.$order->id.'/status', ['status' => 'accepted'])
-        ->assertRedirect('/agent-portal')
-        ->assertSessionHas('success', 'The buy request was accepted and the agreement was generated.');
+        ->assertRedirect('/agent-portal');
 
     $order->refresh();
 
     expect($order->status)->toBe('accepted');
-    expect($order->agreement_path)->not->toBeNull();
+    expect($order->admin_status)->toBe('pending');
+    expect($order->submitted_to_admin_at)->not->toBeNull();
+    expect($order->agreement_path)->toBeNull();
     expect($order->agreed_at)->not->toBeNull();
-    Storage::disk('local')->assertExists($order->agreement_path);
-
-    $pdf = Storage::disk('local')->get($order->agreement_path);
-    expect(str_starts_with($pdf, '%PDF'))->toBeTrue();
-    // Sale agreements use the Amharic purchase template, so the Ethiopic font is embedded.
-    expect($pdf)->toContain('NotoSansEthiopic');
+    expect(Commission::where('order_id', $order->id)->value('status'))->toBe('pending');
 
     Mail::assertSent(OrderStatusUpdate::class, fn ($mail) => $mail->order->id === $order->id);
 });
 
-test('accepted rental order generates a rental agreement pdf', function () {
+test('agent rental acceptance waits for admin commission review before generating an agreement', function () {
     Storage::fake('local');
 
     [$agent, $account, $property] = createAgentWithProperty('rent');
@@ -134,28 +130,36 @@ test('accepted rental order generates a rental agreement pdf', function () {
 
     $this->actingAs($account)
         ->patch('/agent-portal/orders/'.$order->id.'/status', ['status' => 'accepted'])
-        ->assertRedirect('/agent-portal');
+        ->assertRedirect('/agent-portal')
+        ->assertSessionHas('success', 'The rental request was submitted to Admin for commission review.');
 
     $order->refresh();
-    expect($order->agreement_path)->not->toBeNull();
-
-    $pdf = Storage::disk('local')->get($order->agreement_path);
-    expect(str_starts_with($pdf, '%PDF'))->toBeTrue();
-    // The Amharic lease template embeds the Ethiopic font subset.
-    expect($pdf)->toContain('NotoSansEthiopic');
+    expect($order->admin_status)->toBe('pending')
+        ->and($order->agreement_path)->toBeNull()
+        ->and(Commission::where('order_id', $order->id)->exists())->toBeTrue();
 });
 
-test('agent can download the generated agreement pdf', function () {
+test('agent generates and buyer downloads an agreement only after commission collection and admin approval', function () {
     Storage::fake('local');
 
     [$agent, $account, $property] = createAgentWithProperty('sale');
+    $admin = User::factory()->create([
+        'name' => 'Agreement Reviewer',
+        'email' => 'agreement.reviewer@example.com',
+        'role' => 'admin',
+    ]);
+    $buyer = User::factory()->create([
+        'name' => 'Agreement Buyer',
+        'email' => 'download.buyer@example.com',
+        'role' => 'client',
+    ]);
 
     $order = Order::create([
         'property_id' => $property->id,
         'agent_id' => $agent->id,
         'type' => 'sale',
         'name' => 'Download Buyer',
-        'email' => 'download.buyer@example.com',
+        'email' => $buyer->email,
         'status' => 'pending',
     ]);
 
@@ -163,9 +167,51 @@ test('agent can download the generated agreement pdf', function () {
         ->patch('/agent-portal/orders/'.$order->id.'/status', ['status' => 'accepted']);
 
     $order->refresh();
+    expect($order->hasAgreement())->toBeFalse();
 
     $this->actingAs($account)
-        ->get('/orders/'.$order->id.'/agreement')
+        ->post(route('agent.orders.generateAgreement', $order))
+        ->assertForbidden();
+
+    $this->actingAs($buyer)
+        ->get(route('orders.agreement', $order))
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->post(route('dashboard.orders.review', $order), ['admin_status' => 'approved'])
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect($order->fresh()->admin_status)->toBe('pending');
+
+    $collectionResponse = $this->actingAs($admin)
+        ->post(route('dashboard.orders.collectCommission', $order), [
+            'collection_reference' => 'RCPT-ORDER-2026-001',
+        ]);
+
+    $collectionResponse->assertRedirect()->assertSessionHas('success');
+    $this->assertDatabaseHas('financial_ledgers', [
+        'entry_type' => 'credit',
+        'category' => 'website_commission',
+        'reference' => 'ORDER-WEBSITE-COMMISSION-'.$order->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('dashboard.orders.review', $order), ['admin_status' => 'approved'])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $generateResponse = $this->actingAs($account)
+        ->post(route('agent.orders.generateAgreement', $order));
+
+    $generateResponse->assertRedirect()->assertSessionHas('success');
+    $order->refresh();
+    expect($order->hasAgreement())->toBeTrue()
+        ->and($order->admin_status)->toBe('approved');
+    Storage::disk('local')->assertExists($order->agreement_path);
+
+    $this->actingAs($buyer)
+        ->get(route('orders.agreement', $order))
         ->assertOk();
 });
 

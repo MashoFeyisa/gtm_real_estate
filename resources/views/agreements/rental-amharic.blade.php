@@ -234,13 +234,24 @@
         </table>
     </div>
 
+    @php
+        $docCode = $lease->lease_code ?? ('GTP-AGR-' . str_pad((string) ($order->id ?? 1), 5, '0', STR_PAD_LEFT));
+        $buyerName = $o['buyer_name'] ?? ($lease->tenant_name ?? $order->name ?? '________________');
+        $buyerPhone = $o['buyer_phone'] ?? ($lease->tenant_phone ?? $order->phone ?? '________________');
+        $buyerEmail = $o['buyer_email'] ?? ($lease->tenant_email ?? $order->email ?? '________________');
+        $rentAmt = $o['offer_amount'] ?? number_format($lease->monthly_rent ?? $order->offer_amount ?? $property->price, 2);
+        $durationMonths = $o['lease_months'] ?? ($lease->duration_months ?? $order->lease_months ?? 12);
+        $startDate = $lease->start_date ?? $order->lease_start ?? now();
+        $endDate = $lease->end_date ?? (($order->lease_start ?? now())->copy()->addMonths((int) $durationMonths));
+    @endphp
+
     <div class="campaign-banner">ኦፊሴላዊ የኪራይ ውል ሰነድ · {{ $company['name'] }} · {{ now()->format('Y') }}</div>
 
     <h1>የመኖሪያ ቤት ኪራይ ውል</h1>
-    <div class="doc-ref">ማጣቀሻ፦ GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }} · ተዘጋጅቷል {{ now()->format('d/m/Y') }}</div>
+    <div class="doc-ref">ማጣቀሻ፦ {{ $docCode }} · ተዘጋጅቷል {{ now()->format('d/m/Y') }}</div>
 
     <div class="header-line">
-        <p>የውል ቁጥር፦ <span class="blank">GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</span></p>
+        <p>የውል ቁጥር፦ <span class="blank">{{ $docCode }}</span></p>
         <p>የውል ቀን፦ <span class="blank">{{ now()->format('d/m/Y') }}</span> ዓ.ም.</p>
         <p>የውሉ ቦታ፦ <span class="blank">{{ $company['address'] }}</span></p>
     </div>
@@ -261,9 +272,15 @@
 
     <div class="party-block">
         <p><strong>1.2 ተከራይ</strong></p>
-        <p class="sub">ሙሉ ስም፦ <span class="blank">{{ $o['buyer_name'] ?? $order->name }}</span></p>
-        <p class="sub">ስልክ ቁጥር፦ <span class="blank">{{ $o['buyer_phone'] ?? $order->phone ?? '________________' }}</span></p>
-        <p class="sub">ኢሜይል፦ <span class="blank">{{ $o['buyer_email'] ?? $order->email }}</span></p>
+        <p class="sub">ሙሉ ስም፦ <span class="blank">{{ $buyerName }}</span></p>
+        <p class="sub">ስልክ ቁጥር፦ <span class="blank">{{ $buyerPhone }}</span></p>
+        <p class="sub">ኢሜይል፦ <span class="blank">{{ $buyerEmail }}</span></p>
+        @if (!empty($lease?->tenant_id_number))
+            <p class="sub">መታወቂያ ({{ strtoupper($lease->tenant_id_type) }})፦ <span class="blank">{{ $lease->tenant_id_number }}</span></p>
+        @endif
+        @if (!empty($lease?->emergency_contact_name))
+            <p class="sub">ተጠሪ ሰው፦ <span class="blank">{{ $lease->emergency_contact_name }} ({{ $lease->emergency_contact_phone }})</span></p>
+        @endif
         <p class="sub" style="font-size: 9px; color: #587165;">ከዚህ በኋላ “ተከራይ” ተብሎ ይጠራል።</p>
     </div>
 
@@ -304,35 +321,65 @@
     <div class="section-title">3. የኪራይ ዓላማ</div>
     <p>ተከራዩ ንብረቱን ለመኖሪያ ዓላማ ብቻ ይጠቀማል። ተከራዩ የንብረቱን አጠቃቀም ዓላማ ያለአከራዩ የጽሁፍ ፈቃድ መቀየር አይችልም።</p>
 
-    <div class="section-title">4. የኪራይ ዋጋ</div>
+    <div class="section-title">4. የኪራይ ዋጋ እና የክፍያ ውል</div>
     <table class="property-summary">
         <tr>
             <th>የወር ኪራይ</th>
-            <td><strong>{{ $o['offer_amount'] ?? number_format($order->offer_amount ?? $property->price, 2) }} ብር</strong></td>
+            <td><strong>{{ $rentAmt }} ብር</strong></td>
+        </tr>
+        @if (!empty($lease?->security_deposit) && $lease->security_deposit > 0)
+            <tr>
+                <th>ማስያዣ (Security Deposit)</th>
+                <td><strong>{{ number_format($lease->security_deposit, 2) }} ብር</strong></td>
+            </tr>
+        @endif
+        <tr>
+            <th>የክፍያ ድግግሞሽ</th>
+            <td>{{ ucfirst($lease->payment_frequency ?? 'በየወሩ በስምምነት መሠረት') }}</td>
         </tr>
         <tr>
             <th>የክፍያ ዘዴ</th>
-            <td>በየወሩ በስምምነት መሠረት</td>
+            <td>በቴሌብር (Telebirr)፣ በሲቢኢ ብር (CBE Birr) ወይም በባንክ ሂሳብ ክፍያ</td>
         </tr>
-        <tr>
-            <th>የክፍያ ቀን</th>
-            <td>በየወሩ የመጀመሪያ ቀን</td>
-        </tr>
-        @if ($o['agent_note'] ?? $order->agent_note)
+        @if ($o['agent_note'] ?? $order?->agent_note ?? $lease?->notes)
             <tr>
                 <th>የስምምነት ማስታወሻ</th>
-                <td>{{ $o['agent_note'] ?? $order->agent_note }}</td>
+                <td>{{ $o['agent_note'] ?? $order?->agent_note ?? $lease?->notes }}</td>
             </tr>
         @endif
     </table>
 
+    @if (isset($lease) && $lease->schedules && $lease->schedules->isNotEmpty())
+        <div class="section-title">5. የክፍያ የጊዜ ሰሌዳ (Payment Installment Schedule)</div>
+        <table class="property-summary" style="font-size: 8.5px;">
+            <thead>
+                <tr style="background: #edf2ee; font-weight: bold;">
+                    <th style="width: 10%;">#</th>
+                    <th style="width: 45%;">የክፍያ ወቅት (Period)</th>
+                    <th style="width: 25%;">የመክፈያ ቀን (Due Date)</th>
+                    <th style="width: 20%;">የክፍያ መጠን (ETB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($lease->schedules as $sched)
+                    <tr>
+                        <td>{{ $sched->installment_number }}</td>
+                        <td>{{ $sched->period_label }}</td>
+                        <td>{{ $sched->due_date?->format('d/m/Y') }}</td>
+                        <td><strong>{{ number_format($sched->amount_due, 2) }} ብር</strong></td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
     <div class="section-title">6. የውሉ የኪራይ ጊዜ</div>
     <p>
-        የኪራይ ጊዜ ከ፦ <span class="blank">{{ $order->lease_start?->format('d/m/Y') ?? now()->format('d/m/Y') }}</span> ዓ.ም.
-        እስከ፦ <span class="blank">{{ ($order->lease_start ?? now())->copy()->addMonths((int) ($order->lease_months ?? 12))->format('d/m/Y') }}</span> ዓ.ም.
+        የኪራይ ጊዜ ከ፦ <span class="blank">{{ $startDate->format('d/m/Y') }}</span> ዓ.ም.
+        እስከ፦ <span class="blank">{{ $endDate->format('d/m/Y') }}</span> ዓ.ም.
         ድረስ ይሆናል።
     </p>
-    <p>ጠቅላላ የኪራይ ጊዜ፦ <span class="blank">{{ $o['lease_months'] ?? $order->lease_months ?? 12 }} ወራት</span></p>
+    <p>ጠቅላላ የኪራይ ጊዜ፦ <span class="blank">{{ $durationMonths }} ወራት</span></p>
     <p>የውሉ ማደስ በሁለቱም ወገኖች የጽሁፍ ስምምነትና በሚመለከተው ሕግ መሠረት ይፈጸማል።</p>
 
     <div class="section-title">7. የአከራዩ ግዴታዎች</div>
@@ -390,8 +437,11 @@
 
     <div class="section-title">17. የውሉ ተጨማሪ ስምምነቶች</div>
     <p>ተጨማሪ ልዩ ስምምነቶች፦</p>
-    @if ($o['special_terms'] ?? $order->message)
-        <div class="fill-line" style="margin-top: 4px; padding: 4px 8px; border-left: 2px solid #587165;"><span class="blank" style="display: block; text-align: left; min-width: 0; font-weight: normal;">{!! nl2br(e($o['special_terms'] ?? $order->message)) !!}</span></div>
+    @php
+        $specialTerms = $o['special_terms'] ?? $lease?->terms_and_conditions ?? $order?->message;
+    @endphp
+    @if ($specialTerms)
+        <div class="fill-line" style="margin-top: 4px; padding: 4px 8px; border-left: 2px solid #587165;"><span class="blank" style="display: block; text-align: left; min-width: 0; font-weight: normal;">{!! nl2br(e($specialTerms)) !!}</span></div>
     @else
         <p class="fill-line"><span class="blank">&nbsp;</span></p>
     @endif
@@ -414,7 +464,7 @@
             <td>
                 <div class="sig-line">
                     <strong>21. የተከራይ ፊርማ</strong><br>
-                    {{ $o['buyer_name'] ?? $order->name }} — {{ now()->format('d/m/Y') }}
+                    {{ $buyerName }} — {{ now()->format('d/m/Y') }}
                 </div>
             </td>
         </tr>
@@ -430,17 +480,17 @@
                     <div>የፊርማ ሰው፦ {{ $o['seller_name'] ?? $seller['name'] }}{{ ($o['seller_email'] ?? $seller['email']) ? ' ('.($o['seller_email'] ?? $seller['email']).')' : '' }}</div>
                     <div>የተፈረመበት ጊዜ፦ {{ $signature['signed_at']->format('d/m/Y · H:i') }}</div>
                     <div>የማረጋገጫ ኮድ፦ <span class="ds-code">{{ $signature['verification'] }}</span></div>
-                    <div>የሰነድ ማጣቀሻ፦ GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
+                    <div>የሰነድ ማጣቀሻ፦ {{ $docCode }}</div>
                 </div>
             </td>
             <td>
                 <div class="digital-sig">
-                    <div class="ds-title">ተከራይ — {{ $o['buyer_name'] ?? $order->name }}</div>
+                    <div class="ds-title">ተከራይ — {{ $buyerName }}</div>
                     <div><span class="ds-verified">ተፈርሟል</span> · {{ $signature['method'] }}</div>
-                    <div>የፊርማ ሰው፦ {{ $o['buyer_name'] ?? $order->name }} ({{ $o['buyer_email'] ?? $order->email }})</div>
+                    <div>የፊርማ ሰው፦ {{ $buyerName }} ({{ $buyerEmail }})</div>
                     <div>የተፈረመበት ጊዜ፦ {{ $signature['signed_at']->format('d/m/Y · H:i') }}</div>
                     <div>የማረጋገጫ ኮድ፦ <span class="ds-code">{{ $signature['verification'] }}</span></div>
-                    <div>የሰነድ ማጣቀሻ፦ GTP-AGR-{{ str_pad((string) $order->id, 5, '0', STR_PAD_LEFT) }}</div>
+                    <div>የሰነድ ማጣቀሻ፦ {{ $docCode }}</div>
                 </div>
             </td>
         </tr>

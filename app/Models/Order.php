@@ -71,4 +71,33 @@ class Order extends Model
     {
         return $this->hasOne(Commission::class);
     }
+
+    public function hasCollectedWebsiteCommission(): bool
+    {
+        return FinancialLedger::query()
+            ->where('category', 'website_commission')
+            ->where('reference', 'ORDER-WEBSITE-COMMISSION-'.$this->getKey())
+            ->exists();
+    }
+
+    public function isAgreementApprovedForGeneration(): bool
+    {
+        return ! $this->isSubmittedToAdmin()
+            || ($this->admin_status === 'approved' && $this->hasCollectedWebsiteCommission());
+    }
+
+    public function getPropertyPriceAttribute(): float
+    {
+        return (float) ($this->offer_amount ?? $this->property?->price ?? 0);
+    }
+
+    public function getCustomerNameAttribute(): ?string
+    {
+        return $this->name;
+    }
+
+    public function getCustomerEmailAttribute(): ?string
+    {
+        return $this->email;
+    }
 }

@@ -203,26 +203,35 @@ export function initCarousels() {
         createDots();
         updateState();
 
-        // Optional carousel autoplay (if data-carousel-autoplay or data-carousel-interval specified)
+        // Auto-play (default 2-second interval marquee for property listings and news)
+        const isListingCarousel = ['latest-properties', 'featured-properties', 'news', 'testimonials', 'agents'].includes(name);
         const autoPlayAttr = carousel.getAttribute('data-carousel-autoplay');
         const intervalAttr = carousel.getAttribute('data-carousel-interval');
-        if (autoPlayAttr !== null || intervalAttr !== null) {
-            const carouselInterval = parseInt(intervalAttr || '2000', 10);
+        const shouldAutoplay = autoPlayAttr === 'true' || autoPlayAttr === '' || autoPlayAttr !== null || (isListingCarousel && autoPlayAttr !== 'false');
+
+        if (shouldAutoplay) {
+            const defaultInterval = isListingCarousel ? 2000 : 3000;
+            const carouselInterval = parseInt(intervalAttr || defaultInterval, 10);
             let carouselTimer = null;
             let isCarouselHovered = false;
 
+            function advanceSlide() {
+                if (isCarouselHovered || isDragging || document.visibilityState !== 'visible') return;
+
+                const maxScroll = track.scrollWidth - track.clientWidth - 8;
+                if (maxScroll <= 4) return; // No overflow to scroll
+
+                // If reached or near the end, loop smoothly back to beginning
+                if (track.scrollLeft >= maxScroll - 8) {
+                    track.scrollTo({ left: 0, behavior: 'smooth' });
+                } else {
+                    scrollByDirection(1);
+                }
+            }
+
             function startCarouselAutoPlay() {
                 if (carouselTimer) clearInterval(carouselTimer);
-                carouselTimer = setInterval(() => {
-                    if (!isCarouselHovered && !isDragging && document.visibilityState === 'visible') {
-                        const maxScroll = track.scrollWidth - track.clientWidth - 8;
-                        if (track.scrollLeft >= maxScroll) {
-                            track.scrollTo({ left: 0, behavior: 'smooth' });
-                        } else {
-                            scrollByDirection(1);
-                        }
-                    }
-                }, carouselInterval);
+                carouselTimer = setInterval(advanceSlide, carouselInterval);
             }
 
             function stopCarouselAutoPlay() {
@@ -232,6 +241,14 @@ export function initCarousels() {
                 }
             }
 
+            function restartCarouselTimer() {
+                stopCarouselAutoPlay();
+                if (!isCarouselHovered) {
+                    startCarouselAutoPlay();
+                }
+            }
+
+            // Pause on mouse hover & focus, resume on leave
             carousel.addEventListener('mouseenter', () => {
                 isCarouselHovered = true;
                 stopCarouselAutoPlay();
@@ -240,6 +257,48 @@ export function initCarousels() {
             carousel.addEventListener('mouseleave', () => {
                 isCarouselHovered = false;
                 startCarouselAutoPlay();
+            });
+
+            carousel.addEventListener('focusin', () => {
+                isCarouselHovered = true;
+                stopCarouselAutoPlay();
+            });
+
+            carousel.addEventListener('focusout', () => {
+                isCarouselHovered = false;
+                startCarouselAutoPlay();
+            });
+
+            // Pause on mobile touch
+            carousel.addEventListener('touchstart', () => {
+                isCarouselHovered = true;
+                stopCarouselAutoPlay();
+            }, { passive: true });
+
+            carousel.addEventListener('touchend', () => {
+                isCarouselHovered = false;
+                startCarouselAutoPlay();
+            }, { passive: true });
+
+            // Pause when browser tab is inactive
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopCarouselAutoPlay();
+                } else if (!isCarouselHovered) {
+                    startCarouselAutoPlay();
+                }
+            });
+
+            // Reset timer when top navigation buttons are clicked
+            if (prevBtn) {
+                prevBtn.addEventListener('click', restartCarouselTimer);
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener('click', restartCarouselTimer);
+            }
+
+            dots.forEach(dot => {
+                dot.addEventListener('click', restartCarouselTimer);
             });
 
             startCarouselAutoPlay();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\ConstructionMilestone;
 use App\Models\DeveloperPaymentPlan;
 use App\Models\Project;
@@ -9,6 +10,7 @@ use App\Models\ProjectBuilding;
 use App\Models\ProjectUnit;
 use App\Models\Property;
 use App\Models\UnitReservation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -95,7 +97,7 @@ class DevelopmentController extends Controller
     /**
      * Store a newly created development project (by Admin or Agent).
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $user = auth()->user();
         if (! $user || (! $user->isAdmin() && ! $user->agentProfile && ! ($user->isDeveloper() && $user->hasPermission('projects.create')))) {
@@ -212,13 +214,42 @@ class DevelopmentController extends Controller
             DeveloperPaymentPlan::create(array_merge(['project_id' => $project->id], $p));
         }
 
-        return back()->with('success', "Development project '{$project->name}' posted successfully.");
+        AuditLog::log(
+            action: 'development.created',
+            entity: $project,
+            newValue: [
+                'name' => $project->name,
+                'project_code' => $project->project_code,
+                'developer' => $project->developer_name,
+                'type' => $project->project_type,
+                'status' => $project->construction_status,
+                'starting_price' => $project->starting_price,
+                'completion_percentage' => $project->overall_completion_percentage,
+            ],
+            reason: "Development project '{$project->name}' created"
+        );
+
+        $message = "Development project '{$project->name}' posted successfully.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'project' => $project,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
      * Update an existing development project (Admin or project's Agent).
      */
-    public function update(Request $request, Project $project): RedirectResponse
+    public function update(Request $request, Project $project): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($project);
 
@@ -243,6 +274,16 @@ class DevelopmentController extends Controller
             'featured_image' => ['nullable', 'string', 'max:500'],
             'featured_image_file' => ['nullable', 'image', 'max:8192'],
         ]);
+
+        $oldData = [
+            'name' => $project->name,
+            'developer_name' => $project->developer_name,
+            'project_type' => $project->project_type,
+            'construction_status' => $project->construction_status,
+            'overall_completion_percentage' => $project->overall_completion_percentage,
+            'starting_price' => $project->starting_price,
+            'city' => $project->city,
+        ];
 
         $data = [
             'name' => $validated['name'],
@@ -282,26 +323,85 @@ class DevelopmentController extends Controller
 
         $project->update($data);
 
-        return back()->with('success', "Development project '{$project->name}' updated successfully.");
+        AuditLog::log(
+            action: 'development.updated',
+            entity: $project,
+            oldValue: $oldData,
+            newValue: [
+                'name' => $project->name,
+                'developer_name' => $project->developer_name,
+                'project_type' => $project->project_type,
+                'construction_status' => $project->construction_status,
+                'overall_completion_percentage' => $project->overall_completion_percentage,
+                'starting_price' => $project->starting_price,
+                'city' => $project->city,
+            ],
+            reason: "Development project '{$project->name}' updated"
+        );
+
+        $message = "Development project '{$project->name}' updated successfully.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'project' => $project,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
      * Delete/archive a development project.
      */
-    public function destroy(Request $request, Project $project): RedirectResponse
+    public function destroy(Request $request, Project $project): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($project);
 
         $name = $project->name;
+        $projectData = [
+            'name' => $project->name,
+            'project_code' => $project->project_code,
+            'developer_name' => $project->developer_name,
+            'starting_price' => $project->starting_price,
+            'city' => $project->city,
+        ];
+
+        AuditLog::log(
+            action: 'development.deleted',
+            entity: $project,
+            oldValue: $projectData,
+            newValue: null,
+            reason: "Development project '{$name}' deleted"
+        );
+
         $project->delete();
 
-        return back()->with('success', "Development project '{$name}' deleted successfully.");
+        $message = "Development project '{$name}' deleted successfully.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
      * Add a unit to an existing project inventory (Admin or project's Agent).
      */
-    public function storeUnit(Request $request, Project $project): RedirectResponse
+    public function storeUnit(Request $request, Project $project): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($project, 'units.create');
 
@@ -339,25 +439,74 @@ class DevelopmentController extends Controller
             'total_units_count' => $project->units()->count(),
         ]);
 
-        return back()->with('success', "Unit {$unit->unit_number} added to {$project->name} inventory.");
+        AuditLog::log(
+            action: 'development.unit_created',
+            entity: $project,
+            newValue: [
+                'project' => $project->name,
+                'unit_number' => $unit->unit_number,
+                'unit_type' => $unit->unit_type,
+                'price' => $unit->price,
+                'status' => $unit->status,
+            ],
+            reason: "Unit {$unit->unit_number} added to {$project->name}"
+        );
+
+        $message = "Unit {$unit->unit_number} added to {$project->name} inventory.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'unit' => $unit,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
      * Delete a unit from project inventory.
      */
-    public function destroyUnit(Request $request, ProjectUnit $unit): RedirectResponse
+    public function destroyUnit(Request $request, ProjectUnit $unit): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($unit->project, 'units.create');
 
         $unitNumber = $unit->unit_number;
         $project = $unit->project;
+
+        AuditLog::log(
+            action: 'development.unit_deleted',
+            entity: $project,
+            oldValue: ['unit_number' => $unitNumber],
+            newValue: null,
+            reason: "Unit {$unitNumber} removed from inventory"
+        );
+
         $unit->delete();
 
         $project->update([
             'total_units_count' => $project->units()->count(),
         ]);
 
-        return back()->with('success', "Unit {$unitNumber} removed from inventory.");
+        $message = "Unit {$unitNumber} removed from inventory.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -369,7 +518,7 @@ class DevelopmentController extends Controller
             return $this->redirectGuestToSignup(
                 $request,
                 route('developments.show', $project->slug),
-                'Create a client account or sign in before reserving a development unit.'
+                'Register / Login to continue: Create a client account or sign in before reserving a development unit.'
             );
         }
 
@@ -411,7 +560,7 @@ class DevelopmentController extends Controller
     /**
      * Update unit status directly from management dashboard (SRS §92, §157).
      */
-    public function updateUnitStatus(Request $request, ProjectUnit $unit): RedirectResponse
+    public function updateUnitStatus(Request $request, ProjectUnit $unit): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($unit->project, 'units.create');
 
@@ -419,15 +568,38 @@ class DevelopmentController extends Controller
             'status' => ['required', 'in:available,reserved,contracted,sold,blocked'],
         ]);
 
+        $oldStatus = $unit->status;
         $unit->update(['status' => $request->status]);
 
-        return back()->with('success', "Unit {$unit->unit_number} status updated to {$request->status}.");
+        AuditLog::log(
+            action: 'development.unit_status_updated',
+            entity: $unit->project,
+            oldValue: ['unit_number' => $unit->unit_number, 'status' => $oldStatus],
+            newValue: ['unit_number' => $unit->unit_number, 'status' => $request->status],
+            reason: "Unit {$unit->unit_number} status changed to {$request->status}"
+        );
+
+        $message = "Unit {$unit->unit_number} status updated to {$request->status}.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'unit' => $unit,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
      * Update construction milestone percentage and recalculate project overall progress (SRS §93).
      */
-    public function updateMilestone(Request $request, Project $project, ConstructionMilestone $milestone): RedirectResponse
+    public function updateMilestone(Request $request, Project $project, ConstructionMilestone $milestone): RedirectResponse|JsonResponse
     {
         $this->authorizeProjectAccess($project, 'construction.manage');
 
@@ -435,6 +607,11 @@ class DevelopmentController extends Controller
             'percentage' => ['required', 'integer', 'min:0', 'max:100'],
             'status' => ['required', 'in:pending,in_progress,completed'],
         ]);
+
+        $oldValues = [
+            'percentage' => $milestone->percentage,
+            'status' => $milestone->status,
+        ];
 
         $milestone->update([
             'percentage' => $request->percentage,
@@ -445,7 +622,35 @@ class DevelopmentController extends Controller
         $averagePercentage = (int) round($project->milestones()->avg('percentage') ?? 0);
         $project->update(['overall_completion_percentage' => $averagePercentage]);
 
-        return back()->with('success', "Construction milestone '{$milestone->milestone_name}' updated ({$request->percentage}%).");
+        AuditLog::log(
+            action: 'development.milestone_updated',
+            entity: $project,
+            oldValue: array_merge(['milestone' => $milestone->milestone_name], $oldValues),
+            newValue: [
+                'milestone' => $milestone->milestone_name,
+                'percentage' => $request->percentage,
+                'status' => $request->status,
+                'project_overall' => $averagePercentage,
+            ],
+            reason: "Construction milestone '{$milestone->milestone_name}' updated ({$request->percentage}%)"
+        );
+
+        $message = "Construction milestone '{$milestone->milestone_name}' updated ({$request->percentage}%).";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'milestone' => $milestone,
+                'project_completion' => $averagePercentage,
+            ]);
+        }
+
+        if ($request->input('from_dashboard') || str_contains(url()->previous(), 'dashboard')) {
+            return redirect()->to(route('dashboard').'#projects')->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**

@@ -11,6 +11,14 @@ class ContactController extends Controller
 {
     public function store(Request $request)
     {
+        if (! auth()->check()) {
+            return $this->redirectGuestToSignup(
+                $request,
+                route('app.home').'#contact',
+                'Register / Login to continue: Create a client account or sign in before sending a message.'
+            );
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],

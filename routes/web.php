@@ -14,6 +14,7 @@ use App\Http\Controllers\CompanyListingController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CorporateTenancyController;
 use App\Http\Controllers\CustomerSupportDashboardController;
+use App\Http\Controllers\DashboardAnalyticsController;
 use App\Http\Controllers\DeveloperPortalController;
 use App\Http\Controllers\DevelopmentController;
 use App\Http\Controllers\ExperienceController;
@@ -53,6 +54,7 @@ use App\Http\Controllers\StayBookingController;
 use App\Http\Controllers\StayCalendarSyncController;
 use App\Http\Controllers\SubcityBoundaryController;
 use App\Http\Controllers\TenantDashboardController;
+use App\Http\Controllers\UserFeatureController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\VerificationCompanyController;
 use App\Http\Controllers\VerificationDeskController;
@@ -289,14 +291,26 @@ Route::post('/contact', [ContactController::class, 'store'])->name('contact.stor
 Route::post('/newsletter/subscribe', fn () => back()->with('newsletter_success', 'Thank you for subscribing.'))->name('newsletter.subscribe');
 Route::post('/properties/{property}/orders', [OrderController::class, 'store'])->name('orders.store');
 Route::post('/careers/apply', [JobApplicationController::class, 'store'])->name('job-applications.store');
+Route::post('/properties/{property}/like', [PropertyInteractionController::class, 'toggleLike'])->name('properties.like');
+Route::post('/properties/{property}/favorite', [PropertyInteractionController::class, 'toggleFavorite'])->name('properties.favorite');
 
 Route::middleware('auth')->group(function () {
     Route::get('/client-portal', [ClientPortalController::class, 'index'])->name('client.portal');
     Route::get('/persona-portal', [RolePortalController::class, 'index'])->name('role.portal');
     Route::get('/orders/{order}/agreement', [OrderController::class, 'downloadAgreement'])->name('orders.agreement');
-    Route::post('/properties/{property}/like', [PropertyInteractionController::class, 'toggleLike'])->name('properties.like');
-    Route::post('/properties/{property}/favorite', [PropertyInteractionController::class, 'toggleFavorite'])->name('properties.favorite');
     Route::get('/dashboard', [WorkerManagementController::class, 'dashboard'])->name('dashboard');
+
+    // User-facing feature tools (permission-driven)
+    Route::get('/my-properties/create', [UserFeatureController::class, 'createProperty'])->name('user.properties.create');
+    Route::post('/my-properties', [UserFeatureController::class, 'storeProperty'])->name('user.properties.store');
+    Route::get('/my-bookings', [UserFeatureController::class, 'bookings'])->name('user.bookings');
+    Route::get('/my-offers', [UserFeatureController::class, 'offers'])->name('user.offers');
+    Route::get('/my-viewings', [UserFeatureController::class, 'viewings'])->name('user.viewings');
+    Route::get('/my-leases', [UserFeatureController::class, 'leases'])->name('user.leases');
+    Route::get('/my-maintenance', [UserFeatureController::class, 'maintenance'])->name('user.maintenance');
+    Route::get('/my-reviews', [UserFeatureController::class, 'reviews'])->name('user.reviews');
+    Route::get('/my-inquiries', [UserFeatureController::class, 'inquiries'])->name('user.inquiries');
+    Route::get('/dashboard/user-overview/charts', [DashboardAnalyticsController::class, 'data'])->name('dashboard.user-overview.charts');
 
     // Rent installment collection & housekeeping queue actions
     Route::post('/rent-schedules/{rentSchedule}/record-payment', [RentScheduleController::class, 'recordPayment'])->name('rent-schedules.record-payment');
@@ -320,6 +334,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/admin/listing-types/{listingType}', [CategoryManagementController::class, 'destroyListingType'])->name('admin.listing-types.destroy');
     Route::post('/dashboard/roles', [RoleManagementController::class, 'storeRole'])->name('dashboard.roles.store');
     Route::put('/dashboard/roles/{role}', [RoleManagementController::class, 'updateRole'])->name('dashboard.roles.update');
+    Route::delete('/dashboard/roles/{role}', [RoleManagementController::class, 'destroyRole'])->name('dashboard.roles.destroy');
+    Route::post('/dashboard/permissions', [RoleManagementController::class, 'storePermission'])->name('dashboard.permissions.store');
+    Route::delete('/dashboard/permissions/{permission}', [RoleManagementController::class, 'destroyPermission'])->name('dashboard.permissions.destroy');
     Route::post('/dashboard/roles/permissions', [RoleManagementController::class, 'updateRolePermissions'])->name('dashboard.roles.permissions.update');
     Route::post('/dashboard/users/{targetUser}/permissions', [RoleManagementController::class, 'updateUserPermissions'])->name('dashboard.users.permissions.update');
     Route::post('/dashboard/users/{targetUser}/toggle-dashboard', [RoleManagementController::class, 'toggleDashboardAccess'])->name('dashboard.users.toggle-dashboard');

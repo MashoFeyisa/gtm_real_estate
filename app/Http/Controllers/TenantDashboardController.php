@@ -17,9 +17,13 @@ class TenantDashboardController extends Controller
     {
         $user = $request->user();
 
+        if ($user?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot open individual tenant dashboards.');
+        }
+
         $hasTenantPerm = $user?->hasAnyPermission(['agreements.view', 'rent.view', 'leases.manage', 'leases.terminate', 'leases.view', 'rent.manage', 'rent.track']);
 
-        if ($user?->status === 'suspended' || (! in_array($user?->role, ['tenant', 'renter'], true) && ! $user?->isAdmin() && ! $hasTenantPerm)) {
+        if ($user?->status === 'suspended' || (! in_array($user?->role, ['tenant', 'renter'], true) && ! $hasTenantPerm)) {
             abort(403, 'Permission denied: Tenant agreement access required.');
         }
 

@@ -308,10 +308,6 @@ test('admin can configure every landing page section including amenities, panora
         'contact_badge' => 'Private Advisory',
         'contact_title' => 'Schedule Your Confidential Meeting',
         'contact_box_title' => 'Connect With Our Private Concierge',
-        'newsletter_badge' => 'Exclusive Updates',
-        'newsletter_title' => 'VIP Property Dispatch',
-        'newsletter_placeholder' => 'Enter your corporate email',
-        'newsletter_button_text' => 'Join Private Circle',
         'concierge_button_text' => 'Direct Concierge',
     ];
 
@@ -342,10 +338,6 @@ test('admin can configure every landing page section including amenities, panora
         ->assertSee('Private Advisory')
         ->assertSee('Schedule Your Confidential Meeting')
         ->assertSee('Connect With Our Private Concierge')
-        ->assertSee('Exclusive Updates')
-        ->assertSee('VIP Property Dispatch')
-        ->assertSee('Enter your corporate email')
-        ->assertSee('Join Private Circle')
         ->assertSee('Direct Concierge');
 });
 
@@ -363,5 +355,5 @@ test('admin settings panel renders dropside navigation and sections', function (
         ->assertSee('Featured Properties')
         ->assertSee('Developments')
         ->assertSee('VIP Contact Suite')
-        ->assertSee('Newsletter &amp; Floating Concierge', false);
+        ->assertSee('Floating Concierge', false);
 });

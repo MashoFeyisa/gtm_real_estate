@@ -174,27 +174,6 @@
                 </div>
             @endif
 
-            @if ($pendingReportsCount > 0)
-                <div class="mt-6 rounded-2xl border-2 border-rose-400 bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 p-5 text-rose-950 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div class="flex items-center gap-3.5">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white font-black text-xl shadow-xs animate-bounce">
-                            ⚠️
-                        </span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded bg-rose-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">Direct Client Incident Alert</span>
-                                <span class="text-[11px] font-bold text-rose-800">ከደንበኞች የተላከ አፋጣኝ ሪፖርት</span>
-                            </div>
-                            <p class="text-xs text-rose-900 mt-1 font-medium">
-                                <strong>{{ $pendingReportsCount }}</strong> client {{ Str::plural('issue', $pendingReportsCount) }} submitted via portal requiring immediate company review &amp; investigation.
-                            </p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="switchCompanySection('reports')" class="inline-flex items-center justify-center rounded-xl bg-rose-800 px-5 py-2.5 text-xs font-black text-white shadow-sm hover:bg-black transition cursor-pointer shrink-0">
-                        Investigate Reports Desk &rarr;
-                    </button>
-                </div>
-            @endif
 
             {{-- ═══════════════════ 0. EXECUTIVE OVERVIEW PANEL ═══════════════════ --}}
             <div data-company-section="overview" class="company-section-panel mt-6">
@@ -220,41 +199,30 @@
                         <div onclick="switchCompanySection('branches')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Branches</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $companyKpis['totalBranches'] }}</span>
-                            <span class="block text-[10px] text-emerald-400 font-semibold">{{ $companyKpis['activeBranches'] }} Active</span>
                         </div>
                         <div onclick="switchCompanySection('agents')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Agents</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $companyKpis['totalAgents'] }}</span>
-                            <span class="block text-[10px] text-emerald-400 font-semibold">{{ $companyKpis['verifiedAgents'] }} Verified</span>
                         </div>
                         <div onclick="switchCompanySection('listings')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Listings</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $companyKpis['totalListings'] }}</span>
-                            <span class="block text-[10px] text-amber-300 font-semibold">Active Feed</span>
                         </div>
                         <div onclick="switchCompanySection('properties')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Properties</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $companyKpis['totalProperties'] }}</span>
-                            <span class="block text-[10px] text-emerald-400 font-semibold">Assets</span>
                         </div>
                         <div onclick="switchCompanySection('clients')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Clients</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $companyKpis['totalClients'] }}</span>
-                            <span class="block text-[10px] text-blue-300 font-semibold">In CRM</span>
                         </div>
                         <div onclick="switchCompanySection('transactions')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Transactions</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $orders->count() + $rentSchedules->count() }}</span>
-                            <span class="block text-[10px] text-emerald-400 font-semibold">Auditable</span>
                         </div>
                         <div onclick="switchCompanySection('reports')" class="cursor-pointer rounded-2xl bg-white/5 p-3 text-center transition hover:bg-white/10 border border-white/10">
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">Client Reports</span>
                             <span class="block text-2xl font-black text-white mt-0.5">{{ $reports->count() }}</span>
-                            @if ($pendingReportsCount > 0)
-                                <span class="block text-[10px] text-rose-400 font-bold animate-pulse">⚠️ {{ $pendingReportsCount }} Pending</span>
-                            @else
-                                <span class="block text-[10px] text-emerald-400 font-semibold">Trust &amp; Safety</span>
-                            @endif
                         </div>
                     </div>
                 </div>

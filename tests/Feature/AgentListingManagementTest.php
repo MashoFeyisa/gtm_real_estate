@@ -491,14 +491,14 @@ test('admin can toggle agent active status permission', function () {
     // Toggle to inactive
     $this->actingAs($admin)
         ->post(route('dashboard.agents.toggleActive', $agent))
-        ->assertRedirect(route('dashboard', ['section' => 'agents']));
+        ->assertRedirect(route('dashboard', ['section' => 'users']));
 
     expect($agent->fresh()->is_active)->toBeFalse();
 
     // Toggle back to active
     $this->actingAs($admin)
         ->post(route('dashboard.agents.toggleActive', $agent))
-        ->assertRedirect(route('dashboard', ['section' => 'agents']));
+        ->assertRedirect(route('dashboard', ['section' => 'users']));
 
     expect($agent->fresh()->is_active)->toBeTrue();
 });

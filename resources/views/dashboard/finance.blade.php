@@ -564,20 +564,7 @@
                     </div>
                 @endif
 
-                @if ($overdueInstallmentCount > 0)
-                    <div class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-2 border-rose-300 bg-gradient-to-r from-[#fffbfb] via-[#fef6f6] to-[#fdeeed] p-5 shadow-sm">
-                        <div class="flex items-center gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-xl font-black text-white shadow-xs">⚠️</span>
-                            <div>
-                                <h2 class="text-base font-black text-rose-950">{{ $overdueInstallmentCount }} Overdue Rent Installment(s) Pending Collection</h2>
-                                <p class="mt-0.5 text-xs text-rose-800/80">Lease tenants have past-due installments. Follow up and record the payment or issue a notice.</p>
-                            </div>
-                        </div>
-                        <a href="#lease-rental" data-target-section="lease-rental" class="nav-section-link inline-flex items-center gap-2 rounded-full bg-rose-700 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white transition hover:bg-rose-800 shadow-sm cursor-pointer">
-                            <span>Review Overdue Leases &rarr;</span>
-                        </a>
-                    </div>
-                @endif
+
 
                 <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <div class="rounded-[1.5rem] border border-[#d9cab3] bg-white p-5 shadow-sm">

@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Models\UserPermission;
 use App\Models\UserPermissionOverride;
 use App\Services\CommissionSplitService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -23,8 +25,8 @@ class UserManagementController extends Controller
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canCreateUsers()) {
+            abort(403, 'Admin access or user creation permission required.');
         }
 
         $validated = $request->validate([
@@ -90,7 +92,17 @@ class UserManagementController extends Controller
             }
         }
 
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'User registered successfully.');
+        $message = 'User registered successfully.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => 'users',
+            ]);
+        }
+
+        return redirect()->to(route('dashboard').'#users')->with('success', $message);
     }
 
     /**
@@ -100,8 +112,12 @@ class UserManagementController extends Controller
     {
         $currentUser = auth()->user();
 
-        if (! $currentUser || ! $currentUser->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $currentUser || ! $currentUser->canEditUsers()) {
+            abort(403, 'Admin access or user edit permission required.');
+        }
+
+        if ($user->isAdmin() && ! $currentUser->isAdmin()) {
+            abort(403, 'Only administrators can modify administrator accounts.');
         }
 
         $validated = $request->validate([
@@ -194,7 +210,17 @@ class UserManagementController extends Controller
             $user->agentProfile->update($agentData);
         }
 
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'User updated successfully.');
+        $message = 'User updated successfully.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => 'users',
+            ]);
+        }
+
+        return redirect()->to(route('dashboard').'#users')->with('success', $message);
     }
 
     /**
@@ -366,16 +392,24 @@ class UserManagementController extends Controller
     /**
      * Remove the specified user from storage.
      */
-    public function deleteUser(User $user)
+    public function deleteUser(Request $request, User $user): JsonResponse|RedirectResponse
     {
         $currentUser = auth()->user();
 
-        if (! $currentUser || ! $currentUser->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $currentUser || ! $currentUser->canDeleteUsers()) {
+            abort(403, 'Admin access or user delete permission required.');
+        }
+
+        if ($user->isAdmin() && ! $currentUser->isAdmin()) {
+            abort(403, 'Only administrators can delete administrator accounts.');
         }
 
         if ($user->id === $currentUser->id) {
-            return redirect()->route('dashboard', ['section' => 'users'])->withErrors(['error' => 'You cannot delete your own account.']);
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'You cannot delete your own account.'], 422);
+            }
+
+            return redirect()->to(route('dashboard').'#users')->withErrors(['error' => 'You cannot delete your own account.']);
         }
 
         if ($user->agentProfile) {
@@ -384,29 +418,25 @@ class UserManagementController extends Controller
 
         $user->delete();
 
-        return redirect()->route('dashboard')->with('success', 'User deleted successfully.');
+        $message = 'User deleted successfully.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => 'users',
+            ]);
+        }
+
+        return redirect()->to(route('dashboard').'#users')->with('success', $message);
     }
 
     /**
-     * Impersonate the specified user (Admin only).
+     * Impersonate the specified user (Forbidden by security boundary).
      */
     public function impersonate(Request $request, User $user)
     {
-        $currentUser = auth()->user();
-
-        if (! $currentUser || ! $currentUser->isAdmin()) {
-            abort(403, 'Admin access required to impersonate users.');
-        }
-
-        if ($user->id === $currentUser->id) {
-            return redirect()->back()->withErrors(['error' => 'You cannot impersonate your own active administrator account.']);
-        }
-
-        session()->put('impersonating_admin_id', $currentUser->id);
-
-        auth()->login($user);
-
-        return redirect($user->dashboard_url)->with('success', "You are now logged in as {$user->name} ({$user->role}). Use the top bar to switch back anytime.");
+        abort(403, 'Impersonation is not permitted. Administrators cannot open or act inside other users\' dashboards.');
     }
 
     /**
@@ -426,6 +456,6 @@ class UserManagementController extends Controller
             auth()->login($admin);
         }
 
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'Returned to your administrator account.');
+        return redirect()->to(route('dashboard').'#users')->with('success', 'Returned to your administrator account.');
     }
 }

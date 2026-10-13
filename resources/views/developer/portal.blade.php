@@ -588,18 +588,30 @@
         const navLinks = document.querySelectorAll('.nav-section-link');
         const panels = document.querySelectorAll('.section-panel');
 
-        function activateSection(sectionName) {
+        function activateSection(sectionName, updateHash = true) {
             panels.forEach(panel => {
                 panel.classList.toggle('hidden', panel.dataset.section !== sectionName);
             });
 
             navLinks.forEach(link => {
-                const active = link.dataset.targetSection === sectionName;
+                const target = (link.dataset.targetSection || link.getAttribute('href') || '').replace(/^#/, '');
+                const active = target === sectionName;
                 link.classList.toggle('bg-white/10', active);
                 link.classList.toggle('text-white', active);
                 link.classList.toggle('text-[#dfeee4]', !active);
             });
+
+            if (updateHash && window.location.hash !== '#' + sectionName) {
+                history.replaceState(null, '', '#' + sectionName);
+            }
+
+            try {
+                sessionStorage.setItem('dashboard_active_section', sectionName);
+                sessionStorage.setItem('dashboard_active_section_' + window.location.pathname, sectionName);
+            } catch (e) {}
         }
+
+        window.activateSection = activateSection;
 
         navLinks.forEach(link => {
             link.addEventListener('click', function (event) {
@@ -608,15 +620,27 @@
                     return;
                 }
                 event.preventDefault();
-                activateSection(target);
-                history.replaceState(null, '', '#' + target);
+                activateSection(target, true);
             });
         });
 
+        let savedSessionSection = null;
+        try {
+            savedSessionSection = sessionStorage.getItem('dashboard_active_section_' + window.location.pathname) || sessionStorage.getItem('dashboard_active_section');
+        } catch (e) {}
+
         const initialHash = window.location.hash.replace('#', '');
-        if (initialHash && document.querySelector('[data-section="' + initialHash + '"]')) {
-            activateSection(initialHash);
+        const initialSection = initialHash || savedSessionSection || 'overview';
+        if (initialSection && document.querySelector('[data-section="' + initialSection + '"]')) {
+            activateSection(initialSection, !!initialHash);
         }
+
+        window.addEventListener('hashchange', function () {
+            const newHash = window.location.hash.replace('#', '');
+            if (newHash && document.querySelector('[data-section="' + newHash + '"]')) {
+                activateSection(newHash, false);
+            }
+        });
     </script>
     @include('layouts.partials.sidebar-scroll-preserver')
 </body>

@@ -9,6 +9,7 @@ use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Models\UserPermissionOverride;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,14 +17,27 @@ use Illuminate\Validation\Rule;
 
 class RoleManagementController extends Controller
 {
+    protected function roleRedirect(string $message, Request $request, string $section = 'roles-permissions'): RedirectResponse|JsonResponse
+    {
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'section' => $section,
+            ]);
+        }
+
+        return redirect()->to(route('dashboard').'#'.$section)->with('success', $message);
+    }
+
     /**
      * Create a new custom role.
      */
-    public function storeRole(Request $request): RedirectResponse
+    public function storeRole(Request $request): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canManageRoles()) {
+            abort(403, 'Admin access or role management permission required.');
         }
 
         $validated = $request->validate([
@@ -50,17 +64,17 @@ class RoleManagementController extends Controller
             request: $request
         );
 
-        return back()->with('success', "Role '{$role->name}' created successfully.");
+        return $this->roleRedirect("Role '{$role->name}' created successfully.", $request);
     }
 
     /**
      * Update an existing role.
      */
-    public function updateRole(Request $request, Role $role): RedirectResponse
+    public function updateRole(Request $request, Role $role): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canManageRoles()) {
+            abort(403, 'Admin access or role management permission required.');
         }
 
         $validated = $request->validate([
@@ -85,18 +99,139 @@ class RoleManagementController extends Controller
             request: $request
         );
 
-        return back()->with('success', "Role '{$role->name}' updated successfully.");
+        return $this->roleRedirect("Role '{$role->name}' updated successfully.", $request);
+    }
+
+    /**
+     * Delete an existing custom role.
+     */
+    public function destroyRole(Request $request, Role $role): RedirectResponse|JsonResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canManageRoles()) {
+            abort(403, 'Admin access or role management permission required.');
+        }
+
+        if ($role->is_system) {
+            return back()->withErrors(['error' => "System role '{$role->name}' cannot be deleted."]);
+        }
+
+        $oldValue = $role->toArray();
+        $roleName = $role->name;
+
+        $role->rolePermissions()->delete();
+        $role->users()->detach();
+        $role->delete();
+
+        AuditLog::log(
+            action: 'role.deleted',
+            entityType: 'Role',
+            entityId: $role->id,
+            oldValue: $oldValue,
+            newValue: null,
+            reason: $request->input('reason', 'Role deleted by administrator'),
+            user: $user,
+            request: $request
+        );
+
+        return $this->roleRedirect("Role '{$roleName}' deleted successfully.", $request);
+    }
+
+    /**
+     * Create a new granular permission (format: resource.action).
+     */
+    public function storePermission(Request $request): RedirectResponse|JsonResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canManagePermissions()) {
+            abort(403, 'Admin access or permission management required.');
+        }
+
+        $validated = $request->validate([
+            'key' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:permissions,key',
+                'regex:/^[a-z0-9_-]+\.[a-z0-9_-]+$/i',
+            ],
+            'label' => ['required', 'string', 'max:150'],
+            'group' => ['nullable', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'menu_label' => ['nullable', 'string', 'max:150'],
+            'icon' => ['nullable', 'string', 'max:50'],
+            'route' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $normalizedKey = Str::lower(trim($validated['key']));
+        $group = $validated['group'] ?: explode('.', $normalizedKey)[0];
+
+        $permission = Permission::create([
+            'key' => $normalizedKey,
+            'label' => trim($validated['label']),
+            'menu_label' => ! empty($validated['menu_label']) ? trim($validated['menu_label']) : null,
+            'icon' => ! empty($validated['icon']) ? trim($validated['icon']) : null,
+            'route' => ! empty($validated['route']) ? trim($validated['route']) : null,
+            'group' => Str::lower(trim($group)),
+            'description' => $validated['description'] ?? null,
+            'sort_order' => (int) (Permission::max('sort_order') ?? 0) + 1,
+        ]);
+
+        AuditLog::log(
+            action: 'permission.created',
+            entityType: 'Permission',
+            entityId: $permission->id,
+            oldValue: null,
+            newValue: $permission->toArray(),
+            reason: $request->input('reason', 'Permission created by administrator'),
+            user: $user,
+            request: $request
+        );
+
+        return $this->roleRedirect("Permission '{$permission->key}' created successfully.", $request);
+    }
+
+    /**
+     * Delete a permission from the catalog.
+     */
+    public function destroyPermission(Request $request, Permission $permission): RedirectResponse|JsonResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canManagePermissions()) {
+            abort(403, 'Admin access or permission management required.');
+        }
+
+        $oldValue = $permission->toArray();
+        $permKey = $permission->key;
+
+        $permission->roleGrants()->delete();
+        $permission->userOverrides()->delete();
+        UserPermission::where('permission_id', $permission->id)->delete();
+        $permission->delete();
+
+        AuditLog::log(
+            action: 'permission.deleted',
+            entityType: 'Permission',
+            entityId: $permission->id,
+            oldValue: $oldValue,
+            newValue: null,
+            reason: $request->input('reason', 'Permission deleted by administrator'),
+            user: $user,
+            request: $request
+        );
+
+        return $this->roleRedirect("Permission '{$permKey}' deleted successfully.", $request);
     }
 
     /**
      * Save the admin's permission checklist for a persona's role or custom role.
      */
-    public function updateRolePermissions(Request $request): RedirectResponse
+    public function updateRolePermissions(Request $request): RedirectResponse|JsonResponse
     {
         $user = $request->user();
 
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canManageRoles()) {
+            abort(403, 'Admin access or role management permission required.');
         }
 
         $manageablePersonas = collect(config('personas.personas', []))
@@ -147,24 +282,28 @@ class RoleManagementController extends Controller
             entityId: $roleSlug,
             oldValue: ['permission_ids' => $oldPermissionIds],
             newValue: ['permission_ids' => $newPermissionIds->all()],
-            reason: $validated['reason'] ?? 'Permissions modified by super admin',
+            reason: $validated['reason'] ?? 'Permissions modified by administrator',
             user: $user,
             request: $request
         );
 
         $label = $persona ? $persona['label'] : ($roleRecord ? $roleRecord->name : $roleSlug);
 
-        return back()->with('success', "Permissions for '{$label}' updated successfully.");
+        return $this->roleRedirect("Permissions for '{$label}' updated successfully.", $request);
     }
 
     /**
      * Assign per-user permissions.
      */
-    public function updateUserPermissions(Request $request, User $targetUser): RedirectResponse
+    public function updateUserPermissions(Request $request, User $targetUser): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canManagePermissions()) {
+            abort(403, 'Admin access or user permission management required.');
+        }
+
+        if ($targetUser->isAdmin() && ! $user->isAdmin()) {
+            abort(403, 'Only administrators can modify administrator permissions.');
         }
 
         $validated = $request->validate([
@@ -198,7 +337,7 @@ class RoleManagementController extends Controller
                 request: $request
             );
 
-            return back()->with('success', "Permissions for '{$targetUser->name}' reset to role defaults.");
+            return $this->roleRedirect("Permissions for '{$targetUser->name}' reset to role defaults.", $request, 'users');
         }
 
         if ($mode === 'all') {
@@ -274,17 +413,17 @@ class RoleManagementController extends Controller
 
         $count = count($grantedIds);
 
-        return back()->with('success', "Updated permissions for '{$targetUser->name}': {$count} permissions granted.");
+        return $this->roleRedirect("Updated permissions for '{$targetUser->name}': {$count} permissions granted.", $request, 'users');
     }
 
     /**
      * Grant or revoke dashboard access for a user.
      */
-    public function toggleDashboardAccess(Request $request, User $targetUser): RedirectResponse
+    public function toggleDashboardAccess(Request $request, User $targetUser): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || (! $user->canManagePermissions() && ! $user->canEditUsers())) {
+            abort(403, 'Admin access or user management permission required.');
         }
 
         $oldAccess = (bool) $targetUser->dashboard_access_enabled;
@@ -304,17 +443,17 @@ class RoleManagementController extends Controller
 
         $state = $targetUser->dashboard_access_enabled ? 'granted' : 'revoked';
 
-        return back()->with('success', "Dashboard access {$state} for '{$targetUser->name}'.");
+        return $this->roleRedirect("Dashboard access {$state} for '{$targetUser->name}'.", $request, 'users');
     }
 
     /**
      * Enable or disable image/media access for a user.
      */
-    public function toggleMediaAccess(Request $request, User $targetUser): RedirectResponse
+    public function toggleMediaAccess(Request $request, User $targetUser): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || (! $user->canManagePermissions() && ! $user->canEditUsers())) {
+            abort(403, 'Admin access or user management permission required.');
         }
 
         $oldAccess = (bool) $targetUser->media_access_enabled;
@@ -334,17 +473,17 @@ class RoleManagementController extends Controller
 
         $state = $targetUser->media_access_enabled ? 'enabled' : 'disabled';
 
-        return back()->with('success', "Media/Image access {$state} for '{$targetUser->name}'.");
+        return $this->roleRedirect("Media/Image access {$state} for '{$targetUser->name}'.", $request, 'users');
     }
 
     /**
      * Approve or suspend a user.
      */
-    public function updateUserStatus(Request $request, User $targetUser): RedirectResponse
+    public function updateUserStatus(Request $request, User $targetUser): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
+        if (! $user || ! $user->canManageUserStatus()) {
+            abort(403, 'Admin access or user status management permission required.');
         }
 
         $validated = $request->validate([
@@ -367,6 +506,6 @@ class RoleManagementController extends Controller
             request: $request
         );
 
-        return back()->with('success', "Account status for '{$targetUser->name}' updated to {$targetUser->status}.");
+        return $this->roleRedirect("Account status for '{$targetUser->name}' updated to {$targetUser->status}.", $request, 'users');
     }
 }

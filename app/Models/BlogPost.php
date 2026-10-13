@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -84,5 +85,18 @@ class BlogPost extends Model
         }
 
         return asset('storage/'.$this->social_image_path);
+    }
+
+    /**
+     * Scope query to only include active/unexpired jobs, or regular posts.
+     * When a post is of type 'job' and has an application_deadline, it must be today or in the future.
+     */
+    public function scopeActiveNotExpired(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->where('type', '!=', 'job')
+                ->orWhereNull('application_deadline')
+                ->orWhereDate('application_deadline', '>=', now()->toDateString());
+        });
     }
 }

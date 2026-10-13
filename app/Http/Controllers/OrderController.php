@@ -19,6 +19,15 @@ class OrderController extends Controller
     public function store(Request $request, Property $property)
     {
         $isCallback = ($request->input('request_kind') === 'callback');
+        $isExplicitOrder = ($request->input('request_kind') === 'order');
+
+        if (! auth()->check() && $isExplicitOrder) {
+            return $this->redirectGuestToSignup(
+                $request,
+                route('properties.show', $property->slug),
+                'Register / Login to continue: Create a client account or sign in before submitting a request for this property.'
+            );
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -113,10 +122,16 @@ class OrderController extends Controller
 
         $isOwnerAgent = $user && $user->agentProfile && $user->agentProfile->id === $order->agent_id;
         $isAdmin = $user && $user->isAdmin();
+        $isBuyer = $user && (
+            ($order->user_id && $order->user_id === $user->id) ||
+            ($order->email && strtolower($user->email) === strtolower($order->email))
+        );
 
-        if (! $isOwnerAgent && ! $isAdmin) {
+        if (! $isOwnerAgent && ! $isAdmin && ! $isBuyer) {
             abort(403, 'You are not allowed to download this agreement.');
         }
+
+        abort_unless($order->isAgreementApprovedForGeneration(), 403, 'This agreement is awaiting admin approval.');
 
         if (! $order->hasAgreement()) {
             if ($isAdmin) {

@@ -3,6 +3,8 @@
  * High-performance, zero-dependency, touch-enabled with 60fps transitions
  */
 
+import { formatPrice, getActiveCurrency } from './currency';
+
 export function initPropertyGalleryAndSidebar() {
     // -------------------------------------------------------------
     // 1. PROPERTY CARDS MULTI-IMAGE SLIDER
@@ -305,7 +307,10 @@ export function initPropertyGalleryAndSidebar() {
         Array.from(allThumbs).forEach((thumb, idx) => {
             if (idx === currentImageIndex) {
                 thumb.className = 'relative h-14 w-20 shrink-0 rounded-xl overflow-hidden border-2 border-[#d4af37] ring-2 ring-[#d4af37]/40 scale-105 transition-all duration-200 cursor-pointer';
-                thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                if (thumbnailsContainer && typeof thumbnailsContainer.scrollTo === 'function') {
+                    const targetLeft = thumb.offsetLeft - (thumbnailsContainer.clientWidth / 2) + (thumb.clientWidth / 2);
+                    thumbnailsContainer.scrollTo({ left: targetLeft, behavior: 'smooth' });
+                }
             } else {
                 thumb.className = 'relative h-14 w-20 shrink-0 rounded-xl overflow-hidden border-2 border-white/20 opacity-70 hover:opacity-100 hover:border-white/50 transition-all duration-200 cursor-pointer';
             }
@@ -380,8 +385,16 @@ export function initPropertyGalleryAndSidebar() {
         if (typeEl) typeEl.textContent = data.type === 'rent' ? 'For Rent' : 'For Sale';
         if (priceLabelEl) priceLabelEl.textContent = data.type === 'rent' ? 'Rental Rate' : 'Asking Price';
 
-        const formattedPrice = Number(data.price || 0).toLocaleString();
-        if (priceEl) priceEl.textContent = `ETB ${formattedPrice}${data.type === 'rent' ? ' / mo' : ''}`;
+        const formattedPrice = formatPrice(data.price || 0, getActiveCurrency());
+        if (priceEl) {
+            priceEl.setAttribute('data-base-price', data.price || 0);
+            if (data.type === 'rent') {
+                priceEl.setAttribute('data-price-suffix', ' / mo');
+            } else {
+                priceEl.removeAttribute('data-price-suffix');
+            }
+            priceEl.textContent = `${formattedPrice}${data.type === 'rent' ? ' / mo' : ''}`;
+        }
 
         if (cityEl) cityEl.textContent = data.city || 'Prime District';
         if (addressEl) addressEl.textContent = `${data.city || 'Addis Ababa'} · ${data.address || 'Central Prime District'}`;
@@ -435,14 +448,29 @@ export function initPropertyGalleryAndSidebar() {
 
         renderSidebarGallery(images, data.title);
 
-        // Animate Drawer In
+        // Animate Drawer In while preserving landing page scroll
+        const savedScrollY = window.pageYOffset || document.documentElement.scrollTop || window.scrollY || 0;
         document.body.classList.add('overflow-hidden');
-        backdrop.classList.remove('pointer-events-none');
-        backdrop.classList.remove('opacity-0');
+
+        backdrop.classList.remove('hidden');
+        drawer.classList.remove('hidden');
+        drawer.classList.remove('pointer-events-none');
+        drawer.style.display = 'flex';
+
+        // Force browser reflow
+        void drawer.offsetWidth;
+
+        backdrop.classList.remove('pointer-events-none', 'opacity-0');
         backdrop.classList.add('opacity-100');
 
         drawer.classList.remove('translate-x-full');
         drawer.classList.add('translate-x-0');
+        drawer.style.transform = 'translateX(0)';
+
+        const scrollBody = document.getElementById('property-sidebar-scroll-body');
+        if (scrollBody) {
+            scrollBody.scrollTop = 0;
+        }
 
         isOpen = true;
         if (currentImages.length > 1) {
@@ -457,13 +485,27 @@ export function initPropertyGalleryAndSidebar() {
 
         drawer.classList.remove('translate-x-0');
         drawer.classList.add('translate-x-full');
+        drawer.style.transform = 'translateX(100%)';
+        drawer.classList.add('pointer-events-none');
 
         backdrop.classList.remove('opacity-100');
         backdrop.classList.add('opacity-0');
         backdrop.classList.add('pointer-events-none');
 
+        const savedScroll = window.pageYOffset || document.documentElement.scrollTop || window.scrollY || 0;
         document.body.classList.remove('overflow-hidden');
+        if (savedScroll > 0) {
+            window.scrollTo({ top: savedScroll, behavior: 'instant' });
+        }
         isOpen = false;
+
+        setTimeout(() => {
+            if (!isOpen) {
+                drawer.classList.add('hidden');
+                drawer.style.display = 'none';
+                backdrop.classList.add('hidden');
+            }
+        }, 500);
     };
 
     if (closeBtn) {

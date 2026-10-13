@@ -9,37 +9,41 @@ use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-function createTestAgent(?User $user = null): Agent
-{
-    $random = Str::random(6);
+if (! function_exists('createTestAgent')) {
+    function createTestAgent(?User $user = null): Agent
+    {
+        $random = Str::random(6);
 
-    return Agent::create([
-        'name' => 'Agent '.$random,
-        'email' => 'agent.'.$random.'@example.com',
-        'phone' => '+251911'.rand(100000, 999999),
-        'bio' => 'Licensed real estate agent',
-        'user_id' => $user?->id,
-    ]);
+        return Agent::create([
+            'name' => 'Agent '.$random,
+            'email' => 'agent.'.$random.'@example.com',
+            'phone' => '+251911'.rand(100000, 999999),
+            'bio' => 'Licensed real estate agent',
+            'user_id' => $user?->id,
+        ]);
+    }
 }
 
-function createTestProperty(Agent $agent, string $type = 'buy'): Property
-{
-    $random = Str::random(6);
+if (! function_exists('createTestProperty')) {
+    function createTestProperty(Agent $agent, string $type = 'buy'): Property
+    {
+        $random = Str::random(6);
 
-    return Property::create([
-        'title' => 'Property '.$random,
-        'slug' => 'property-'.$random,
-        'description' => 'Test property description.',
-        'price' => 150000,
-        'bedrooms' => 3,
-        'bathrooms' => 2,
-        'area' => 150,
-        'type' => $type === 'rent' ? 'rent' : 'sale',
-        'property_category' => 'home',
-        'status' => 'published',
-        'is_active' => true,
-        'agent_id' => $agent->id,
-    ]);
+        return Property::create([
+            'title' => 'Property '.$random,
+            'slug' => 'property-'.$random,
+            'description' => 'Test property description.',
+            'price' => 150000,
+            'bedrooms' => 3,
+            'bathrooms' => 2,
+            'area' => 150,
+            'type' => $type === 'rent' ? 'rent' : 'sale',
+            'property_category' => 'home',
+            'status' => 'published',
+            'is_active' => true,
+            'agent_id' => $agent->id,
+        ]);
+    }
 }
 
 test('admin can delete an order and its agreement file', function () {
@@ -226,7 +230,7 @@ test('agent cannot delete another agents inquiry message', function () {
     $this->assertDatabaseHas('inquiries', ['id' => $inquiry->id]);
 });
 
-test('admin dashboard renders delete buttons for orders commissions and inquiries', function () {
+test('admin dashboard renders delete buttons for orders and inquiries', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $agent = createTestAgent();
     $property = createTestProperty($agent);
@@ -237,16 +241,6 @@ test('admin dashboard renders delete buttons for orders commissions and inquirie
         'name' => 'Test Client Order',
         'email' => 'order@example.com',
         'type' => 'buy',
-        'status' => 'pending',
-    ]);
-
-    $commission = Commission::query()->create([
-        'agent_id' => $agent->id,
-        'order_id' => $order->id,
-        'property_id' => $property->id,
-        'property_price' => 100000,
-        'commission_rate' => 5,
-        'commission_amount' => 5000,
         'status' => 'pending',
     ]);
 
@@ -262,7 +256,6 @@ test('admin dashboard renders delete buttons for orders commissions and inquirie
 
     $response->assertOk()
         ->assertSee(route('dashboard.orders.destroy', $order), false)
-        ->assertSee(route('dashboard.commissions.destroy', $commission), false)
         ->assertSee(route('dashboard.inquiries.destroy', $inquiry), false);
 });
 
@@ -301,14 +294,14 @@ test('agent portal renders delete buttons for orders and messages', function () 
 test('dashboard uses custom confirmation modal and data-confirm for requests without browser alert', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $agent = createTestAgent();
-    $property = createTestProperty($agent);
+    $property = createTestProperty($agent, 'rent');
 
     $order = Order::query()->create([
         'property_id' => $property->id,
         'agent_id' => $agent->id,
         'name' => 'Modal Client',
         'email' => 'modal@example.com',
-        'type' => 'buy',
+        'type' => 'rent',
         'status' => 'pending',
         'submitted_to_admin_at' => now(),
     ]);

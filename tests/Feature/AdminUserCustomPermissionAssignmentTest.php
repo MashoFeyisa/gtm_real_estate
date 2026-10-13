@@ -180,12 +180,12 @@ test('sidebar does not show granted access desks when user has role default perm
     $response->assertDontSee(route('finance.index'));
 });
 
-test('sidebar dynamically renders granted capability desk when admin grants permissions to user', function () {
+test('sidebar dynamically renders granted capability feature when admin grants permissions to user', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $buyer = User::factory()->create(['role' => 'buyer']);
 
-    // Admin grants properties.create and projects.create to buyer
-    $permIds = Permission::whereIn('key', ['properties.create', 'projects.create'])->pluck('id')->all();
+    // Admin grants properties.create and booking.view to buyer
+    $permIds = Permission::whereIn('key', ['properties.create', 'booking.view'])->pluck('id')->all();
 
     $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
         'permission_mode' => 'custom',
@@ -194,22 +194,22 @@ test('sidebar dynamically renders granted capability desk when admin grants perm
 
     $buyer->refresh();
 
-    // Buyer visits dashboard; sidebar now includes Granted Access section with links
+    // Buyer visits dashboard; sidebar now includes Granted Access section with user-facing links
     $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
 
     $response->assertOk();
     $response->assertSee('Granted Access');
-    $response->assertSee('Properties &amp; Listings', false);
-    $response->assertSee(route('seller.dashboard'));
-    $response->assertSee('Developer &amp; Projects', false);
-    $response->assertSee(route('developer.portal'));
+    $response->assertSee('Post Property');
+    $response->assertSee(route('user.properties.create'));
+    $response->assertSee('My Bookings');
+    $response->assertSee(route('user.bookings'));
 
-    // And buyer can successfully access the granted desks
-    $this->actingAs($buyer)->get(route('seller.dashboard'))->assertOk();
-    $this->actingAs($buyer)->get(route('developer.portal'))->assertOk();
+    // And buyer can successfully access the user-facing granted pages
+    $this->actingAs($buyer)->get(route('user.properties.create'))->assertOk();
+    $this->actingAs($buyer)->get(route('user.bookings'))->assertOk();
 });
 
-test('sidebar dynamically shows all desks when admin grants everything and hides them when reset', function () {
+test('sidebar dynamically shows all user features when admin grants everything and hides them when reset', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $buyer = User::factory()->create(['role' => 'buyer']);
 
@@ -223,10 +223,9 @@ test('sidebar dynamically shows all desks when admin grants everything and hides
     $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
     $response->assertOk();
     $response->assertSee('Granted Access');
-    $response->assertSee(route('seller.dashboard'));
-    $response->assertSee(route('developer.portal'));
-    $response->assertSee(route('host.dashboard'));
-    $response->assertSee(route('finance.index'));
+    $response->assertSee(route('user.properties.create'));
+    $response->assertSee(route('user.bookings'));
+    $response->assertSee(route('user.maintenance'));
 
     // Admin resets to role default
     $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
@@ -237,17 +236,17 @@ test('sidebar dynamically shows all desks when admin grants everything and hides
 
     $responseReset = $this->actingAs($buyer)->get(route('buyer.dashboard'));
     $responseReset->assertOk();
-    $responseReset->assertDontSee(route('seller.dashboard'));
-    $responseReset->assertDontSee(route('developer.portal'));
-    $responseReset->assertDontSee(route('finance.index'));
+    $responseReset->assertDontSee('Granted Access');
+    $responseReset->assertDontSee(route('user.properties.create'));
+    $responseReset->assertDontSee(route('user.bookings'));
 });
 
 test('developer portal renders granted access links when developer has additional permissions', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $developer = User::factory()->create(['role' => 'developer']);
 
-    // Admin grants CRM permission to developer
-    $permId = Permission::where('key', 'crm.view')->value('id');
+    // Admin grants booking.view permission to developer
+    $permId = Permission::where('key', 'booking.view')->value('id');
 
     $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $developer), [
         'permission_mode' => 'custom',
@@ -259,16 +258,16 @@ test('developer portal renders granted access links when developer has additiona
     $response = $this->actingAs($developer)->get(route('developer.portal'));
     $response->assertOk();
     $response->assertSee('Granted Access');
-    $response->assertSee(route('agent.portal'));
+    $response->assertSee(route('user.bookings'));
 });
 
-test('agent portal renders granted access links when agent has developer permissions', function () {
+test('agent portal renders granted access links when agent has additional user permissions', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $agentUser = User::factory()->create(['role' => 'agent']);
     $agentUser->ensureAgentProfile();
 
-    // Admin grants projects.create permission to agent
-    $permId = Permission::where('key', 'projects.create')->value('id');
+    // Admin grants booking.view permission to agent
+    $permId = Permission::where('key', 'booking.view')->value('id');
 
     $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $agentUser), [
         'permission_mode' => 'custom',
@@ -280,5 +279,5 @@ test('agent portal renders granted access links when agent has developer permiss
     $response = $this->actingAs($agentUser)->get(route('agent.portal'));
     $response->assertOk();
     $response->assertSee('Granted Access');
-    $response->assertSee(route('developer.portal'));
+    $response->assertSee(route('user.bookings'));
 });

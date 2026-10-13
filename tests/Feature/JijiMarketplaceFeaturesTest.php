@@ -259,16 +259,16 @@ test('agreement seller name is the person who posted the property', function () 
     expect($viewHtml)->toContain('1.1 ሻጭ');
 });
 
-test('user role is removed when adding a user and only agent or admin are allowed', function () {
+test('non-assignable roles are rejected when adding a user and agent role still works', function () {
     $admin = User::factory()->create(['role' => 'admin']);
 
-    // Attempting to add a user with role 'user' fails validation
+    // Attempting to add a user with an unknown role fails validation
     $this->actingAs($admin)
         ->post('/dashboard/users', [
             'name' => 'Attempted User',
             'email' => 'attempted.user@example.com',
             'password' => 'Secret123!',
-            'role' => 'user',
+            'role' => 'not_a_real_role',
         ])
         ->assertSessionHasErrors('role');
 
@@ -287,8 +287,12 @@ test('user role is removed when adding a user and only agent or admin are allowe
         'role' => 'agent',
     ]);
 
-    // Role select on dashboard does not offer User as an option for adding a new user
+    // Role select offers the 16 platform actors (personas); guests self-register and are not assignable
     $response = $this->actingAs($admin)->get('/dashboard?section=users');
     $response->assertOk();
-    $response->assertDontSee('<option value="user" >User</option>', false);
+    $response->assertSee('<option value="buyer"', false);
+    $response->assertSee('<option value="developer"', false);
+    $response->assertDontSee('<option value="guest"', false);
+    $response->assertDontSee('<option value="user"', false);
+    $response->assertDontSee('<option value="client"', false);
 });

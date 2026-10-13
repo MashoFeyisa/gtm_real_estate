@@ -31,16 +31,31 @@ test('admin can log in with the seeded credentials', function () {
     $this->assertAuthenticatedAs(User::where('email', 'admin@realestate.com')->first());
 });
 
+test('guest must sign in before sending a contact inquiry', function () {
+    $response = $this->post('/contact', [
+        'name' => 'Guest Visitor',
+        'email' => 'guest@example.com',
+        'subject' => 'Property question',
+        'message' => 'I would like more information about a property.',
+    ]);
+
+    $response->assertRedirect(route('register'))
+        ->assertSessionHas('signup_prompt', 'Register / Login to continue: Create a client account or sign in before sending a message.');
+
+    expect(Inquiry::count())->toBe(0);
+});
+
 test('user can submit a home page contact form and notify the admin', function () {
     Mail::fake();
 
-    $response = $this->post('/contact', [
-        'name' => 'Amanuel Bekele',
-        'email' => 'amanuel@example.com',
-        'phone' => '+251912345678',
-        'subject' => 'House inquiry',
-        'message' => 'I want to schedule a visit for the Greenview Residence property.',
-    ]);
+    $response = $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/contact', [
+            'name' => 'Amanuel Bekele',
+            'email' => 'amanuel@example.com',
+            'phone' => '+251912345678',
+            'subject' => 'House inquiry',
+            'message' => 'I want to schedule a visit for the Greenview Residence property.',
+        ]);
 
     $response->assertRedirect('/app#contact')
         ->assertSessionHas('success', 'Your message has been sent successfully.');
@@ -187,7 +202,7 @@ test('admin can edit and delete a user from the user manager board', function ()
             'email' => 'updated-user@example.com',
             'role' => 'admin',
         ])
-        ->assertRedirect(route('dashboard', ['section' => 'users']));
+        ->assertRedirect(route('dashboard').'#users');
 
     $user->refresh();
     expect($user->name)->toBe('Updated User');
@@ -196,7 +211,7 @@ test('admin can edit and delete a user from the user manager board', function ()
 
     $this->actingAs($admin)
         ->delete('/dashboard/users/'.$user->id)
-        ->assertRedirect('/dashboard');
+        ->assertRedirect(route('dashboard').'#users');
 
     $this->assertDatabaseMissing('users', ['id' => $user->id]);
 });
@@ -336,8 +351,7 @@ test('the home page includes the required real estate sections', function () {
         ->assertSee('Latest Properties')
         ->assertSee('Featured Projects')
         ->assertSee('About GTP')
-        ->assertSee('Testimonials')
-        ->assertSee('Newsletter');
+        ->assertSee('Testimonials');
 });
 
 test('admin can publish listing and featured project content for homepage sections', function () {
@@ -624,7 +638,7 @@ test('admin can create agents and they appear on the home page agents section', 
             'phone' => '+251911555000',
             'bio' => 'Luxury villa specialist',
         ])
-        ->assertRedirect('/dashboard?section=agents')
+        ->assertRedirect('/dashboard?section=users')
         ->assertSessionHas('success', 'Agent created successfully.');
 
     $this->assertDatabaseHas('agents', [
@@ -652,14 +666,15 @@ test('users can send a message directly to a specific agent from the contact for
     $response = $this->get('/app?agent='.$agent->id);
     $response->assertOk()->assertSee('<option value="'.$agent->id.'" selected', false);
 
-    $this->post('/contact', [
-        'name' => 'Daniel Girma',
-        'email' => 'daniel@example.com',
-        'phone' => '+251933444555',
-        'agent_id' => $agent->id,
-        'subject' => 'Villa viewing request',
-        'message' => 'I would like to arrange a viewing with Mekdes for the Bole villa listing.',
-    ])->assertRedirect('/agents/'.$agent->id)
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/contact', [
+            'name' => 'Daniel Girma',
+            'email' => 'daniel@example.com',
+            'phone' => '+251933444555',
+            'agent_id' => $agent->id,
+            'subject' => 'Villa viewing request',
+            'message' => 'I would like to arrange a viewing with Mekdes for the Bole villa listing.',
+        ])->assertRedirect('/agents/'.$agent->id)
         ->assertSessionHas('success', 'Your message has been sent to Mekdes Ali successfully.');
 
     $inquiry = Inquiry::query()->where('email', 'daniel@example.com')->first();
@@ -672,12 +687,13 @@ test('users can send a message directly to a specific agent from the contact for
 test('contact form still works without choosing an agent', function () {
     Mail::fake();
 
-    $this->post('/contact', [
-        'name' => 'General Visitor',
-        'email' => 'general@example.com',
-        'subject' => 'General question',
-        'message' => 'I have a general question about listings in Harar.',
-    ])->assertRedirect('/app#contact')
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/contact', [
+            'name' => 'General Visitor',
+            'email' => 'general@example.com',
+            'subject' => 'General question',
+            'message' => 'I have a general question about listings in Harar.',
+        ])->assertRedirect('/app#contact')
         ->assertSessionHas('success', 'Your message has been sent successfully.');
 
     $inquiry = Inquiry::query()->where('email', 'general@example.com')->first();
@@ -727,12 +743,13 @@ test('clients can leave feedback for an agent and it shows after approval', func
         'bio' => 'Land investment advisor',
     ]);
 
-    $this->post('/agents/'.$agent->id.'/feedback', [
-        'name' => 'Sara Tesfaye',
-        'email' => 'sara@example.com',
-        'rating' => 5,
-        'message' => 'Dawit helped us find the perfect plot with great patience and honest advice.',
-    ])->assertRedirect('/agents/'.$agent->id)
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/agents/'.$agent->id.'/feedback', [
+            'name' => 'Sara Tesfaye',
+            'email' => 'sara@example.com',
+            'rating' => 5,
+            'message' => 'Dawit helped us find the perfect plot with great patience and honest advice.',
+        ])->assertRedirect('/agents/'.$agent->id)
         ->assertSessionHas('feedback_success', 'Thank you! Your feedback was submitted and will appear once reviewed.');
 
     $this->assertDatabaseHas('agent_feedbacks', [
@@ -767,7 +784,8 @@ test('agent feedback requires valid rating and message', function () {
         'bio' => 'First-time buyer consultant',
     ]);
 
-    $this->from('/agents/'.$agent->id)
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->from('/agents/'.$agent->id)
         ->post('/agents/'.$agent->id.'/feedback', [
             'name' => 'Test User',
             'email' => 'testuser@example.com',
@@ -797,7 +815,7 @@ test('agent photo can be uploaded from the dashboard and displays on the agents 
             'bio' => 'Luxury apartment specialist',
             'photo' => UploadedFile::fake()->image('agent-photo.jpg'),
         ])
-        ->assertRedirect('/dashboard?section=agents')
+        ->assertRedirect('/dashboard?section=users')
         ->assertSessionHas('success', 'Agent created successfully.');
 
     $agent = Agent::query()->where('email', 'photo.agent@example.com')->first();
@@ -821,14 +839,15 @@ test('contact form submitted from an agent profile redirects back to the profile
         'bio' => 'Property legal advisor',
     ]);
 
-    $this->post('/contact', [
-        'name' => 'Marta Bekele',
-        'email' => 'marta@example.com',
-        'phone' => '+251966777888',
-        'agent_id' => $agent->id,
-        'subject' => 'Viewing request',
-        'message' => 'I would like to schedule a viewing for the property listed by Yonas.',
-    ])->assertRedirect('/agents/'.$agent->id)
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/contact', [
+            'name' => 'Marta Bekele',
+            'email' => 'marta@example.com',
+            'phone' => '+251966777888',
+            'agent_id' => $agent->id,
+            'subject' => 'Viewing request',
+            'message' => 'I would like to schedule a viewing for the property listed by Yonas.',
+        ])->assertRedirect('/agents/'.$agent->id)
         ->assertSessionHas('success', 'Your message has been sent to Yonas Mekonnen successfully.');
 });
 
@@ -855,7 +874,7 @@ test('admin can delete an agent from the agents management section', function ()
     $this->assertDatabaseMissing('agents', ['id' => $agent->id]);
 });
 
-test('admin dashboard has an agents sidebar section with create and manage forms', function () {
+test('admin dashboard manages agents from the users section with agent profile fields', function () {
     $admin = User::factory()->create([
         'name' => 'Admin User',
         'email' => 'agents-sidebar@example.com',
@@ -866,9 +885,10 @@ test('admin dashboard has an agents sidebar section with create and manage forms
     $this->actingAs($admin)
         ->get('/dashboard')
         ->assertOk()
-        ->assertSee('Agents Management')
-        ->assertSee('Add Agent')
-        ->assertSee('Title / Specialty');
+        ->assertSee('Agent Profile')
+        ->assertSee('Title / Specialty')
+        ->assertSee('Commission Tier')
+        ->assertDontSee('Agents Management');
 });
 
 test('admin can edit an agent from the agents management section', function () {
@@ -887,7 +907,7 @@ test('admin can edit an agent from the agents management section', function () {
     ]);
 
     $this->actingAs($admin)
-        ->get('/dashboard?edit_agent='.$agent->id.'&section=agents')
+        ->get('/dashboard?edit_agent='.$agent->id.'&section=users')
         ->assertOk()
         ->assertSee('Edit Agent')
         ->assertSee('Editable Agent');
@@ -900,7 +920,7 @@ test('admin can edit an agent from the agents management section', function () {
             'bio' => 'Senior consultant',
             'password' => 'Portal123!',
         ])
-        ->assertRedirect('/dashboard?section=agents')
+        ->assertRedirect('/dashboard?section=users')
         ->assertSessionHas('success', 'Agent updated successfully.');
 
     $agent->refresh();
@@ -930,7 +950,7 @@ test('creating an agent with a password creates a portal login account', functio
             'bio' => 'Portal tester',
             'password' => 'AgentPass1!',
         ])
-        ->assertRedirect('/dashboard?section=agents')
+        ->assertRedirect('/dashboard?section=users')
         ->assertSessionHas('success', 'Agent created successfully.');
 
     $agent = Agent::query()->where('email', 'portal.agent@example.com')->first();
@@ -1056,7 +1076,7 @@ test('agent can accept and reject buy requests', function () {
             'agent_note' => 'Congratulations, we accept your offer.',
         ])
         ->assertRedirect('/agent-portal')
-        ->assertSessionHas('success', 'The buy request was accepted and the agreement was generated.');
+        ->assertSessionHas('success', 'The buy request was submitted to Admin for commission review.');
 
     $order->refresh();
     expect($order->status)->toBe('accepted');
@@ -1132,13 +1152,14 @@ test('clients can submit a buy request on a property page', function () {
         'agent_id' => $agent->id,
     ]);
 
-    $this->post('/properties/'.$property->id.'/orders', [
-        'name' => 'Interested Buyer',
-        'email' => 'buyer.person@example.com',
-        'phone' => '+251988111222',
-        'offer_amount' => 430000,
-        'message' => 'I am interested in this villa and can visit this weekend.',
-    ])->assertRedirect('/properties/buyable-villa')
+    $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post('/properties/'.$property->id.'/orders', [
+            'name' => 'Interested Buyer',
+            'email' => 'buyer.person@example.com',
+            'phone' => '+251988111222',
+            'offer_amount' => 430000,
+            'message' => 'I am interested in this villa and can visit this weekend.',
+        ])->assertRedirect('/properties/buyable-villa')
         ->assertSessionHas('success', 'Your buy request was sent. The agent will contact you shortly.');
 
     $this->assertDatabaseHas('orders', [
@@ -1362,14 +1383,15 @@ test('client can submit rental order with custom written lease duration', functi
         'is_active' => true,
     ]);
 
-    $response = $this->post(route('orders.store', $property), [
-        'name' => 'Kassahun Tenant',
-        'email' => 'kassahun@example.com',
-        'phone' => '+251911334455',
-        'offer_amount' => 25000,
-        'lease_months' => 18,
-        'message' => 'Looking for an 18-month lease starting next month.',
-    ]);
+    $response = $this->actingAs(User::factory()->create(['role' => 'client']))
+        ->post(route('orders.store', $property), [
+            'name' => 'Kassahun Tenant',
+            'email' => 'kassahun@example.com',
+            'phone' => '+251911334455',
+            'offer_amount' => 25000,
+            'lease_months' => 18,
+            'message' => 'Looking for an 18-month lease starting next month.',
+        ]);
 
     $response->assertRedirect(route('properties.show', $property->slug));
 
@@ -1377,4 +1399,97 @@ test('client can submit rental order with custom written lease duration', functi
     expect($order)->not->toBeNull();
     expect($order->type)->toBe('rent');
     expect($order->lease_months)->toBe(18);
+});
+
+test('home page excludes sold and rented properties from featured and latest property lists', function () {
+    $availableVilla = Property::create([
+        'title' => 'Available Prime Villa Bole',
+        'slug' => 'available-prime-villa-bole',
+        'price' => 12000000,
+        'bedrooms' => 4,
+        'bathrooms' => 3,
+        'area' => 300,
+        'type' => 'sale',
+        'status' => 'published',
+        'featured' => true,
+        'is_active' => true,
+    ]);
+
+    $soldVilla = Property::create([
+        'title' => 'Sold Luxury Villa Old Airport',
+        'slug' => 'sold-luxury-villa-old-airport',
+        'price' => 15000000,
+        'bedrooms' => 5,
+        'bathrooms' => 4,
+        'area' => 400,
+        'type' => 'sale',
+        'status' => 'sold',
+        'featured' => true,
+        'is_active' => true,
+    ]);
+
+    $rentedApartment = Property::create([
+        'title' => 'Rented Modern Penthouse Kazanchis',
+        'slug' => 'rented-modern-penthouse-kazanchis',
+        'price' => 60000,
+        'bedrooms' => 3,
+        'bathrooms' => 2,
+        'area' => 180,
+        'type' => 'rent',
+        'status' => 'rented',
+        'featured' => true,
+        'is_active' => true,
+    ]);
+
+    $response = $this->get(route('home'));
+    $response->assertOk();
+
+    // Available property is rendered
+    $response->assertSee('Available Prime Villa Bole');
+
+    // Sold and rented properties are excluded from home display lists
+    $response->assertDontSee('Sold Luxury Villa Old Airport');
+    $response->assertDontSee('Rented Modern Penthouse Kazanchis');
+});
+
+test('home page and careers exclude job postings whose deadline has expired', function () {
+    $user = User::factory()->create(['role' => 'admin']);
+
+    $activeJob = BlogPost::create([
+        'user_id' => $user->id,
+        'title' => 'Active Legal Counsel 2026',
+        'slug' => 'active-legal-counsel-2026',
+        'type' => 'job',
+        'status' => 'published',
+        'content' => 'Advising clients on real estate contracts and land transfers.',
+        'job_type' => 'Full-time',
+        'job_location' => 'Addis Ababa',
+        'published_at' => now()->subDay(),
+        'application_deadline' => now()->addDays(14)->toDateString(),
+    ]);
+
+    $expiredJob = BlogPost::create([
+        'user_id' => $user->id,
+        'title' => 'Expired Field Surveyor 2024',
+        'slug' => 'expired-field-surveyor-2024',
+        'type' => 'job',
+        'status' => 'published',
+        'content' => 'Surveying plots and construction milestones.',
+        'job_type' => 'Full-time',
+        'job_location' => 'Dire Dawa',
+        'published_at' => now()->subMonth(),
+        'application_deadline' => now()->subDays(2)->toDateString(),
+    ]);
+
+    // Check on Home page
+    $homeResponse = $this->get(route('home'));
+    $homeResponse->assertOk();
+    $homeResponse->assertSee('Active Legal Counsel 2026');
+    $homeResponse->assertDontSee('Expired Field Surveyor 2024');
+
+    // Check on Careers page
+    $careersResponse = $this->get(route('careers'));
+    $careersResponse->assertOk();
+    $careersResponse->assertSee('Active Legal Counsel 2026');
+    $careersResponse->assertDontSee('Expired Field Surveyor 2024');
 });

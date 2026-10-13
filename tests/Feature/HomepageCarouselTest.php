@@ -87,6 +87,7 @@ test('homepage displays more than three items in carousels when available in dat
 
     $response = $this->get('/');
     $response->assertOk();
+    $response->assertSee('data-register-url="'.route('register').'"', false);
 
     // Verify all 5 featured properties are present in the carousel
     for ($i = 1; $i <= 5; $i++) {

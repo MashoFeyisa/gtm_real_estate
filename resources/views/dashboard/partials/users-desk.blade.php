@@ -520,7 +520,7 @@
                                     <span class="inline-block rounded-full border px-2 py-0.5 text-[11px] font-bold {{ $statusBadge[1] }}">
                                         {{ $statusBadge[0] }}
                                     </span>
-                                    @if ($systemUser->id !== auth()->id())
+                                    @if ($systemUser->id !== auth()->id() && auth()->user()->canManageUserStatus())
                                         <div class="mt-1 flex items-center gap-1">
                                             @if (($systemUser->status ?? 'active') !== 'active')
                                                 <form method="POST" action="{{ route('dashboard.users.status', $systemUser) }}" class="inline">
@@ -541,18 +541,24 @@
                                 </td>
                                 <td class="px-5 py-4 text-xs">
                                     <div class="flex flex-col gap-1.5">
-                                        <form method="POST" action="{{ route('dashboard.users.toggle-dashboard', $systemUser) }}" class="inline">
-                                            @csrf
-                                            <button type="submit" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $systemUser->dashboard_access_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
+                                        @if (auth()->user()->canEditUsers())
+                                            <form method="POST" action="{{ route('dashboard.users.toggle-dashboard', $systemUser) }}" class="inline">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $systemUser->dashboard_access_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
+                                                    Dashboard: {{ $systemUser->dashboard_access_enabled ? 'Granted' : 'Revoked' }}
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('dashboard.users.toggle-media', $systemUser) }}" class="inline">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $systemUser->media_access_enabled ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700' }}">
+                                                    Media: {{ $systemUser->media_access_enabled ? 'Enabled' : 'Disabled' }}
+                                                </button>
+                                            </form>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $systemUser->dashboard_access_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
                                                 Dashboard: {{ $systemUser->dashboard_access_enabled ? 'Granted' : 'Revoked' }}
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ route('dashboard.users.toggle-media', $systemUser) }}" class="inline">
-                                            @csrf
-                                            <button type="submit" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $systemUser->media_access_enabled ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700' }}">
-                                                Media: {{ $systemUser->media_access_enabled ? 'Enabled' : 'Disabled' }}
-                                            </button>
-                                        </form>
+                                            </span>
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 text-xs text-slate-500">
@@ -560,14 +566,20 @@
                                 </td>
                                 <td class="px-5 py-4 text-right">
                                     <div class="flex items-center justify-end gap-2">
-                                        <button type="button" onclick="openUserPermissionsModal({{ $systemUser->id }}, '{{ addslashes($systemUser->name) }}', '{{ $systemUser->role }}', '{{ addslashes($systemUser->email) }}')" class="rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#254d43] shadow-xs cursor-pointer inline-flex items-center gap-1" title="Manage permissions for this user">
-                                            <svg class="h-3.5 w-3.5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                                            Permissions
-                                        </button>
-                                        <a href="{{ route('dashboard', ['edit_user' => $systemUser->id, 'section' => 'users']) }}" class="rounded-full bg-[#587165] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1d3c34]">
-                                            Edit
-                                        </a>
-                                        @if ($systemUser->id !== auth()->id())
+                                        @if (auth()->user()->canManagePermissions())
+                                            <button type="button" onclick="openUserPermissionsModal({{ $systemUser->id }}, '{{ addslashes($systemUser->name) }}', '{{ $systemUser->role }}', '{{ addslashes($systemUser->email) }}')" class="rounded-full bg-[#1d3c34] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#254d43] shadow-xs cursor-pointer inline-flex items-center gap-1" title="Manage permissions for this user">
+                                                <svg class="h-3.5 w-3.5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                                Permissions
+                                            </button>
+                                        @endif
+
+                                        @if (auth()->user()->canEditUsers())
+                                            <a href="{{ route('dashboard', ['edit_user' => $systemUser->id, 'section' => 'users']) }}" class="rounded-full bg-[#587165] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1d3c34]">
+                                                Edit
+                                            </a>
+                                        @endif
+
+                                        @if ($systemUser->id !== auth()->id() && auth()->user()->canDeleteUsers())
                                             <form method="POST" action="{{ route('dashboard.users.delete', $systemUser) }}" class="inline-block">
                                                 @csrf
                                                 @method('DELETE')

@@ -2333,7 +2333,7 @@
             const navLinks = document.querySelectorAll('.nav-section-link');
             const panels = document.querySelectorAll('.section-panel');
 
-            function activateSection(sectionName) {
+            function activateSection(sectionName, updateHash = true) {
                 panels.forEach(panel => {
                     const visible = panel.dataset.section === sectionName;
                     panel.classList.toggle('hidden', !visible);
@@ -2352,7 +2352,18 @@
                     link.classList.toggle('text-[#dfeee4]', !active);
                     link.classList.toggle('font-semibold', true);
                 });
+
+                if (updateHash && window.location.hash !== '#' + sectionName) {
+                    history.replaceState(null, '', '#' + sectionName);
+                }
+
+                try {
+                    sessionStorage.setItem('dashboard_active_section', sectionName);
+                    sessionStorage.setItem('dashboard_active_section_' + window.location.pathname, sectionName);
+                } catch (e) {}
             }
+
+            window.activateSection = activateSection;
 
             navLinks.forEach(link => {
                 link.addEventListener('click', function (event) {
@@ -2362,27 +2373,39 @@
                     }
 
                     event.preventDefault();
-                    activateSection(target);
-                    history.replaceState(null, '', '#' + target);
+                    activateSection(target, true);
                 });
             });
 
             const params = new URLSearchParams(window.location.search);
             const paramSection = params.get('section');
             const initialHash = window.location.hash.replace('#', '');
+            let savedSessionSection = null;
+            try {
+                savedSessionSection = sessionStorage.getItem('dashboard_active_section_' + window.location.pathname) || sessionStorage.getItem('dashboard_active_section');
+            } catch (e) {}
 
             let initialSection = 'overview';
             if (params.has('edit_property')) {
                 initialSection = 'listings';
-            } else if (paramSection && document.querySelector('[data-section="' + paramSection + '"]')) {
-                initialSection = paramSection;
             } else if (initialHash && document.querySelector('[data-section="' + initialHash + '"]')) {
                 initialSection = initialHash;
+            } else if (paramSection && document.querySelector('[data-section="' + paramSection + '"]')) {
+                initialSection = paramSection;
+            } else if (savedSessionSection && document.querySelector('[data-section="' + savedSessionSection + '"]')) {
+                initialSection = savedSessionSection;
             }
 
             if (document.querySelector('[data-section="' + initialSection + '"]')) {
-                activateSection(initialSection);
+                activateSection(initialSection, !!initialHash);
             }
+
+            window.addEventListener('hashchange', function () {
+                const newHash = window.location.hash.replace('#', '');
+                if (newHash && document.querySelector('[data-section="' + newHash + '"]')) {
+                    activateSection(newHash, false);
+                }
+            });
 
             // "+ Add Property" button toggles the create-listing form.
             const addToggle = document.getElementById('agent-add-listing-toggle');

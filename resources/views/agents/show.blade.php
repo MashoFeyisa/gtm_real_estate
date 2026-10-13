@@ -127,11 +127,15 @@
 
             @if ($properties->isNotEmpty())
                 <div class="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    @php
+                        $agentComparedIds = session('compared_property_ids', []);
+                    @endphp
                     @foreach ($properties as $property)
                         @php
                             $cardGallery = $property->gallery_images;
+                            $isAgentPropCompared = in_array($property->id, $agentComparedIds, true);
                         @endphp
-                        <article class="group overflow-hidden rounded-[1.75rem] border border-[#d9cab3] bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                        <article data-property-card data-property-id="{{ $property->id }}" class="property-card group overflow-hidden rounded-[1.75rem] border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg {{ $isAgentPropCompared ? 'is-marked-for-compare ring-3 ring-[#d4af37] border-[#d4af37] shadow-xl' : 'border-[#d9cab3] bg-white shadow-sm' }}">
                             <div class="relative">
                                 @if (count($cardGallery) > 1)
                                     <div data-property-slider class="group/slider relative h-52 w-full overflow-hidden bg-[#e8efe8] shrink-0 select-none">
@@ -175,11 +179,39 @@
                                         {{ $property->type === 'rent' ? 'Rent' : 'Sale' }}
                                     </span>
                                 </div>
+
+                                {{-- Select Compare directly from image --}}
+                                <div class="absolute right-3 top-3 z-30">
+                                    <form method="POST" action="{{ route('properties.compare.toggle', $property) }}" class="inline compare-toggle-form pointer-events-auto" data-property-id="{{ $property->id }}">
+                                        @csrf
+                                        <button type="submit" 
+                                            title="{{ $isAgentPropCompared ? 'Remove from comparison matrix' : 'Compare side by side in matrix' }}" 
+                                            data-compared="{{ $isAgentPropCompared ? '1' : '0' }}"
+                                            class="compare-toggle-btn compare-img-btn inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-md backdrop-blur-md transition-all duration-200 cursor-pointer select-none active:scale-95 {{ $isAgentPropCompared ? 'bg-[#d4af37] text-[#102b25] border border-[#d4af37] ring-2 ring-[#d4af37]/40 font-black' : 'bg-[#102b25]/85 text-[#fdf8f0] border border-white/25 hover:bg-[#102b25] hover:text-[#d4af37]' }}">
+                                            <span class="compare-icon-wrap flex items-center justify-center">
+                                                @if ($isAgentPropCompared)
+                                                    <svg class="h-3.5 w-3.5 text-[#102b25]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                                @else
+                                                    <svg class="h-3.5 w-3.5 text-[#d4af37]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                                @endif
+                                            </span>
+                                            <span class="compare-btn-text">{{ $isAgentPropCompared ? '✓ In Matrix' : 'Compare' }}</span>
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {{-- Automatic compare matrix mark indicator on image --}}
+                                <div class="compare-matrix-marker-badge absolute bottom-2.5 left-2.5 z-30 transition-all duration-300 {{ $isAgentPropCompared ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none hidden' }}">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#102b25]/95 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-[#d4af37] border border-[#d4af37] shadow-lg backdrop-blur-md ring-1 ring-black/40">
+                                        <svg class="h-3.5 w-3.5 text-[#d4af37]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        <span>Marked for Matrix</span>
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="p-5">
                                 <div class="flex items-center justify-between text-xs text-[#587165]">
-                                    <span class="font-bold uppercase tracking-wider">{{ ucfirst($property->property_category ?? 'Property') }}</span>
+                                    <span class="font-bold uppercase tracking-wider">{{ ucwords(str_replace('_', ' ', (string) ($property->property_category ?? 'Property'))) }}</span>
                                     <span>{{ $property->city ?? 'Addis Ababa' }}</span>
                                 </div>
 
@@ -188,7 +220,7 @@
                                 </h3>
 
                                 <div class="mt-3 flex items-baseline gap-2">
-                                    <span class="text-xl font-black text-[#1d3c34]">ETB {{ number_format($property->price) }}</span>
+                                    <span class="text-xl font-black text-[#1d3c34] currency-price" data-base-price="{{ $property->price }}">ETB {{ number_format($property->price) }}</span>
                                     @if ($property->type === 'rent')
                                         <span class="text-xs font-semibold text-[#587165]">/ mo</span>
                                     @endif
@@ -199,7 +231,7 @@
                                     <span>•</span>
                                     <span>{{ $property->bathrooms }} baths</span>
                                     <span>•</span>
-                                    <span>{{ $property->area }} sqm (ካሬ)</span>
+                                    <span>{{ $property->area }} sqm</span>
                                 </div>
 
                                 <div class="mt-4 flex items-center justify-between">

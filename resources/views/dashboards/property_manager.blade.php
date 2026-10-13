@@ -7,83 +7,49 @@
     <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">
         <span>📊 Overview</span>
     </a>
-    <a href="#units" data-target-section="units" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>🏢</span>
-            <span>Units & Occupancy</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $totalUnits }}</span>
-    </a>
-    <a href="#tenants-guests" data-target-section="tenants-guests" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>🧑‍🤝‍🧑</span>
-            <span>Tenants & Guests</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $tenants->count() + $guests->count() }}</span>
-    </a>
-    <a href="#rent-collection" data-target-section="rent-collection" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>💳</span>
-            <span>Rent & Collections</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $rentSchedules->count() }}</span>
-    </a>
-    <a href="#maintenance-cleaning" data-target-section="maintenance-cleaning" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>🧹</span>
-            <span>Maintenance & Tasks</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $maintenanceTickets->count() + $cleaningTasks->count() }}</span>
-    </a>
+    @if (auth()->user()->hasAnyPermission(['units.manage', 'units.create', 'units.view', 'buildings.manage']))
+        <a href="#units" data-target-section="units" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>🏢</span>
+                <span>Units & Occupancy</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $totalUnits }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['tenants.manage', 'tenants.view', 'guests.view']))
+        <a href="#tenants-guests" data-target-section="tenants-guests" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>🧑‍🤝‍🧑</span>
+                <span>Tenants & Guests</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $tenants->count() + $guests->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['rent.manage', 'rent.view', 'payments.manage']))
+        <a href="#rent-collection" data-target-section="rent-collection" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>💳</span>
+                <span>Rent & Collections</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $rentSchedules->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['housekeeping.manage', 'maintenance.manage', 'maintenance.view']))
+        <a href="#maintenance-cleaning" data-target-section="maintenance-cleaning" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>🧹</span>
+                <span>Maintenance & Tasks</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $maintenanceTickets->count() + $cleaningTasks->count() }}</span>
+        </a>
+    @endif
 @endsection
 
 @section('content')
 <div class="space-y-8">
-    {{-- Banner --}}
-    <div id="overview" class="scroll-mt-6 rounded-3xl border border-[#d9cab3] bg-gradient-to-r from-[#1d3c34] to-[#2d5d4d] p-6 text-white shadow-sm md:p-8">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-                <span class="rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-3 py-1 text-xs font-bold text-[#f8e7b9] uppercase tracking-wider">Property Operations</span>
-                <h1 class="mt-2 text-2xl md:text-3xl font-black text-white">Property Manager Control Center</h1>
-                <p class="mt-1 text-sm text-slate-200">Manage multi-unit portfolios, tenant leases, short-stay guest turns, rent collection rolls, maintenance, and housekeeping.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <button type="button" onclick="document.getElementById('add-unit-modal').classList.remove('hidden'); document.getElementById('add-unit-modal').scrollIntoView({behavior: 'smooth'})" class="rounded-full bg-[#d4af37] px-4 py-2 text-xs font-bold text-[#1d3c34] hover:bg-[#b7842d] transition shadow-sm cursor-pointer">
-                    + Add New Unit
-                </button>
-                <button type="button" onclick="document.getElementById('dispatch-cleaning-modal').classList.toggle('hidden')" class="rounded-full bg-white/15 border border-white/30 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition shadow-sm cursor-pointer">
-                    + Dispatch Cleaning
-                </button>
-                <button type="button" onclick="document.getElementById('file-maintenance-modal').classList.toggle('hidden')" class="rounded-full bg-white/15 border border-white/30 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition shadow-sm cursor-pointer">
-                    + File Ticket
-                </button>
-                <a href="{{ route('role.portal') }}" class="rounded-full bg-white/15 border border-white/30 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition shadow-sm">
-                    🎛️ Universal Desk
-                </a>
-                <a href="#units" class="rounded-full bg-white/15 border border-white/30 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition shadow-sm">
-                    🏢 Units &amp; Occupancy Roll
-                </a>
-            </div>
-        </div>
-
-        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-white/20 pt-6">
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Total Units</p>
-                <p class="text-2xl font-black text-white">{{ $totalUnits }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Occupied vs Vacant</p>
-                <p class="text-2xl font-black text-white"><span class="text-emerald-300">{{ $occupiedUnits }}</span> / <span class="text-amber-300">{{ $vacantUnits }}</span></p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Occupancy Rate</p>
-                <p class="text-2xl font-black text-[#f8e7b9]">{{ $occupancyRate }}%</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Open Tickets</p>
-                <p class="text-2xl font-black text-white">{{ $maintenanceTickets->whereIn('status', ['open', 'in_progress'])->count() }}</p>
-            </div>
-        </div>
+    {{-- Overview Analytics --}}
+    <div id="overview" data-section="overview" class="section-panel scroll-mt-6 space-y-8">
+        @include('dashboards.partials.analytics-charts')
     </div>
 
     {{-- Add Unit Modal/Form --}}
@@ -267,7 +233,7 @@
     </div>
 
     {{-- 1. Units Inventory Matrix (Occupied vs Vacant) --}}
-    <div id="units" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="units" data-section="units" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3">
             <div>
                 <h2 class="text-xl font-black text-[#1d3c34]">Units &amp; Occupancy Roll</h2>
@@ -428,7 +394,7 @@
     </div>
 
     {{-- 2. Active Tenants & In-House Guests --}}
-    <div id="tenants-guests" class="scroll-mt-6 grid gap-6 md:grid-cols-2">
+    <div id="tenants-guests" data-section="tenants-guests" class="section-panel hidden scroll-mt-6 grid gap-6 md:grid-cols-2">
         {{-- Long-Term Tenants --}}
         <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3">
@@ -592,7 +558,7 @@
     </div>
 
     {{-- 3. Rent Collection & Schedules Roll --}}
-    <div id="rent-collection" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="rent-collection" data-section="rent-collection" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#e7ddca] pb-3 gap-2">
             <div>
                 <h3 class="text-lg font-black text-[#1d3c34]">Rent Collection &amp; Installment Schedules</h3>
@@ -701,7 +667,7 @@
     </div>
 
     {{-- 4. Maintenance & Cleaning Task Queues --}}
-    <div id="maintenance-cleaning" class="scroll-mt-6 grid gap-6 md:grid-cols-2">
+    <div id="maintenance-cleaning" data-section="maintenance-cleaning" class="section-panel hidden scroll-mt-6 grid gap-6 md:grid-cols-2">
         {{-- Maintenance Tickets --}}
         <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3">

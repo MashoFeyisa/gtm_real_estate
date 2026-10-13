@@ -7,71 +7,44 @@
     <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">
         <span>📊 Overview</span>
     </a>
-    <a href="#properties" data-target-section="properties" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>🏠</span>
-            <span>My Properties</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $properties->count() }}</span>
-    </a>
-    <a href="#listings" data-target-section="listings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>📋</span>
-            <span>Listings Workflow</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $listings->count() }}</span>
-    </a>
-    <a href="#leads-inquiries" data-target-section="leads-inquiries" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-        <span class="flex items-center gap-2.5">
-            <span>💬</span>
-            <span>Leads & Inquiries</span>
-        </span>
-        <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $leads->count() + $inquiries->count() }}</span>
-    </a>
+    @if (auth()->user()->hasAnyPermission(['properties.create', 'properties.update', 'properties.view', 'properties.delete']))
+        <a href="#properties" data-target-section="properties" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>🏠</span>
+                <span>My Properties</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $properties->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['listings.create', 'listings.publish', 'listings.manage', 'properties.publish']))
+        <a href="#listings" data-target-section="listings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>📋</span>
+                <span>Listings Workflow</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $listings->count() }}</span>
+        </a>
+    @endif
+    @if (auth()->user()->hasAnyPermission(['inquiries.view', 'leads.manage', 'inquiries.reply', 'sellers.contact']))
+        <a href="#leads-inquiries" data-target-section="leads-inquiries" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+            <span class="flex items-center gap-2.5">
+                <span>💬</span>
+                <span>Leads & Inquiries</span>
+            </span>
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $leads->count() + $inquiries->count() }}</span>
+        </a>
+    @endif
 @endsection
 
 @section('content')
 <div x-data="{ openCreateModal: false }" class="space-y-8">
-    {{-- Banner --}}
-    <div id="overview" class="scroll-mt-6 rounded-3xl border border-[#d9cab3] bg-gradient-to-r from-[#1d3c34] to-[#2d5d4d] p-6 text-white shadow-sm md:p-8">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <span class="rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-3 py-1 text-xs font-bold text-[#f8e7b9] uppercase tracking-wider">Property Supply Side</span>
-                <h1 class="mt-2 text-2xl md:text-3xl font-black text-white">Seller &amp; Landlord Hub</h1>
-                <p class="mt-1 text-sm text-slate-200">Manage property inventory, listing publication lifecycle, prospective buyer leads, inquiries, and listing optimization scores.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <button @click="openCreateModal = true" type="button" class="rounded-full bg-emerald-500 hover:bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white transition shadow-sm flex items-center gap-1.5">
-                    <span>+</span> Add Property / Listing
-                </button>
-                <a href="{{ route('properties.index') }}" class="rounded-full bg-[#d4af37] px-5 py-2.5 text-xs font-bold text-[#1d3c34] hover:bg-[#b7842d] transition shadow-sm">
-                    Marketplace Feed &rarr;
-                </a>
-            </div>
-        </div>
-
-        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-white/20 pt-6">
-            <div>
-                <p class="text-xs font-semibold text-slate-300">My Properties</p>
-                <p class="text-2xl font-black text-white">{{ $properties->count() }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Active Listings</p>
-                <p class="text-2xl font-black text-[#f8e7b9]">{{ $listings->where('status', 'published')->count() }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Buyer Leads &amp; Offers</p>
-                <p class="text-2xl font-black text-white">{{ $leads->count() }}</p>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-slate-300">Direct Inquiries</p>
-                <p class="text-2xl font-black text-white">{{ $inquiries->count() }}</p>
-            </div>
-        </div>
+    {{-- Overview Analytics --}}
+    <div id="overview" data-section="overview" class="section-panel scroll-mt-6 space-y-8">
+        @include('dashboards.partials.analytics-charts')
     </div>
 
     {{-- 1. Properties & Listing Quality Score --}}
-    <div id="properties" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="properties" data-section="properties" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <h2 class="text-xl font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">Properties &amp; Listing Quality Scores</h2>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @forelse ($properties as $property)
@@ -116,7 +89,7 @@
     </div>
 
     {{-- 2. Listings & Status Workflow --}}
-    <div id="listings" class="scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+    <div id="listings" data-section="listings" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
         <h2 class="text-xl font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">Listings &amp; Lifecycle Status (Draft &rarr; Published &rarr; Sold)</h2>
         <div class="mt-4 overflow-x-auto">
             <table class="min-w-full divide-y divide-[#e7ddca] text-sm">
@@ -167,7 +140,7 @@
     </div>
 
     {{-- 3. Inbound Leads, Offers & Inquiries --}}
-    <div id="leads-inquiries" class="scroll-mt-6 grid gap-6 md:grid-cols-2">
+    <div id="leads-inquiries" data-section="leads-inquiries" class="section-panel hidden scroll-mt-6 grid gap-6 md:grid-cols-2">
         <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
             <h3 class="text-lg font-black text-[#1d3c34] border-b border-[#e7ddca] pb-3">Buyer Leads &amp; Offers</h3>
             <div class="mt-4 space-y-3">

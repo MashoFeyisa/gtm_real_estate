@@ -92,7 +92,95 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return ($this->role ?? '') === 'admin';
+        $role = strtolower(trim((string) ($this->role ?? '')));
+        if (in_array($role, ['admin', 'administrator', 'superadmin', 'super_admin'], true)) {
+            return true;
+        }
+
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->contains(function ($r) {
+                $roleName = strtolower(trim((string) ($r->slug ?? $r->name ?? '')));
+
+                return in_array($roleName, ['admin', 'administrator', 'superadmin', 'super_admin'], true);
+            });
+        }
+
+        return $this->roles()->where(function ($q) {
+            $q->whereIn('slug', ['admin', 'administrator', 'superadmin', 'super_admin'])
+                ->orWhereIn('name', ['admin', 'Admin', 'administrator', 'Administrator', 'superadmin', 'super_admin']);
+        })->exists();
+    }
+
+    public function canEditUsers(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'users.update',
+            'users.edit',
+            'users.manage',
+            'platform.users_manage',
+            'platform.roles_manage',
+        ]);
+    }
+
+    public function canCreateUsers(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'users.create',
+            'users.manage',
+            'platform.users_manage',
+            'platform.roles_manage',
+        ]);
+    }
+
+    public function canDeleteUsers(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'users.delete',
+            'users.manage',
+            'platform.users_manage',
+            'platform.roles_manage',
+        ]);
+    }
+
+    public function canManageUserStatus(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'users.suspend',
+            'users.manage',
+            'platform.users_manage',
+            'platform.roles_manage',
+        ]);
+    }
+
+    public function canManageRoles(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'platform.roles_manage',
+            'roles.manage',
+            'roles.update',
+            'roles.create',
+            'roles.delete',
+            'roles.edit',
+            'platform.permissions_manage',
+        ]);
+    }
+
+    public function canManagePermissions(): bool
+    {
+        return $this->isAdmin() || $this->hasAnyPermission([
+            'platform.roles_manage',
+            'platform.users_manage',
+            'platform.permissions_manage',
+            'roles.manage',
+            'roles.update',
+            'users.manage',
+            'users.update',
+            'users.edit',
+            'permissions.manage',
+            'permissions.create',
+            'permissions.update',
+            'permissions.delete',
+        ]);
     }
 
     public function isFinanceOfficer(): bool
@@ -179,18 +267,18 @@ class User extends Authenticatable
 
         $catalog = $this->permissionCatalog();
         if (! empty($catalog)) {
-            return $this->hasAnyPermission([
-                'buildings.manage',
-                'units.manage',
-                'tenants.manage',
-                'housekeeping.manage',
+            $candidates = array_intersect([
                 'units.create',
+                'units.view',
                 'buildings.create',
-            ]);
+                'buildings.view',
+                'tenants.view',
+            ], array_keys($catalog));
+
+            return ! empty($candidates) && $this->hasAnyPermission($candidates);
         }
 
-        return $this->hasPermission('units.create')
-            || $this->hasPermission('buildings.create');
+        return false;
     }
 
     public function getDashboardUrlAttribute(): string
@@ -341,11 +429,15 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($permissionKey === 'dashboard.view' && ! $this->dashboard_access_enabled) {
-            return false;
+        if ($permissionKey === 'dashboard.view') {
+            return (bool) $this->dashboard_access_enabled;
         }
 
-        if (in_array($permissionKey, ['media.view', 'photos.view', 'media.upload', 'photos.create'], true) && ! $this->media_access_enabled) {
+        if ($permissionKey === 'media.view') {
+            return (bool) $this->media_access_enabled;
+        }
+
+        if (in_array($permissionKey, ['photos.view', 'media.upload', 'photos.create'], true) && ! $this->media_access_enabled) {
             return false;
         }
 
@@ -363,6 +455,9 @@ class User extends Authenticatable
             'property.delete' => 'properties.delete',
             'property.approve' => 'properties.approve',
             'property.verify' => 'properties.verify',
+            'property.save' => 'properties.save',
+            'properties.favorite' => 'properties.save',
+            'property.favorite' => 'properties.save',
             'booking.view' => 'bookings.view',
             'booking.create' => 'bookings.create',
             'booking.cancel' => 'bookings.cancel',
@@ -371,6 +466,51 @@ class User extends Authenticatable
             'document.view' => 'documents.view',
             'media.view' => 'photos.view',
             'media.upload' => 'photos.create',
+            'offer.view' => 'offers.view',
+            'offer.create' => 'offers.create',
+            'offer.make' => 'offers.make',
+            'offer.update' => 'offers.update',
+            'offer.cancel' => 'offers.cancel',
+            'viewing.view' => 'viewings.view',
+            'viewing.create' => 'viewings.create',
+            'viewing.request' => 'viewings.request',
+            'viewing.schedule' => 'viewings.schedule',
+            'viewing.cancel' => 'viewings.cancel',
+            'inquiry.view' => 'inquiries.view',
+            'inquiry.create' => 'inquiries.create',
+            'inquiry.update' => 'inquiries.update',
+            'lead.view' => 'leads.view',
+            'lead.manage' => 'leads.manage',
+            'listing.view' => 'listings.view',
+            'listing.create' => 'listings.create',
+            'listing.update' => 'listings.update',
+            'listing.delete' => 'listings.delete',
+            'listing.publish' => 'listings.publish',
+            'searches.view' => 'properties.search',
+            'searches.save' => 'properties.search',
+            'search.view' => 'properties.search',
+            'search.save' => 'properties.search',
+            'users.edit' => 'users.update',
+            'user.edit' => 'users.update',
+            'user.update' => 'users.update',
+            'users.manage' => 'platform.users_manage',
+            'user.manage' => 'platform.users_manage',
+            'user.delete' => 'users.delete',
+            'user.create' => 'users.create',
+            'user.suspend' => 'users.suspend',
+            'user.view' => 'users.view',
+            'roles.manage' => 'platform.roles_manage',
+            'role.manage' => 'platform.roles_manage',
+            'roles.update' => 'platform.roles_manage',
+            'roles.edit' => 'platform.roles_manage',
+            'roles.create' => 'platform.roles_manage',
+            'roles.delete' => 'platform.roles_manage',
+            'permissions.manage' => 'platform.roles_manage',
+            'permission.manage' => 'platform.roles_manage',
+            'permissions.create' => 'platform.roles_manage',
+            'permissions.update' => 'platform.roles_manage',
+            'permissions.delete' => 'platform.roles_manage',
+            'platform.permissions_manage' => 'platform.roles_manage',
         ];
 
         $keysToCheck = [$permissionKey];
@@ -381,53 +521,72 @@ class User extends Authenticatable
         if (isset($reverseMap[$permissionKey])) {
             $keysToCheck[] = $reverseMap[$permissionKey];
         }
+        $keysToCheck = array_values(array_unique($keysToCheck));
 
-        // If none of the keys exist in catalog, fail open (legacy behavior)
-        $knownKeys = array_filter($keysToCheck, fn ($k) => array_key_exists($k, $catalog));
-        if (empty($knownKeys)) {
-            return true;
+        $knownPermissionIds = [];
+        foreach ($keysToCheck as $k) {
+            if (isset($catalog[$k])) {
+                $knownPermissionIds[] = $catalog[$k];
+            }
         }
+        $knownPermissionIds = array_values(array_unique($knownPermissionIds));
 
-        foreach ($knownKeys as $k) {
-            if ($this->checkSingleCatalogKey($k, $catalog)) {
+        // 1. Direct user permission overrides take highest precedence across all aliases
+        if (! empty($knownPermissionIds)) {
+            $overrides = $this->permissionOverrides()->whereIn('permission_id', $knownPermissionIds)->get();
+            $userPerms = $this->userPermissions()->whereIn('permission_id', $knownPermissionIds)->get();
+
+            // If explicitly denied on ANY alias override, deny immediately
+            if ($overrides->contains(fn ($o) => ! $o->granted) || $userPerms->contains(fn ($p) => ! $p->granted)) {
+                return false;
+            }
+
+            // If explicitly granted on ANY alias override, grant immediately
+            if ($overrides->contains(fn ($o) => (bool) $o->granted) || $userPerms->contains(fn ($p) => (bool) $p->granted)) {
                 return true;
             }
         }
 
-        return false;
-    }
+        // 2. Check role grants in database
+        if (! empty($knownPermissionIds)) {
+            $userRoleIds = $this->roles()->pluck('roles.id')->all();
+            if (! empty($userRoleIds) && RolePermission::query()->whereIn('role_id', $userRoleIds)->whereIn('permission_id', $knownPermissionIds)->exists()) {
+                return true;
+            }
 
-    protected function checkSingleCatalogKey(string $key, array $catalog): bool
-    {
-        $permissionId = $catalog[$key];
-
-        // Direct user permissions / overrides
-        $userPerm = $this->userPermissions()->where('permission_id', $permissionId)->first();
-        if ($userPerm) {
-            return (bool) $userPerm->granted;
+            if ($this->role && RolePermission::query()->where('role', $this->role)->whereIn('permission_id', $knownPermissionIds)->exists()) {
+                return true;
+            }
         }
 
-        $override = $this->permissionOverrides()->where('permission_id', $permissionId)->first();
-        if ($override) {
-            return (bool) $override->granted;
-        }
-
-        // Check user_roles table
-        $userRoleIds = $this->roles()->pluck('roles.id')->all();
-        if (! empty($userRoleIds) && RolePermission::query()->whereIn('role_id', $userRoleIds)->where('permission_id', $permissionId)->exists()) {
-            return true;
-        }
-
-        // Role permissions by role string
-        if ($this->role && RolePermission::query()->where('role', $this->role)->where('permission_id', $permissionId)->exists()) {
-            return true;
-        }
-
-        // Persona default configuration fallback
+        // 3. Check persona default configuration fallback
         $roleConfig = collect(config('personas.personas', []))->first(function ($p) {
             return ($p['role'] ?? null) === $this->role || in_array($this->role, $p['legacy_roles'] ?? [], true);
         });
-        if ($roleConfig && isset($roleConfig['permissions'][$key])) {
+        if ($roleConfig) {
+            foreach ($keysToCheck as $k) {
+                if (isset($roleConfig['permissions'][$k])) {
+                    return true;
+                }
+            }
+        }
+
+        // 4. If none of the keys exist in catalog:
+        if (empty($knownPermissionIds)) {
+            // Administrative & user management permissions are never granted by default to non-admins
+            $isAdminAction = false;
+            foreach ($keysToCheck as $k) {
+                if (str_starts_with($k, 'users.') || str_starts_with($k, 'platform.') || str_starts_with($k, 'roles.') || str_starts_with($k, 'audit.')) {
+                    $isAdminAction = true;
+                    break;
+                }
+            }
+
+            if ($isAdminAction) {
+                return false;
+            }
+
+            // Permissions outside the seeded catalog are not restricted (legacy / open capability)
             return true;
         }
 
