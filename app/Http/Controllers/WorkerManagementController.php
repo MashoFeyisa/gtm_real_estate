@@ -2,22 +2,44 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Agent;
 use App\Models\AgentFeedback;
+use App\Models\AuditLog;
 use App\Models\BlogPost;
+use App\Models\Booking;
+use App\Models\Branch;
+use App\Models\Campaign;
 use App\Models\Commission;
+use App\Models\FinancialLedger;
 use App\Models\Inquiry;
-use App\Models\NewsletterSubscriber;
+use App\Models\JobApplication;
+use App\Models\Lease;
+use App\Models\Listing;
+use App\Models\ListingType;
 use App\Models\Order;
+use App\Models\Payment;
+use App\Models\Permission;
+use App\Models\Project;
+use App\Models\ProjectUnit;
 use App\Models\Property;
-use App\Models\SiteSetting;
+use App\Models\PropertyCategory;
+use App\Models\PropertyOffer;
+use App\Models\PropertyReport;
+use App\Models\PropertyViewing;
+use App\Models\RentSchedule;
+use App\Models\Role;
+use App\Models\RolePermission;
+use App\Models\UnitReservation;
 use App\Models\User;
 use App\Services\AgreementPdfService;
+use App\Services\AnalyticsService;
+use App\Services\CommissionSplitService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -33,41 +55,58 @@ class WorkerManagementController extends Controller
             abort(403, 'Access denied.');
         }
 
-        $users = User::latest()->get();
-        $properties = Property::with(['agent', 'orders'])->latest()->get();
-        $agents = Agent::query()->with('account')->orderBy('name')->get();
-        $orders = Order::query()->with(['property', 'agent'])->latest()->get();
+        $users = User::query()
+            ->with(['permissionOverrides', 'userPermissions', 'roles', 'agentProfile', 'assignedProperty'])
+            ->latest()
+            ->paginate(12, ['*'], 'users_page')
+            ->withQueryString();
+        $properties = Property::with(['agent', 'orders'])->latest()->paginate(12, ['*'], 'properties_page')->withQueryString();
+        $agents = Agent::query()->with('account')->orderBy('name')->paginate(12, ['*'], 'agents_page')->withQueryString();
+        $orders = Order::query()
+            ->with(['property', 'agent', 'commission'])
+            ->latest()
+            ->paginate(12, ['*'], 'orders_page')
+            ->withQueryString();
         $agentRequestsToAdmin = Order::query()
-            ->with(['property', 'agent'])
+            ->with(['property', 'agent', 'commission'])
+            ->where(function ($query) {
+                $query->where('type', 'rent')
+                    ->orWhereHas('property', function ($propQuery) {
+                        $propQuery->where('type', 'rent')
+                            ->orWhere('status', 'sold')
+                            ->orWhere('status', 'rented');
+                    })
+                    ->orWhere('status', 'accepted');
+            })
             ->whereNotNull('submitted_to_admin_at')
             ->latest('submitted_to_admin_at')
             ->get();
         $unreadAdminRequests = $agentRequestsToAdmin->whereNull('admin_viewed_at');
 
-        $testimonials = AgentFeedback::withTrashed()->with('agent')->latest()->get();
+        $testimonials = AgentFeedback::withTrashed()->with('agent')->latest()->paginate(12, ['*'], 'testimonials_page')->withQueryString();
         $trashedTestimonials = AgentFeedback::onlyTrashed()->with('agent')->latest('deleted_at')->get();
 
         // Commission data
         $commissions = Commission::query()
             ->with(['agent', 'order', 'property'])
             ->latest()
-            ->get();
-        $pendingCommissionsTotal = $commissions->where('status', 'pending')->sum('commission_amount');
-        $paidCommissionsTotal = $commissions->where('status', 'paid')->sum('commission_amount');
+            ->paginate(12, ['*'], 'commissions_page')
+            ->withQueryString();
+        $pendingCommissionsTotal = Commission::where('status', 'pending')->sum('commission_amount');
+        $paidCommissionsTotal = Commission::where('status', 'paid')->sum('commission_amount');
 
-        $inquiries = Inquiry::query()->with('agent')->latest()->get();
-        $subscribers = NewsletterSubscriber::latest()->get();
+        $inquiries = Inquiry::query()->with('agent')->latest()->paginate(12, ['*'], 'inquiries_page')->withQueryString();
+        $notifications = $user->notifications()->latest()->take(20)->get();
 
         $overviewStats = [
-            'totalProperties' => $properties->count(),
-            'activeListings' => $properties->where('is_active', true)->whereNotIn('status', ['draft', 'archived'])->count(),
-            'pendingReviews' => $properties->where('status', 'draft')->count(),
+            'totalProperties' => Property::count(),
+            'activeListings' => Property::where('is_active', true)->whereNotIn('status', ['draft', 'archived'])->count(),
+            'pendingReviews' => Property::where('status', 'draft')->count(),
             'pendingAgentRequests' => $unreadAdminRequests->count(),
-            'pendingCommissions' => $commissions->where('status', 'pending')->count(),
+            'pendingCommissions' => Commission::where('status', 'pending')->count(),
             'pendingCommissionsTotal' => $pendingCommissionsTotal,
-            'totalSubscribers' => $subscribers->count(),
         ];
-        $recentProperties = $properties->take(3);
+        $recentProperties = Property::latest()->take(3)->get();
 
         $postsQuery = BlogPost::with('user')->latest();
 
@@ -89,8 +128,98 @@ class WorkerManagementController extends Controller
             $postsQuery->where('status', $request->status);
         }
 
-        $posts = $postsQuery->get();
-        $jobs = BlogPost::query()->where('type', 'job')->latest()->get();
+        $posts = $postsQuery->paginate(12, ['*'], 'posts_page')->withQueryString();
+        $jobs = BlogPost::query()->where('type', 'job')->latest()->paginate(12, ['*'], 'jobs_page')->withQueryString();
+        $jobApplications = JobApplication::query()->with('blogPost')->latest()->paginate(12, ['*'], 'applications_page')->withQueryString();
+        $pendingApplicationsCount = JobApplication::where('status', 'pending')->count();
+
+        Booking::completeExpiredReservations();
+
+        $bookings = Booking::query()
+            ->with('property')
+            ->where('status', '!=', 'completed')
+            ->latest()
+            ->paginate(12, ['*'], 'bookings_page')
+            ->withQueryString();
+        $overviewStats['totalBookings'] = Booking::where('status', '!=', 'completed')->count();
+
+        $projects = Project::query()->with(['units', 'milestones', 'buildings'])->latest()->get();
+        $unitReservations = UnitReservation::query()->with(['project', 'unit'])->latest()->paginate(12, ['*'], 'reservations_page')->withQueryString();
+        $overviewStats['totalProjects'] = Project::count();
+        $overviewStats['totalProjectUnits'] = ProjectUnit::count();
+        $overviewStats['totalUnitReservations'] = UnitReservation::count();
+
+        // Module 4: Property Viewings & Offers
+        $viewings = PropertyViewing::query()->with(['property', 'agent'])->latest()->get();
+        $offers = PropertyOffer::query()->with(['property', 'agent', 'negotiations'])->latest()->get();
+        $overviewStats['totalViewings'] = PropertyViewing::count();
+        $overviewStats['pendingViewings'] = PropertyViewing::where('status', 'requested')->count();
+        $overviewStats['totalOffers'] = PropertyOffer::count();
+        $overviewStats['activeOffers'] = PropertyOffer::whereIn('status', ['pending', 'countered', 'under_review'])->count();
+
+        // Ethiopian Transaction & Payments (SRS §78–§83)
+        $pendingPayments = Payment::query()->where('status', 'pending')->latest()->get();
+        $pendingPaymentsCount = Payment::where('status', 'pending')->count();
+        $overviewStats['pendingPaymentsCount'] = $pendingPaymentsCount;
+
+        // Rental & Lease Management Engine (SRS §84–§88)
+        $leases = Lease::query()->with(['property', 'agent', 'schedules.payment'])->latest()->paginate(12, ['*'], 'leases_page')->withQueryString();
+        $rentSchedules = RentSchedule::query()->with(['lease.property'])->latest()->get();
+        $activeLeasesCount = Lease::where('status', 'active')->count();
+        $overdueRentCount = $rentSchedules->filter(fn ($s) => $s->is_overdue)->count();
+        $totalRentCollected = (float) RentSchedule::where('status', 'paid')->sum('amount_paid');
+        $overviewStats['totalLeases'] = Lease::count();
+        $overviewStats['activeLeases'] = $activeLeasesCount;
+        $overviewStats['overdueRentCount'] = $overdueRentCount;
+        $overviewStats['totalRentCollected'] = $totalRentCollected;
+
+        // Trust & Safety / Client Incident & Misleading Reports
+        $reports = PropertyReport::query()->with(['property', 'user', 'resolver'])->latest()->paginate(12, ['*'], 'reports_page')->withQueryString();
+        $pendingReportsCount = PropertyReport::where('status', 'pending')->count();
+        $overviewStats['totalReports'] = PropertyReport::count();
+        $overviewStats['pendingReportsCount'] = $pendingReportsCount;
+
+        // Enterprise Pillars: Branches, Listings & Clients
+        $branches = Branch::with(['agents', 'properties'])->latest()->paginate(12, ['*'], 'branches_page')->withQueryString();
+        $listings = Listing::with('property')->latest()->paginate(12, ['*'], 'listings_page')->withQueryString();
+        $clients = User::whereIn('role', ['client', 'buyer', 'tenant', 'user'])
+            ->withCount(['orders', 'propertyLikes', 'propertyFavorites'])
+            ->latest()
+            ->paginate(12, ['*'], 'clients_page')
+            ->withQueryString();
+        $overviewStats['totalBranches'] = Branch::count();
+        $overviewStats['activeBranches'] = Branch::where('status', 'active')->count();
+        $overviewStats['totalListings'] = Listing::count();
+        $overviewStats['totalClients'] = User::whereIn('role', ['client', 'buyer', 'tenant', 'user'])->count();
+
+        $activityLogs = ActivityLog::with('user')->latest()->paginate(12, ['*'], 'logs_page')->withQueryString();
+        $campaigns = Campaign::with(['agent.user', 'property', 'reviewer', 'leads'])->latest()->get();
+        $overviewStats['totalCampaigns'] = Campaign::count();
+        $overviewStats['pendingCampaigns'] = Campaign::where('status', 'submitted')->count();
+        $overviewStats['totalActivityLogs'] = ActivityLog::count();
+
+        $adminCharts = app(AnalyticsService::class)->getAdminOverviewChartData();
+
+        // Access control: persona catalog, permission checklist & role grants
+        $personas = config('personas.personas', []);
+        $allPermissions = Permission::query()->orderBy('sort_order')->get();
+        $roleGrantsByPersona = RolePermission::query()->get()
+            ->groupBy('role')
+            ->map(fn ($grants) => $grants->pluck('permission_id')->all());
+
+        // Database-configurable property taxonomy (categories & listing types)
+        $propertyCategories = PropertyCategory::query()->ordered()->get();
+        $listingTypes = ListingType::query()->ordered()->get();
+        $categoryGroups = PropertyCategory::GROUPS;
+        $transactionModes = ListingType::MODES;
+
+        // Actor rosters for the sidebar desks (SRS: Hosts, Companies, Developers)
+        $hostUsers = User::query()->where('role', 'host')->latest()->take(15)->get();
+        $companyUsers = User::query()->whereIn('role', ['company', 'company_admin', 'real_estate_company'])->latest()->take(15)->get();
+        $developerUsers = User::query()->where('role', 'developer')->latest()->take(15)->get();
+
+        $roles = Role::with('permissions')->orderBy('name')->get();
+        $auditLogs = AuditLog::with('user')->latest()->paginate(15, ['*'], 'audit_logs_page')->withQueryString();
 
         return view('dashboard', compact(
             'users',
@@ -99,6 +228,13 @@ class WorkerManagementController extends Controller
             'orders',
             'posts',
             'jobs',
+            'jobApplications',
+            'pendingApplicationsCount',
+            'bookings',
+            'projects',
+            'unitReservations',
+            'viewings',
+            'offers',
             'overviewStats',
             'recentProperties',
             'agentRequestsToAdmin',
@@ -109,252 +245,40 @@ class WorkerManagementController extends Controller
             'pendingCommissionsTotal',
             'paidCommissionsTotal',
             'inquiries',
-            'subscribers'
+            'notifications',
+            'pendingPayments',
+            'pendingPaymentsCount',
+            'leases',
+            'rentSchedules',
+            'activeLeasesCount',
+            'overdueRentCount',
+            'totalRentCollected',
+            'reports',
+            'pendingReportsCount',
+            'branches',
+            'listings',
+            'clients',
+            'activityLogs',
+            'campaigns',
+            'adminCharts',
+            'personas',
+            'propertyCategories',
+            'listingTypes',
+            'categoryGroups',
+            'transactionModes',
+            'hostUsers',
+            'companyUsers',
+            'developerUsers',
+            'allPermissions',
+            'roleGrantsByPersona',
+            'roles',
+            'auditLogs'
         ));
     }
 
     public function updateSettings(Request $request)
     {
-        $user = auth()->user();
-
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
-        }
-
-        $validated = $request->validate([
-            'site_name' => ['required', 'string', 'max:255'],
-            'site_logo' => $request->hasFile('site_logo') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'site_logo_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'contact_email' => ['required', 'email', 'max:255'],
-            'contact_phone' => ['required', 'string', 'max:50'],
-            'contact_address' => ['required', 'string', 'max:255'],
-            'happy_buyers_base_count' => ['nullable', 'integer', 'min:0'],
-            // Static Landing Page Images (Files or URLs)
-            'hero_image' => $request->hasFile('hero_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'hero_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'panorama_image' => $request->hasFile('panorama_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'panorama_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'project_1_image' => $request->hasFile('project_1_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'project_1_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'project_2_image' => $request->hasFile('project_2_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'project_2_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'project_3_image' => $request->hasFile('project_3_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'project_3_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            'about_image' => $request->hasFile('about_image') ? ['file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'] : ['nullable', 'string', 'max:1000'],
-            'about_image_file' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
-            // Hero & Search
-            'hero_badge' => ['nullable', 'string', 'max:255'],
-            'hero_title' => ['nullable', 'string', 'max:255'],
-            'hero_description' => ['nullable', 'string', 'max:1500'],
-            'hero_primary_button_text' => ['nullable', 'string', 'max:100'],
-            'hero_secondary_button_text' => ['nullable', 'string', 'max:100'],
-            'hero_careers_link_text' => ['nullable', 'string', 'max:100'],
-            'hero_featured_badge' => ['nullable', 'string', 'max:100'],
-            'hero_stat_1_label' => ['nullable', 'string', 'max:100'],
-            'hero_stat_2_label' => ['nullable', 'string', 'max:100'],
-            'hero_stat_3_value' => ['nullable', 'string', 'max:100'],
-            'hero_stat_3_label' => ['nullable', 'string', 'max:100'],
-            'filter_category_label' => ['nullable', 'string', 'max:100'],
-            'filter_type_label' => ['nullable', 'string', 'max:100'],
-            'filter_location_label' => ['nullable', 'string', 'max:100'],
-            'filter_button_text' => ['nullable', 'string', 'max:100'],
-            // Counter
-            'counter_1_value' => ['nullable', 'string', 'max:100'],
-            'counter_1_label' => ['nullable', 'string', 'max:100'],
-            'counter_2_label' => ['nullable', 'string', 'max:100'],
-            'counter_3_label' => ['nullable', 'string', 'max:100'],
-            'counter_4_value' => ['nullable', 'string', 'max:100'],
-            'counter_4_label' => ['nullable', 'string', 'max:100'],
-            // Amenities
-            'amenities_badge' => ['nullable', 'string', 'max:100'],
-            'amenities_title' => ['nullable', 'string', 'max:255'],
-            'amenities_description' => ['nullable', 'string', 'max:1500'],
-            'amenity_1_title' => ['nullable', 'string', 'max:255'],
-            'amenity_1_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_2_title' => ['nullable', 'string', 'max:255'],
-            'amenity_2_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_3_title' => ['nullable', 'string', 'max:255'],
-            'amenity_3_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_4_title' => ['nullable', 'string', 'max:255'],
-            'amenity_4_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_5_title' => ['nullable', 'string', 'max:255'],
-            'amenity_5_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_6_title' => ['nullable', 'string', 'max:255'],
-            'amenity_6_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_7_title' => ['nullable', 'string', 'max:255'],
-            'amenity_7_description' => ['nullable', 'string', 'max:1000'],
-            'amenity_8_title' => ['nullable', 'string', 'max:255'],
-            'amenity_8_description' => ['nullable', 'string', 'max:1000'],
-            // Featured Properties
-            'featured_properties_badge' => ['nullable', 'string', 'max:100'],
-            'featured_properties_title' => ['nullable', 'string', 'max:255'],
-            'featured_properties_link_text' => ['nullable', 'string', 'max:100'],
-            // Panorama
-            'panorama_badge' => ['nullable', 'string', 'max:100'],
-            'panorama_title' => ['nullable', 'string', 'max:255'],
-            'panorama_description' => ['nullable', 'string', 'max:1500'],
-            'panorama_primary_button_text' => ['nullable', 'string', 'max:100'],
-            'panorama_secondary_button_text' => ['nullable', 'string', 'max:100'],
-            // Developments
-            'developments_badge' => ['nullable', 'string', 'max:100'],
-            'developments_title' => ['nullable', 'string', 'max:255'],
-            'developments_link_text' => ['nullable', 'string', 'max:100'],
-            'developments_link_url' => ['nullable', 'string', 'max:255'],
-            'project_1_tag' => ['nullable', 'string', 'max:100'],
-            'project_1_title' => ['nullable', 'string', 'max:255'],
-            'project_1_description' => ['nullable', 'string', 'max:1000'],
-            'project_2_tag' => ['nullable', 'string', 'max:100'],
-            'project_2_title' => ['nullable', 'string', 'max:255'],
-            'project_2_description' => ['nullable', 'string', 'max:1000'],
-            'project_3_tag' => ['nullable', 'string', 'max:100'],
-            'project_3_title' => ['nullable', 'string', 'max:255'],
-            'project_3_description' => ['nullable', 'string', 'max:1000'],
-            // Latest Properties
-            'latest_properties_badge' => ['nullable', 'string', 'max:100'],
-            'latest_properties_title' => ['nullable', 'string', 'max:255'],
-            'latest_properties_link_text' => ['nullable', 'string', 'max:100'],
-            // About
-            'about_badge' => ['nullable', 'string', 'max:100'],
-            'about_title' => ['nullable', 'string', 'max:255'],
-            'about_description' => ['nullable', 'string', 'max:2000'],
-            'about_pillar_1_title' => ['nullable', 'string', 'max:100'],
-            'about_pillar_1_desc' => ['nullable', 'string', 'max:100'],
-            'about_pillar_2_title' => ['nullable', 'string', 'max:100'],
-            'about_pillar_2_desc' => ['nullable', 'string', 'max:100'],
-            'about_image_subtitle' => ['nullable', 'string', 'max:100'],
-            'about_image_title' => ['nullable', 'string', 'max:255'],
-            // Blog / News
-            'news_badge' => ['nullable', 'string', 'max:100'],
-            'news_title' => ['nullable', 'string', 'max:255'],
-            'news_link_text' => ['nullable', 'string', 'max:100'],
-            // Testimonials
-            'testimonials_badge' => ['nullable', 'string', 'max:100'],
-            'testimonials_title' => ['nullable', 'string', 'max:255'],
-            // Agents
-            'agents_badge' => ['nullable', 'string', 'max:100'],
-            'agents_title' => ['nullable', 'string', 'max:255'],
-            'agents_link_text' => ['nullable', 'string', 'max:100'],
-            // Contact
-            'contact_badge' => ['nullable', 'string', 'max:100'],
-            'contact_title' => ['nullable', 'string', 'max:255'],
-            'contact_description' => ['nullable', 'string', 'max:1500'],
-            'contact_box_title' => ['nullable', 'string', 'max:255'],
-            'contact_box_description' => ['nullable', 'string', 'max:1500'],
-            'contact_benefit_1' => ['nullable', 'string', 'max:255'],
-            'contact_benefit_2' => ['nullable', 'string', 'max:255'],
-            'contact_benefit_3' => ['nullable', 'string', 'max:255'],
-            'contact_submit_text' => ['nullable', 'string', 'max:100'],
-            // Newsletter
-            'newsletter_badge' => ['nullable', 'string', 'max:100'],
-            'newsletter_title' => ['nullable', 'string', 'max:255'],
-            'newsletter_description' => ['nullable', 'string', 'max:1500'],
-            'newsletter_placeholder' => ['nullable', 'string', 'max:100'],
-            'newsletter_button_text' => ['nullable', 'string', 'max:100'],
-            // Concierge
-            'concierge_button_text' => ['nullable', 'string', 'max:100'],
-        ]);
-
-        // Persist basic site settings
-        SiteSetting::set('site_name', $validated['site_name']);
-        SiteSetting::set('contact_email', $validated['contact_email']);
-        SiteSetting::set('contact_phone', $validated['contact_phone']);
-        SiteSetting::set('contact_address', $validated['contact_address']);
-
-        if ($request->has('happy_buyers_base_count')) {
-            SiteSetting::set('happy_buyers_base_count', (int) ($validated['happy_buyers_base_count'] ?? 0));
-        }
-
-        // Persist all landing page content controlled from the dashboard
-        $allConfigurableKeys = [
-            'hero_badge', 'hero_title', 'hero_description', 'hero_primary_button_text', 'hero_secondary_button_text',
-            'hero_careers_link_text', 'hero_featured_badge', 'hero_stat_1_label', 'hero_stat_2_label',
-            'hero_stat_3_value', 'hero_stat_3_label', 'filter_category_label', 'filter_type_label',
-            'filter_location_label', 'filter_button_text',
-            'counter_1_value', 'counter_1_label', 'counter_2_label', 'counter_3_label',
-            'counter_4_value', 'counter_4_label',
-            'amenities_badge', 'amenities_title', 'amenities_description',
-            'amenity_1_title', 'amenity_1_description', 'amenity_2_title', 'amenity_2_description',
-            'amenity_3_title', 'amenity_3_description', 'amenity_4_title', 'amenity_4_description',
-            'amenity_5_title', 'amenity_5_description', 'amenity_6_title', 'amenity_6_description',
-            'amenity_7_title', 'amenity_7_description', 'amenity_8_title', 'amenity_8_description',
-            'featured_properties_badge', 'featured_properties_title', 'featured_properties_link_text',
-            'panorama_badge', 'panorama_title', 'panorama_description',
-            'panorama_primary_button_text', 'panorama_secondary_button_text',
-            'developments_badge', 'developments_title', 'developments_link_text', 'developments_link_url',
-            'project_1_tag', 'project_1_title', 'project_1_description',
-            'project_2_tag', 'project_2_title', 'project_2_description',
-            'project_3_tag', 'project_3_title', 'project_3_description',
-            'latest_properties_badge', 'latest_properties_title', 'latest_properties_link_text',
-            'about_badge', 'about_title', 'about_description',
-            'about_pillar_1_title', 'about_pillar_1_desc', 'about_pillar_2_title', 'about_pillar_2_desc',
-            'about_image_subtitle', 'about_image_title',
-            'news_badge', 'news_title', 'news_link_text',
-            'testimonials_badge', 'testimonials_title',
-            'agents_badge', 'agents_title', 'agents_link_text',
-            'contact_badge', 'contact_title', 'contact_description',
-            'contact_box_title', 'contact_box_description',
-            'contact_benefit_1', 'contact_benefit_2', 'contact_benefit_3', 'contact_submit_text',
-            'newsletter_badge', 'newsletter_title', 'newsletter_description',
-            'newsletter_placeholder', 'newsletter_button_text',
-            'concierge_button_text',
-        ];
-
-        foreach ($allConfigurableKeys as $key) {
-            if ($request->has($key)) {
-                SiteSetting::set($key, $validated[$key] ?? null);
-            }
-        }
-
-        // Handle logo upload or URL
-        $logoFile = $request->file('site_logo_file') ?? $request->file('site_logo');
-        if ($logoFile) {
-            $previousLogo = SiteSetting::get('site_logo');
-
-            // Delete the old logo if it exists in the images directory
-            if ($previousLogo && str_starts_with($previousLogo, 'images/') && Storage::disk('public')->exists($previousLogo)) {
-                Storage::disk('public')->delete($previousLogo);
-            }
-
-            // Store the new logo in the images folder on the public disk
-            $newPath = $logoFile->store('images', 'public');
-            SiteSetting::set('site_logo', $newPath);
-        } elseif ($request->has('site_logo') && ! $request->hasFile('site_logo')) {
-            $stringLogo = $request->input('site_logo');
-            if (filled($stringLogo)) {
-                SiteSetting::set('site_logo', trim($stringLogo));
-            }
-        }
-
-        // Handle static landing page images (uploaded file or custom URL)
-        $staticImageKeys = [
-            'hero_image',
-            'panorama_image',
-            'project_1_image',
-            'project_2_image',
-            'project_3_image',
-            'about_image',
-        ];
-
-        foreach ($staticImageKeys as $imgKey) {
-            $fileInputKey = $imgKey.'_file';
-            $uploaded = $request->file($fileInputKey) ?? $request->file($imgKey);
-
-            if ($uploaded) {
-                $previousImage = SiteSetting::get($imgKey);
-                if ($previousImage && str_starts_with($previousImage, 'site_images/') && Storage::disk('public')->exists($previousImage)) {
-                    Storage::disk('public')->delete($previousImage);
-                }
-
-                $newPath = $uploaded->store('site_images', 'public');
-                SiteSetting::set($imgKey, $newPath);
-            } elseif ($request->has($imgKey) && ! $request->hasFile($imgKey)) {
-                $stringValue = $request->input($imgKey);
-                SiteSetting::set($imgKey, filled($stringValue) ? trim($stringValue) : null);
-            }
-        }
-
-        return redirect()->route('dashboard', ['section' => 'settings'])
-            ->with('success', 'Site settings, content, and images updated successfully.');
+        return app(SiteSettingsController::class)->updateSettings($request);
     }
 
     public function storeAgent(Request $request)
@@ -370,14 +294,23 @@ class WorkerManagementController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:agents,email'],
             'phone' => ['nullable', 'string', 'max:255'],
             'bio' => ['nullable', 'string', 'max:1000'],
+            'tier' => ['nullable', 'string', 'in:junior,senior,principal'],
+            'split_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'license_number' => ['nullable', 'string', 'max:100'],
+            'license_verified' => ['nullable', 'boolean'],
             'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $tier = $validated['tier'] ?? 'junior';
+        $defaultSplit = app(CommissionSplitService::class)->getTierDetails($tier)['default_split'];
+
         $agent = Agent::create([
             ...collect($validated)->except(['photo', 'password', 'is_active'])->all(),
+            'tier' => $tier,
+            'split_percentage' => $validated['split_percentage'] ?? $defaultSplit,
             'is_active' => $request->boolean('is_active', true),
             'password' => $validated['password'] ?? null,
             'photo_path' => $this->storeAgentPhoto($request),
@@ -385,7 +318,7 @@ class WorkerManagementController extends Controller
 
         $this->syncAgentAccount($agent, $validated['password'] ?? null);
 
-        return redirect()->route('dashboard', ['section' => 'agents'])->with('success', 'Agent created successfully.');
+        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'Agent created successfully.');
     }
 
     public function updateAgent(Request $request, Agent $agent)
@@ -401,6 +334,10 @@ class WorkerManagementController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:agents,email,'.$agent->id],
             'phone' => ['nullable', 'string', 'max:255'],
             'bio' => ['nullable', 'string', 'max:1000'],
+            'tier' => ['nullable', 'string', 'in:junior,senior,principal'],
+            'split_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'license_number' => ['nullable', 'string', 'max:100'],
+            'license_verified' => ['nullable', 'boolean'],
             'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -425,7 +362,7 @@ class WorkerManagementController extends Controller
         $agent->update($data);
         $this->syncAgentAccount($agent, $validated['password'] ?? null);
 
-        return redirect()->route('dashboard', ['section' => 'agents'])->with('success', 'Agent updated successfully.');
+        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'Agent updated successfully.');
     }
 
     /**
@@ -444,7 +381,7 @@ class WorkerManagementController extends Controller
 
         $status = $agent->is_active ? 'activated' : 'deactivated';
 
-        return redirect()->route('dashboard', ['section' => 'agents'])
+        return redirect()->route('dashboard', ['section' => 'users'])
             ->with('success', "Agent {$agent->name} has been {$status}.");
     }
 
@@ -490,82 +427,17 @@ class WorkerManagementController extends Controller
 
     public function storeUser(Request $request)
     {
-        $user = auth()->user();
-
-        if (! $user || ! $user->isAdmin()) {
-            abort(403, 'Admin access required.');
-        }
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
-            'role' => ['required', 'in:admin,agent'],
-        ]);
-
-        $createdUser = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => $validated['role'],
-        ]);
-
-        if ($validated['role'] === 'agent') {
-            $agent = Agent::query()->firstOrCreate(
-                ['email' => $validated['email']],
-                [
-                    'name' => $validated['name'],
-                    'password' => $validated['password'],
-                    'user_id' => $createdUser->id,
-                ]
-            );
-            if (! $agent->user_id) {
-                $agent->forceFill(['user_id' => $createdUser->id])->save();
-            }
-        }
-
-        return back()->with('success', 'User created successfully.');
+        return app(UserManagementController::class)->storeUser($request);
     }
 
     public function updateUser(Request $request, User $user)
     {
-        $currentUser = auth()->user();
+        return app(UserManagementController::class)->updateUser($request, $user);
+    }
 
-        if (! $currentUser || ! $currentUser->isAdmin()) {
-            abort(403, 'Admin access required.');
-        }
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
-            'role' => ['required', 'in:admin,user,agent'],
-        ]);
-
-        $userData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'role' => $validated['role'],
-        ];
-
-        if (filled($validated['password'] ?? null)) {
-            $userData['password'] = $validated['password'];
-        }
-
-        $user->update($userData);
-
-        if ($user->agentProfile) {
-            $agentData = [
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-            ];
-            if (filled($validated['password'] ?? null)) {
-                $agentData['password'] = $validated['password'];
-            }
-            $user->agentProfile->update($agentData);
-        }
-
-        return redirect()->route('dashboard', ['section' => 'users'])->with('success', 'User updated successfully.');
+    public function deleteUser(User $user)
+    {
+        return app(UserManagementController::class)->deleteUser($user);
     }
 
     public function updateProfile(Request $request)
@@ -580,6 +452,7 @@ class WorkerManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$currentUser->id],
             'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         $userData = [
@@ -589,6 +462,14 @@ class WorkerManagementController extends Controller
 
         if (filled($validated['password'] ?? null)) {
             $userData['password'] = $validated['password'];
+        }
+
+        if ($request->hasFile('photo')) {
+            if ($currentUser->photo_path && Storage::disk('public')->exists($currentUser->photo_path)) {
+                Storage::disk('public')->delete($currentUser->photo_path);
+            }
+
+            $userData['photo_path'] = $request->file('photo')->store('user-photos', 'public');
         }
 
         $currentUser->update($userData);
@@ -671,7 +552,7 @@ class WorkerManagementController extends Controller
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -679,6 +560,13 @@ class WorkerManagementController extends Controller
             'admin_status' => ['required', 'in:approved,rejected,reviewed'],
             'admin_note' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        if ($validated['admin_status'] === 'approved'
+            && $order->isSubmittedToAdmin()
+            && ! $order->hasCollectedWebsiteCommission()) {
+            return redirect()->route('dashboard', ['section' => 'orders'])
+                ->with('error', 'Confirm receipt of the website commission before approving this agreement.');
+        }
 
         $order->update([
             'admin_status' => $validated['admin_status'],
@@ -689,21 +577,57 @@ class WorkerManagementController extends Controller
         return redirect()->route('dashboard', ['section' => 'orders'])->with('success', 'Agent agreement request was updated by admin.');
     }
 
-    public function deleteUser(User $user)
+    public function collectOrderCommission(Request $request, Order $order): RedirectResponse
     {
-        $currentUser = auth()->user();
-
-        if (! $currentUser || ! $currentUser->isAdmin()) {
+        $user = $request->user();
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
-        if ($user->id === $currentUser->id) {
-            abort(403, 'You cannot delete your own account.');
+        abort_unless($order->isSubmittedToAdmin() && $order->status === 'accepted', 404);
+
+        $validated = $request->validate([
+            'collection_reference' => ['required', 'string', 'max:100'],
+        ]);
+
+        $collected = DB::transaction(function () use ($order, $user, $validated): bool {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            if ($lockedOrder->hasCollectedWebsiteCommission()) {
+                return false;
+            }
+
+            $commission = $lockedOrder->commission()->lockForUpdate()->firstOrFail();
+            $ledgerReference = 'ORDER-WEBSITE-COMMISSION-'.$lockedOrder->id;
+
+            FinancialLedger::create([
+                'entry_type' => 'credit',
+                'category' => 'website_commission',
+                'amount' => $commission->commission_amount,
+                'currency' => 'ETB',
+                'description' => 'Website commission received for order '.$lockedOrder->id.' ('.$lockedOrder->name.'); receipt '.$validated['collection_reference'],
+                'reference' => $ledgerReference,
+                'user_id' => $user->id,
+            ]);
+
+            $commission->update([
+                'admin_note' => 'Website commission received. Receipt reference: '.$validated['collection_reference'],
+            ]);
+
+            $lockedOrder->update([
+                'admin_status' => 'commission_collected',
+                'admin_viewed_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $collected) {
+            return redirect()->route('dashboard', ['section' => 'orders'])
+                ->with('error', 'Website commission has already been recorded for this agreement.');
         }
 
-        $user->delete();
-
-        return redirect()->route('dashboard')->with('success', 'User deleted successfully.');
+        return redirect()->route('dashboard', ['section' => 'orders'])
+            ->with('success', 'Website commission collected and recorded for '.$order->name.'. You can now approve the agreement.');
     }
 
     public function storeBlogPost(Request $request)
@@ -989,7 +913,7 @@ class WorkerManagementController extends Controller
     public function updateCommissionStatus(Request $request, Commission $commission): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1019,6 +943,19 @@ class WorkerManagementController extends Controller
 
         $commission->update($updates);
 
+        if ($validated['status'] === 'paid') {
+            FinancialLedger::firstOrCreate([
+                'category' => 'agent_commission',
+                'reference' => 'COMM-'.$commission->id,
+            ], [
+                'entry_type' => 'debit',
+                'amount' => $commission->commission_amount,
+                'currency' => 'ETB',
+                'description' => "Commission payout for Agent {$commission->agent?->name} on property #{$commission->property_id}",
+                'user_id' => $user->id,
+            ]);
+        }
+
         return redirect()->route('dashboard', ['#commissions'])
             ->with('success', 'Commission record updated by Admin.');
     }
@@ -1034,13 +971,38 @@ class WorkerManagementController extends Controller
         }
 
         $validated = $request->validate([
-            'commission_rate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'tier' => ['nullable', 'string', 'in:junior,senior,principal'],
+            'split_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'license_number' => ['nullable', 'string', 'max:100'],
+            'license_verified' => ['nullable', 'boolean'],
         ]);
 
-        $agent->update(['commission_rate' => $validated['commission_rate']]);
+        $updateData = [];
+        if (isset($validated['commission_rate'])) {
+            $updateData['commission_rate'] = $validated['commission_rate'];
+        }
+        if (isset($validated['tier'])) {
+            $updateData['tier'] = $validated['tier'];
+            if (! isset($validated['split_percentage'])) {
+                $tierDetails = app(CommissionSplitService::class)->getTierDetails($validated['tier']);
+                $updateData['split_percentage'] = $tierDetails['default_split'];
+            }
+        }
+        if (isset($validated['split_percentage'])) {
+            $updateData['split_percentage'] = $validated['split_percentage'];
+        }
+        if (isset($validated['license_number'])) {
+            $updateData['license_number'] = $validated['license_number'];
+        }
+        if ($request->has('license_verified')) {
+            $updateData['license_verified'] = $request->boolean('license_verified');
+        }
 
-        return redirect()->route('dashboard', ['#agents'])
-            ->with('success', $agent->name."'s commission rate updated to {$validated['commission_rate']}%.");
+        $agent->update($updateData);
+
+        return redirect()->route('dashboard', ['section' => 'users'])
+            ->with('success', "{$agent->name}'s commission profile and tier updated successfully.");
     }
 
     /**
@@ -1049,7 +1011,7 @@ class WorkerManagementController extends Controller
     public function deleteOrder(Order $order): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1069,7 +1031,7 @@ class WorkerManagementController extends Controller
     public function deleteCommission(Commission $commission): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1085,7 +1047,7 @@ class WorkerManagementController extends Controller
     public function deleteInquiry(Inquiry $inquiry): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1101,7 +1063,7 @@ class WorkerManagementController extends Controller
     public function markInquiryRead(Request $request, Inquiry $inquiry): JsonResponse|RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1128,8 +1090,13 @@ class WorkerManagementController extends Controller
     public function generateOrderAgreement(Request $request, Order $order, AgreementPdfService $agreements): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
+        }
+
+        if (! $order->isAgreementApprovedForGeneration()) {
+            return redirect()->route('dashboard', ['section' => 'orders'])
+                ->with('error', 'Collect the website commission and approve this agreement before generating the PDF.');
         }
 
         $order->update([
@@ -1158,7 +1125,7 @@ class WorkerManagementController extends Controller
     public function generatePropertyAgreement(Request $request, Property $property, AgreementPdfService $agreements): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
 
@@ -1210,9 +1177,11 @@ class WorkerManagementController extends Controller
     public function editAgreementContent(Order $order, AgreementPdfService $agreements): View
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
+
+        abort_unless($order->isAgreementApprovedForGeneration(), 403, 'This agreement is not approved for generation.');
 
         $content = $order->agreement_content ?? $agreements->getEditableContent($order);
 
@@ -1225,9 +1194,11 @@ class WorkerManagementController extends Controller
     public function storeAgreementContent(Request $request, Order $order, AgreementPdfService $agreements): RedirectResponse
     {
         $user = auth()->user();
-        if (! $user || ! $user->isAdmin()) {
+        if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Admin access required.');
         }
+
+        abort_unless($order->isAgreementApprovedForGeneration(), 403, 'This agreement is not approved for generation.');
 
         $validated = $request->validate([
             'seller_name' => ['nullable', 'string', 'max:255'],
@@ -1270,5 +1241,65 @@ class WorkerManagementController extends Controller
 
         return redirect()->route('dashboard', ['section' => 'orders'])
             ->with('success', 'Agreement content saved and PDF generated for '.$order->name.'.');
+    }
+
+    public function storeBranch(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', 'unique:branches,code'],
+            'city' => ['required', 'string', 'max:100'],
+            'subcity' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'manager_name' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'status' => ['required', 'string', 'in:active,inactive'],
+            'is_headquarters' => ['nullable'],
+        ]);
+
+        $validated['is_headquarters'] = (bool) ($validated['is_headquarters'] ?? false);
+        if ($validated['is_headquarters']) {
+            Branch::where('is_headquarters', true)->update(['is_headquarters' => false]);
+        }
+
+        Branch::create($validated);
+
+        return redirect()->route('dashboard', ['section' => 'branches'])
+            ->with('success', 'Branch created successfully.');
+    }
+
+    public function updateBranch(Request $request, Branch $branch): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', 'unique:branches,code,'.$branch->id],
+            'city' => ['required', 'string', 'max:100'],
+            'subcity' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'manager_name' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'status' => ['required', 'string', 'in:active,inactive'],
+            'is_headquarters' => ['nullable'],
+        ]);
+
+        $validated['is_headquarters'] = (bool) ($validated['is_headquarters'] ?? false);
+        if ($validated['is_headquarters']) {
+            Branch::where('id', '!=', $branch->id)->where('is_headquarters', true)->update(['is_headquarters' => false]);
+        }
+
+        $branch->update($validated);
+
+        return redirect()->route('dashboard', ['section' => 'branches'])
+            ->with('success', 'Branch updated successfully.');
+    }
+
+    public function deleteBranch(Branch $branch): RedirectResponse
+    {
+        $branch->delete();
+
+        return redirect()->route('dashboard', ['section' => 'branches'])
+            ->with('success', 'Branch deleted successfully.');
     }
 }
