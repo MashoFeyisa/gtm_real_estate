@@ -10,6 +10,24 @@ use Illuminate\Support\Facades\Storage;
 class PropertyFormRequest extends FormRequest
 {
     /**
+     * Authorize whether the user can create or update properties via policies.
+     */
+    public function authorize(): bool
+    {
+        $user = $this->user();
+        if (! $user) {
+            return false;
+        }
+
+        $property = $this->route('property');
+        if ($property instanceof Property) {
+            return $user->can('update', $property);
+        }
+
+        return $user->can('create', Property::class);
+    }
+
+    /**
      * Shared validation rules for creating and updating properties,
      * used by both the admin dashboard and the agent portal.
      *
@@ -24,11 +42,18 @@ class PropertyFormRequest extends FormRequest
             'bedrooms' => ['required', 'integer', 'min:0'],
             'bathrooms' => ['required', 'integer', 'min:0'],
             'area' => ['required', 'integer', 'min:0'],
-            'type' => ['required', 'in:sale,rent'],
-            'category' => ['nullable', 'in:villa,home,apartment'],
+            'type' => ['required', 'in:sale,rent,stay'],
+            'category' => ['nullable', 'in:home,villa,apartment,guest_house,condominium,hotel,office,guesthouse,condo,hotels,offices'],
             'status' => ['required', 'in:draft,published,archived,available,sold,rented'],
             'city' => ['nullable', 'string', 'max:255'],
+            'subcity' => ['nullable', 'string', 'max:255'],
+            'woreda' => ['nullable', 'string', 'max:255'],
+            'neighborhood' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'walk_score' => ['nullable', 'integer', 'between:0,100'],
+            'transit_score' => ['nullable', 'integer', 'between:0,100'],
             'featured' => ['nullable', 'boolean'],
             'agent_id' => ['nullable', 'exists:agents,id'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:20480'],
@@ -39,6 +64,18 @@ class PropertyFormRequest extends FormRequest
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,avif', 'max:20480'],
             'delete_images' => ['nullable', 'array'],
             'delete_images.*' => ['integer', 'exists:property_images,id'],
+            'building_area' => ['nullable', 'integer', 'min:0'],
+            'floors' => ['nullable', 'integer', 'min:0'],
+            'parking_spaces' => ['nullable', 'integer', 'min:0'],
+            'balconies' => ['nullable', 'integer', 'min:0'],
+            'year_built' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 5)],
+            'condition' => ['nullable', 'string', 'in:new,excellent,good,renovated,under_construction'],
+            'has_electricity' => ['nullable', 'boolean'],
+            'has_water' => ['nullable', 'boolean'],
+            'has_generator' => ['nullable', 'boolean'],
+            'has_water_tank' => ['nullable', 'boolean'],
+            'has_solar' => ['nullable', 'boolean'],
+            'has_security' => ['nullable', 'boolean'],
         ];
     }
 

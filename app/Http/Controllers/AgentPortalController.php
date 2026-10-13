@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PropertyFormRequest;
 use App\Mail\OrderStatusUpdate;
 use App\Models\Agent;
+use App\Models\Booking;
 use App\Models\Commission;
 use App\Models\Inquiry;
 use App\Models\Order;
 use App\Models\Property;
 use App\Models\PropertyImage;
 use App\Services\AgreementPdfService;
+use App\Services\AnalyticsService;
+use App\Services\WorkflowIntegrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -27,12 +30,22 @@ class AgentPortalController extends Controller
      */
     public function index(Request $request)
     {
-        $agent = $request->user()->agentProfile;
+        $agent = $request->user()->ensureAgentProfile();
+        $notifications = $request->user()->notifications()->latest()->take(20)->get();
+        Booking::completeExpiredReservations();
+        $bookings = Booking::query()
+            ->where('status', '!=', 'completed')
+            ->whereHas('property', fn ($query) => $query->where('agent_id', $agent->id))
+            ->with(['property', 'payments'])
+            ->latest()
+            ->paginate(12, ['*'], 'bookings_page')
+            ->withQueryString();
 
-        $orders = $agent->orders()->with('property')->latest()->get();
-        $inquiries = $agent->inquiries()->latest()->get();
+        $orders = $agent->orders()->with(['property', 'commission'])->latest()->paginate(12, ['*'], 'orders_page')->withQueryString();
+        $pendingOrders = $agent->orders()->where('status', 'pending')->with(['property', 'commission'])->latest()->get();
+        $inquiries = $agent->inquiries()->latest()->paginate(12, ['*'], 'inquiries_page')->withQueryString();
 
-        $unreadInquiries = $inquiries->whereNull('read_at');
+        $unreadInquiries = $agent->inquiries()->whereNull('read_at')->latest()->get();
 
         if ($request->boolean('mark_read')) {
             $agent->inquiries()->whereNull('read_at')->update(['read_at' => now()]);
@@ -44,19 +57,57 @@ class AgentPortalController extends Controller
             ? $agent->properties()->whereKey($editPropertyId)->first()
             : null;
 
+        // Agent CRM metrics (SRS: Leads, New Leads, Viewings, Offers, Closed Deals)
+        $inquiryTotal = $agent->inquiries()->count();
+        $inquiriesResponded = $agent->inquiries()->whereNotNull('read_at')->count();
+
+        $crmStats = [
+            'leads' => $inquiryTotal,
+            'new_leads' => $agent->inquiries()->whereNull('read_at')->count(),
+            'active_viewings' => $agent->viewings()->whereIn('status', ['requested', 'confirmed'])->count(),
+            'active_offers' => $agent->offers()->whereNotIn('status', ['rejected', 'expired', 'converted'])->count(),
+            'closed_deals' => $agent->orders()->where('status', 'completed')->count() + $agent->leases()->where('status', 'active')->count(),
+            'clients' => $agent->orders()->whereNotNull('email')->distinct()->count('email')
+                + $agent->leases()->whereNotNull('tenant_user_id')->distinct()->count('tenant_user_id'),
+            'response_rate' => $inquiryTotal > 0 ? (int) round(($inquiriesResponded / $inquiryTotal) * 100) : 0,
+        ];
+
+        // Listing quality score (SRS: Photos, Description, Location, Price, Amenities, Documents)
+        $listingQuality = $agent->properties()->get()->mapWithKeys(
+            fn (Property $property) => [$property->id => $this->propertyQualityScore($property)]
+        );
+
         return view('agent.portal', [
             'agent' => $agent,
+            'crmStats' => $crmStats,
+            'listingQuality' => $listingQuality,
             'orders' => $orders,
-            'pendingOrders' => $orders->where('status', 'pending'),
+            'bookings' => $bookings,
+            'pendingOrders' => $pendingOrders,
             'inquiries' => $inquiries,
             'unreadInquiries' => $unreadInquiries,
-            'properties' => $agent->properties()->latest()->get(),
+            'notifications' => $notifications,
+            'properties' => $agent->properties()->latest()->paginate(12, ['*'], 'properties_page')->withQueryString(),
             'propertyToEdit' => $propertyToEdit,
             'propertiesCount' => $agent->properties()->count(),
             'publishedCount' => $agent->properties()->publicVisible()->count(),
             'feedbackCount' => $agent->feedback_count,
             'averageRating' => $agent->average_rating,
-            'feedbacks' => $agent->feedbacks()->latest()->get(),
+            'feedbacks' => $agent->feedbacks()->latest()->paginate(12, ['*'], 'feedbacks_page')->withQueryString(),
+            'projects' => $agent->projects()->with(['units', 'milestones', 'buildings'])->latest()->paginate(12, ['*'], 'projects_page')->withQueryString(),
+            'projectsCount' => $agent->projects()->count(),
+            'viewings' => $agent->viewings()->with('property')->latest()->get(),
+            'offers' => $agent->offers()->with(['property', 'negotiations'])->latest()->get(),
+            'leases' => $agent->leases()->with(['property', 'schedules.payment'])->latest()->get(),
+            'campaigns' => $agent->campaigns()->with(['property', 'leads'])->latest()->get(),
+            'actionableTasks' => app(WorkflowIntegrationService::class)->getActorActionableTasks($request->user()),
+            'commissions' => Commission::where(function ($q) use ($agent) {
+                $q->where('agent_id', $agent->id)
+                    ->orWhere('listing_agent_id', $agent->id)
+                    ->orWhere('selling_agent_id', $agent->id)
+                    ->orWhere('referral_agent_id', $agent->id);
+            })->with(['property', 'disbursedBy', 'listingAgent', 'sellingAgent', 'referralAgent'])->latest()->get(),
+            'agentCharts' => app(AnalyticsService::class)->getAgentChartData($agent),
         ]);
     }
 
@@ -67,7 +118,7 @@ class AgentPortalController extends Controller
     {
         $agent = $request->user()->agentProfile;
 
-        $validated = $request->validationData();
+        $validated = $request->validated();
 
         $status = in_array($validated['status'], ['published', 'draft'], true) ? $validated['status'] : 'published';
 
@@ -80,11 +131,30 @@ class AgentPortalController extends Controller
             'bedrooms' => $validated['bedrooms'],
             'bathrooms' => $validated['bathrooms'],
             'area' => $validated['area'],
+            'building_area' => $validated['building_area'] ?? $validated['area'],
+            'floors' => $validated['floors'] ?? 1,
+            'parking_spaces' => $validated['parking_spaces'] ?? 1,
+            'balconies' => $validated['balconies'] ?? 0,
+            'year_built' => $validated['year_built'] ?? null,
+            'condition' => $validated['condition'] ?? 'excellent',
+            'has_electricity' => (bool) $request->input('has_electricity', false),
+            'has_water' => (bool) $request->input('has_water', false),
+            'has_generator' => (bool) $request->input('has_generator', false),
+            'has_water_tank' => (bool) $request->input('has_water_tank', false),
+            'has_solar' => (bool) $request->input('has_solar', false),
+            'has_security' => (bool) $request->input('has_security', false),
             'type' => $validated['type'],
             'property_category' => $validated['category'] ?? 'home',
             'status' => $status,
             'city' => $validated['city'] ?? null,
+            'subcity' => $validated['subcity'] ?? null,
+            'woreda' => $validated['woreda'] ?? null,
+            'neighborhood' => $validated['neighborhood'] ?? null,
             'address' => $validated['address'] ?? null,
+            'latitude' => ! empty($validated['latitude']) ? (float) $validated['latitude'] : null,
+            'longitude' => ! empty($validated['longitude']) ? (float) $validated['longitude'] : null,
+            'walk_score' => ! empty($validated['walk_score']) ? (int) $validated['walk_score'] : null,
+            'transit_score' => ! empty($validated['transit_score']) ? (int) $validated['transit_score'] : null,
             'featured' => false,
             'agent_id' => $agent->id,
             'is_active' => $status === 'published',
@@ -106,7 +176,7 @@ class AgentPortalController extends Controller
 
         $this->authorizeListingOwner($agent, $property);
 
-        $validated = $request->validationData();
+        $validated = $request->validated();
 
         $status = in_array($validated['status'], ['published', 'draft', 'sold', 'rented', 'available', 'archived'], true)
             ? $validated['status']
@@ -121,11 +191,30 @@ class AgentPortalController extends Controller
             'bedrooms' => $validated['bedrooms'],
             'bathrooms' => $validated['bathrooms'],
             'area' => $validated['area'],
+            'building_area' => $validated['building_area'] ?? ($property->building_area ?: $validated['area']),
+            'floors' => $validated['floors'] ?? ($property->floors ?: 1),
+            'parking_spaces' => $validated['parking_spaces'] ?? ($property->parking_spaces ?: 1),
+            'balconies' => $validated['balconies'] ?? ($property->balconies ?: 0),
+            'year_built' => $validated['year_built'] ?? $property->year_built,
+            'condition' => $validated['condition'] ?? ($property->condition ?: 'excellent'),
+            'has_electricity' => (bool) $request->input('has_electricity', false),
+            'has_water' => (bool) $request->input('has_water', false),
+            'has_generator' => (bool) $request->input('has_generator', false),
+            'has_water_tank' => (bool) $request->input('has_water_tank', false),
+            'has_solar' => (bool) $request->input('has_solar', false),
+            'has_security' => (bool) $request->input('has_security', false),
             'type' => $validated['type'],
             'property_category' => $validated['category'] ?? $property->property_category ?? 'home',
             'status' => $status,
-            'city' => $validated['city'] ?? null,
-            'address' => $validated['address'] ?? null,
+            'city' => $validated['city'] ?? $property->city,
+            'subcity' => $validated['subcity'] ?? $property->subcity,
+            'woreda' => $validated['woreda'] ?? $property->woreda,
+            'neighborhood' => $validated['neighborhood'] ?? $property->neighborhood,
+            'address' => $validated['address'] ?? $property->address,
+            'latitude' => ! empty($validated['latitude']) ? (float) $validated['latitude'] : $property->latitude,
+            'longitude' => ! empty($validated['longitude']) ? (float) $validated['longitude'] : $property->longitude,
+            'walk_score' => ! empty($validated['walk_score']) ? (int) $validated['walk_score'] : $property->walk_score,
+            'transit_score' => ! empty($validated['transit_score']) ? (int) $validated['transit_score'] : $property->transit_score,
             'agent_id' => $agent->id,
             'is_active' => in_array($status, ['published', 'available', 'sold', 'rented'], true),
         ]);
@@ -364,7 +453,7 @@ class AgentPortalController extends Controller
     }
 
     /**
-     * Accept or reject a buy/rent request. Accepting sends request to admin and generates agreement.
+     * Accept or reject a buy/rent request. Accepting submits it for admin review.
      */
     public function updateOrderStatus(Request $request, Order $order)
     {
@@ -391,9 +480,8 @@ class AgentPortalController extends Controller
         $order->update($updateData);
 
         if ($validated['status'] === 'accepted') {
-            $this->agreements->generate($order);
             $this->generateCommission($order, $agent);
-            $message = 'The '.($order->isRental() ? 'rental' : 'buy').' request was accepted and the agreement was generated.';
+            $message = 'The '.($order->isRental() ? 'rental' : 'buy').' request was submitted to Admin for commission review.';
         } else {
             $message = 'The '.($order->isRental() ? 'rental' : 'buy').' request was rejected.';
         }
@@ -424,6 +512,24 @@ class AgentPortalController extends Controller
     /**
      * Update the authenticated agent's profile details.
      */
+    /**
+     * Listing quality score (SRS: completeness of photos, description,
+     * location, price, amenities, and documents) — 0 to 100.
+     */
+    private function propertyQualityScore(Property $property): int
+    {
+        $checks = [
+            'photos' => $property->images()->count() > 0,
+            'description' => filled($property->description) && mb_strlen((string) $property->description) >= 40,
+            'location' => filled($property->city) && filled($property->address),
+            'price' => (float) $property->price > 0,
+            'amenities' => filled($property->nearby_amenities) || filled($property->facilities),
+            'documents' => $property->documents()->count() > 0 || $property->verification_level > 0,
+        ];
+
+        return (int) round((count(array_filter($checks)) / count($checks)) * 100);
+    }
+
     public function updateProfile(Request $request)
     {
         $agent = $request->user()->agentProfile;
@@ -434,11 +540,20 @@ class AgentPortalController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:agents,email,'.$agent->id, 'unique:users,email,'.$agent->user_id],
             'phone' => ['nullable', 'string', 'max:255'],
             'bio' => ['nullable', 'string', 'max:1000'],
+            'service_locations' => ['nullable', 'array', 'max:20'],
+            'service_locations.*' => ['nullable', 'string', 'max:100'],
+            'languages' => ['nullable', 'array', 'max:10'],
+            'languages.*' => ['nullable', 'string', 'max:50'],
+            'phone_privacy' => ['nullable', 'in:show,hide,messaging_only'],
             'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         $data = collect($validated)->except(['photo', 'password'])->all();
+
+        $data['service_locations'] = array_values(array_filter($validated['service_locations'] ?? []));
+        $data['languages'] = array_values(array_filter($validated['languages'] ?? []));
+        $data['phone_privacy'] = $validated['phone_privacy'] ?? 'show';
 
         if (filled($validated['password'] ?? null)) {
             $data['password'] = $validated['password'];
@@ -489,9 +604,34 @@ class AgentPortalController extends Controller
         $agent = $request->user()->agentProfile;
 
         abort_unless($order->agent_id === $agent->id, 403, 'This order belongs to another agent.');
+        abort_unless($order->isAgreementApprovedForGeneration(), 403, 'Admin approval and website commission collection are required before downloading the agreement.');
         abort_unless($order->hasAgreement(), 404, 'No agreement has been generated for this request.');
 
         return redirect()->route('orders.agreement', $order);
+    }
+
+    public function generateAgreement(Request $request, Order $order): RedirectResponse
+    {
+        $agent = $request->user()->agentProfile;
+
+        abort_unless($agent && $order->agent_id === $agent->id, 403, 'This order belongs to another agent.');
+        abort_unless($order->isSubmittedToAdmin() && $order->isAgreementApprovedForGeneration(), 403, 'Admin approval and website commission collection are required before generating the agreement.');
+
+        if (! $order->hasAgreement()) {
+            $this->agreements->generate($order);
+
+            if ($order->property && ! in_array($order->property->status, ['sold', 'rented'], true)) {
+                $order->property->update([
+                    'status' => $order->isRental() ? 'rented' : 'sold',
+                    'is_active' => false,
+                ]);
+            }
+        }
+
+        $this->notifyClientOfStatus($order->refresh());
+
+        return redirect()->route('agent.portal')
+            ->with('success', 'Admin approved the agreement. The PDF is ready for '.$order->name.'.');
     }
 
     /**

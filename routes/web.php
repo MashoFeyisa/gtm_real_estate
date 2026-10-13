@@ -355,6 +355,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/dashboard/users', [UserManagementController::class, 'storeUser'])->name('dashboard.users.store');
     Route::put('/dashboard/users/{user}', [UserManagementController::class, 'updateUser'])->name('dashboard.users.update');
     Route::delete('/dashboard/users/{user}', [UserManagementController::class, 'deleteUser'])->name('dashboard.users.delete');
+    Route::post('/dashboard/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('dashboard.users.impersonate');
+    Route::post('/impersonate/leave', [UserManagementController::class, 'leaveImpersonation'])->name('impersonate.leave');
     Route::post('/dashboard/posts', [WorkerManagementController::class, 'storeBlogPost'])->name('dashboard.posts.store');
     Route::put('/dashboard/posts/{post}', [WorkerManagementController::class, 'updateBlogPost'])->name('dashboard.posts.update');
     Route::post('/dashboard/posts/{post}/toggle-publish', [WorkerManagementController::class, 'togglePublish'])->name('dashboard.posts.togglePublish');
@@ -456,6 +458,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/developments/{project}/units', [DevelopmentController::class, 'storeUnit'])->name('developments.units.store');
     Route::delete('/developments/units/{unit}', [DevelopmentController::class, 'destroyUnit'])->name('developments.units.destroy');
     Route::put('/developments/units/{unit}/status', [DevelopmentController::class, 'updateUnitStatus'])->name('developments.update-unit-status');
+    Route::post('/developments/units/{unit}/publish-listing', [DevelopmentController::class, 'publishUnitAsListing'])->name('developments.units.publish-listing');
     Route::put('/developments/{project}/milestones/{milestone}', [DevelopmentController::class, 'updateMilestone'])->name('developments.update-milestone');
 
     // Module 4: Viewing Management & Offer Negotiation Actions
@@ -558,10 +561,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/investor/portfolios', [InvestorDashboardController::class, 'storePortfolio'])->name('investor.portfolios.store');
 
     Route::get('/dashboard/seller', [SellerDashboardController::class, 'index'])->name('seller.dashboard');
+    Route::post('/seller/listings', [SellerDashboardController::class, 'storeListing'])->name('seller.listings.store');
+    Route::put('/seller/listings/{property}', [SellerDashboardController::class, 'updateListing'])->name('seller.listings.update');
+    Route::post('/seller/listings/{property}/publish', [SellerDashboardController::class, 'togglePublish'])->name('seller.listings.publish');
+    Route::post('/seller/listings/{property}/status/{status}', [SellerDashboardController::class, 'updateListingStatus'])->name('seller.listings.status');
+
     Route::get('/dashboard/host', [HostDashboardController::class, 'index'])->name('host.dashboard');
+    Route::post('/host/stays', [HostDashboardController::class, 'storeStayListing'])->name('host.stays.store');
+    Route::post('/host/stays/{property}/publish', [HostDashboardController::class, 'togglePublishStay'])->name('host.stays.publish');
     Route::post('/host/reviews/{review}/reply', [HostDashboardController::class, 'replyReview'])->name('host.reviews.reply');
     Route::get('/dashboard/property-manager', [PropertyManagerDashboardController::class, 'index'])->name('property-manager.dashboard');
     Route::post('/property-manager/cleaning/dispatch', [PropertyManagerDashboardController::class, 'dispatchCleaning'])->name('property_manager.cleaning.dispatch');
+    Route::post('/property-manager/units', [PropertyManagerDashboardController::class, 'storeUnit'])->name('property_manager.units.store');
+    Route::put('/property-manager/units/{property}', [PropertyManagerDashboardController::class, 'updateUnit'])->name('property_manager.units.update');
 
     Route::get('/dashboard/professional', [ProfessionalDashboardController::class, 'index'])->name('professional.dashboard');
     Route::post('/professional/requests/{serviceRequest}/status', [ProfessionalDashboardController::class, 'updateStatus'])->name('professional.requests.status');

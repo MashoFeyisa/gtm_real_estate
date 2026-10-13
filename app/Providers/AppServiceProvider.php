@@ -2,9 +2,18 @@
 
 namespace App\Providers;
 
+use App\Models\Listing;
+use App\Models\Property;
 use App\Models\SiteSetting;
+use App\Policies\ListingPolicy;
+use App\Policies\PropertyPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Throwable;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,7 +34,43 @@ class AppServiceProvider extends ServiceProvider
         // Resolve at render time so updated settings appear immediately.
         view()->composer('*', function ($view): void {
             $view->with('siteBrand', $this->siteBrand());
+            $view->with('siteTheme', $this->siteTheme());
         });
+
+        Gate::policy(Property::class, PropertyPolicy::class);
+        Gate::policy(Listing::class, ListingPolicy::class);
+
+        $this->configureRateLimiting();
+    }
+
+    /**
+     * Named rate limiters for credential endpoints.
+     *
+     * Login attempts are keyed by email + IP so one attacker cannot lock out
+     * every account behind a shared address, and one account cannot be
+     * brute-forced from a single source.
+     */
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by(
+                'login|'.Str::transliterate(Str::lower((string) $request->input('email'))).'|'.$request->ip()
+            );
+        });
+    }
+
+    /**
+     * Resolve the active theme values, falling back to defaults if settings table is unavailable.
+     *
+     * @return array<string, string>
+     */
+    private function siteTheme(): array
+    {
+        try {
+            return SiteSetting::currentTheme();
+        } catch (Throwable) {
+            return SiteSetting::fallbackTheme();
+        }
     }
 
     /**
