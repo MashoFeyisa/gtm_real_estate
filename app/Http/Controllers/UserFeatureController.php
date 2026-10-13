@@ -201,10 +201,17 @@ class UserFeatureController extends Controller
             abort(403, 'Permission denied: Inquiries access required.');
         }
 
+        $agentId = $user->agentProfile?->id;
         $inquiries = Inquiry::query()
-            ->where('email', $user->email)
-            ->orWhere('user_id', $user->id)
-            ->with('property')
+            ->where(function ($q) use ($user, $agentId) {
+                $q->where('email', $user->email)
+                    ->orWhere('user_id', $user->id);
+
+                if ($agentId) {
+                    $q->orWhere('agent_id', $agentId);
+                }
+            })
+            ->with(['property', 'agent'])
             ->latest()
             ->get();
 

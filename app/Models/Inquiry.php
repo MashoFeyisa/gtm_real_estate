@@ -11,6 +11,7 @@ class Inquiry extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'name',
         'email',
         'phone',
@@ -18,12 +19,23 @@ class Inquiry extends Model
         'message',
         'status',
         'agent_id',
+        'property_id',
         'read_at',
     ];
 
     protected $casts = [
         'read_at' => 'datetime',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function property(): BelongsTo
+    {
+        return $this->belongsTo(Property::class);
+    }
 
     public function agent(): BelongsTo
     {
