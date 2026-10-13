@@ -61,7 +61,7 @@
             'title' => 'Company Agency Desk',
             'icon' => '🏛️',
             'route' => 'company.dashboard',
-            'permissions' => ['agents.manage', 'agents.create', 'agents.update'],
+            'permissions' => ['agents.create', 'agents.update', 'branches.create', 'branches.view'],
             'roles' => ['company', 'company_admin', 'branch_manager', 'real_estate_company'],
         ],
         [
@@ -126,6 +126,13 @@
             'route' => 'dashboard',
             'permissions' => ['platform.roles_manage', 'platform.audit_view', 'platform.users_manage', 'platform.settings_manage'],
             'roles' => ['admin', 'super_admin'],
+        ],
+        [
+            'title' => 'Universal Persona Desk',
+            'icon' => '🎛️',
+            'route' => 'role.portal',
+            'permissions' => ['properties.view', 'properties.browse', 'leases.view', 'bookings.view', 'units.view'],
+            'roles' => ['role.portal'],
         ],
     ];
 

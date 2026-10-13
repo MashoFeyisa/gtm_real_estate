@@ -51,7 +51,15 @@ class WorkerManagementController extends Controller
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->isAdmin()) {
+        $catalog = $user ? $user->permissionCatalog() : [];
+        $hasAdminPerm = ! empty($catalog) && $user->hasAnyPermission([
+            'platform.roles_manage',
+            'platform.audit_view',
+            'platform.users_manage',
+            'platform.settings_manage',
+        ]);
+
+        if (! $user || (! $user->isAdmin() && ! $hasAdminPerm)) {
             abort(403, 'Access denied.');
         }
 

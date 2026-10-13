@@ -18,7 +18,16 @@ class HostDashboardController extends Controller
     {
         $user = $request->user();
 
-        if ($user?->status === 'suspended' || (! $user?->isHost() && ! $user?->isAdmin() && ! $user?->hasPermission('stays.listing_view') && ! $user?->hasPermission('stays.view'))) {
+        $hasHostPerm = $user?->hasAnyPermission([
+            'stays.listing_view',
+            'stays.view',
+            'stays.listing_create',
+            'stays.listing_update',
+            'stays.pricing_manage',
+            'stays.availability_manage',
+        ]);
+
+        if ($user?->status === 'suspended' || (! $user?->isHost() && ! $user?->isAdmin() && ! $hasHostPerm)) {
             abort(403, 'Permission denied: Short-stay host access required.');
         }
 

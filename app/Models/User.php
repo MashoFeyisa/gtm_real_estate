@@ -122,7 +122,18 @@ class User extends Authenticatable
 
     public function canManageCampaigns(): bool
     {
-        return $this->isCampaignOfficer();
+        if ($this->isCampaignOfficer()) {
+            return true;
+        }
+
+        return $this->permissionOverrides()
+            ->whereHas('permission', fn ($q) => $q->whereIn('key', ['campaigns.manage', 'campaigns.approve']))
+            ->where('granted', true)
+            ->exists()
+            || $this->userPermissions()
+                ->whereHas('permission', fn ($q) => $q->whereIn('key', ['campaigns.manage', 'campaigns.approve']))
+                ->where('granted', true)
+                ->exists();
     }
 
     public function isCompany(): bool
@@ -132,7 +143,16 @@ class User extends Authenticatable
 
     public function canAccessCompanyDashboard(): bool
     {
-        return $this->isAdmin() || $this->isCompany();
+        if ($this->isAdmin() || $this->isCompany()) {
+            return true;
+        }
+
+        $catalog = $this->permissionCatalog();
+        if (! empty($catalog)) {
+            return $this->hasAnyPermission(['agents.create', 'agents.update', 'branches.create', 'branches.view']);
+        }
+
+        return false;
     }
 
     public function hasRole(string $role): bool
@@ -153,8 +173,23 @@ class User extends Authenticatable
 
     public function canAccessPropertyManagerDashboard(): bool
     {
-        return $this->isPropertyManager()
-            || $this->hasPermission('units.create')
+        if ($this->isAdmin() || $this->isPropertyManager()) {
+            return true;
+        }
+
+        $catalog = $this->permissionCatalog();
+        if (! empty($catalog)) {
+            return $this->hasAnyPermission([
+                'buildings.manage',
+                'units.manage',
+                'tenants.manage',
+                'housekeeping.manage',
+                'units.create',
+                'buildings.create',
+            ]);
+        }
+
+        return $this->hasPermission('units.create')
             || $this->hasPermission('buildings.create');
     }
 
@@ -455,7 +490,7 @@ class User extends Authenticatable
      *
      * @return array<string, int>
      */
-    protected function permissionCatalog(): array
+    public function permissionCatalog(): array
     {
         if ($this->permissionCatalogCache === null) {
             $this->permissionCatalogCache = Permission::query()->pluck('id', 'key')->all();

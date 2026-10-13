@@ -17,7 +17,26 @@ class EnsureUserIsAgent
     {
         $user = $request->user();
 
-        if (! $user || ! $user->agentProfile || ! $user->agentProfile->is_active) {
+        if (! $user) {
+            abort(403);
+        }
+
+        if ($user->isAdmin()) {
+            $user->ensureAgentProfile();
+
+            return $next($request);
+        }
+
+        $catalog = $user->permissionCatalog();
+        $hasAgentPerm = ! empty($catalog) && $user->hasAnyPermission(['crm.view', 'crm.manage', 'leads.manage']);
+
+        if ($hasAgentPerm) {
+            $user->ensureAgentProfile();
+
+            return $next($request);
+        }
+
+        if (! $user->agentProfile || ! $user->agentProfile->is_active) {
             abort(403, 'Your agent account is currently deactivated. Please contact an administrator.');
         }
 
