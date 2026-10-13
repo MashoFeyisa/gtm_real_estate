@@ -6,78 +6,176 @@
     <title>{{ $agent->name }} — Agent Portal</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}" />
+    <script src="{{ asset('vendor/leaflet/leaflet.js') }}"></script>
+    {{-- CDN reference fallback --}}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        window.GOOGLE_MAPS_API_KEY = @json(config('services.google.maps_api_key') ?: '');
+    </script>
+    @include('layouts.partials.theme-styles')
 </head>
 <body class="bg-[#f5f0e7] text-slate-800 antialiased scroll-smooth">
+    @include('layouts.partials.impersonation-banner')
     <div class="flex min-h-screen">
         {{-- Sidebar (same structure as the admin dashboard) --}}
-        <aside class="w-72 shrink-0 border-r border-[#d9cab3] bg-[#1d3c34] p-6 text-[#f8f3eb]">
+        <aside id="agent-sidebar" class="dashboard-sidebar sidebar-scroll-area w-72 shrink-0 border-r border-[#d9cab3] bg-[#1d3c34] p-6 text-[#f8f3eb] flex flex-col justify-between" style="position: sticky; top: 0; height: 100dvh; overflow-y: auto;">
+            <div>
             <a href="{{ route('home') }}" class="flex items-center gap-3">
                 <img src="{{ $siteBrand['logoUrl'] }}" alt="{{ $siteBrand['name'] }} Logo" class="h-10 w-10 rounded-xl object-contain ring-2 ring-[#d9cab3] bg-white/10">
                 <span class="text-xl font-black tracking-tight text-white">{{ $siteBrand['name'] }}</span>
             </a>
 
+            {{-- Sidebar Skeleton placeholder for layout height stability while permissions/badges evaluate --}}
+            <div class="sidebar-skeleton hidden pointer-events-none opacity-0 h-0 overflow-hidden" aria-hidden="true">
+                <div class="h-9 w-full rounded-xl bg-white/5 animate-pulse mb-2"></div>
+                <div class="h-9 w-full rounded-xl bg-white/5 animate-pulse mb-2"></div>
+            </div>
+
             <div class="mt-8 flex items-center gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
                 <img src="{{ $agent->photo_url }}" alt="{{ $agent->name }}" class="h-12 w-12 rounded-xl object-cover ring-2 ring-[#d9cab3]">
                 <div class="min-w-0">
                     <p class="truncate text-sm font-bold text-white">{{ $agent->name }}</p>
-                    <p class="truncate text-xs text-[#dfeee4]">{{ $agent->bio ?: 'Property consultant' }}</p>
+                    @if ($agent->license_number)
+                        <p class="truncate text-[10px] font-mono text-[#dfeee4] mt-0.5">Lic: {{ $agent->license_number }}</p>
+                    @endif
                 </div>
             </div>
 
-            <nav class="mt-6 space-y-2">
-                <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">Overview</a>
-                <a href="#buy-requests" data-target-section="buy-requests" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-                    <span>Buy Requests</span>
-                    @if ($pendingOrders->isNotEmpty())
-                        <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-xs font-bold text-[#9b6c17]">{{ $pendingOrders->count() }} new</span>
-                    @endif
+            <nav class="mt-6 space-y-2 min-h-[420px]">
+                <a href="{{ route('home') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🏠</span>
+                    <span>Home</span>
                 </a>
-                <a href="#listings" data-target-section="listings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-                    <span>My Listings</span>
-                    <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $propertiesCount }}</span>
-                </a>
-                <a href="#messages" data-target-section="messages" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-                    <span>Client Messages</span>
+                <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white">📊 Overview</a>
+                <a href="#leads-pipeline" data-target-section="leads-pipeline" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🎯 Leads &amp; Pipeline</span>
                     @if ($unreadInquiries->isNotEmpty())
                         <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-xs font-bold text-[#9b6c17]">{{ $unreadInquiries->count() }} new</span>
                     @endif
                 </a>
+                <a href="#viewings" data-target-section="viewings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>👁️ Viewings</span>
+                    @if ($viewings->whereIn('status', ['requested', 'confirmed'])->count() > 0)
+                        <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $viewings->whereIn('status', ['requested', 'confirmed'])->count() }}</span>
+                    @endif
+                </a>
+                <a href="#offers-negotiations" data-target-section="offers-negotiations" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🤝 Offers &amp; Negotiations</span>
+                    @if ($offers->whereNotIn('status', ['rejected', 'expired', 'converted'])->count() > 0)
+                        <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $offers->whereNotIn('status', ['rejected', 'expired', 'converted'])->count() }}</span>
+                    @endif
+                </a>
+                <a href="#leases" data-target-section="leases" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🔑 Lease and Rental</span>
+                    @if ($leases->where('status', 'active')->count() > 0)
+                        <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $leases->where('status', 'active')->count() }}</span>
+                    @endif
+                </a>
+                <a href="#listings" data-target-section="listings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🏠 My Listings</span>
+                    <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $propertiesCount }}</span>
+                </a>
+                <a href="#buy-requests" data-target-section="buy-requests" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>🧾 Buy Requests</span>
+                    @if ($pendingOrders->isNotEmpty())
+                        <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-xs font-bold text-[#9b6c17]">{{ $pendingOrders->count() }} new</span>
+                    @endif
+                </a>
+                <a href="#commissions" data-target-section="commissions" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>💰 Commissions</span>
+                    <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $commissions->count() }}</span>
+                </a>
+                <a href="#clients" data-target-section="clients" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>👥 Clients</span>
+                    <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ ($orders ?? collect())->pluck('email')->filter()->unique()->count() }}</span>
+                </a>
+                <a href="#messages" data-target-section="messages" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>💬 Messages</span>
+                    @if ($unreadInquiries->isNotEmpty())
+                        <span id="agent-inquiries-badge" class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-xs font-bold text-[#9b6c17]">{{ $unreadInquiries->count() }} new</span>
+                    @endif
+                </a>
                 <a href="#feedback" data-target-section="feedback" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
-                    <span>Client Reviews</span>
+                    <span>⭐ Reviews &amp; Feedback</span>
                     <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $feedbackCount }}</span>
                 </a>
-                <a href="#profile" data-target-section="profile" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">My Profile</a>
-                <a href="{{ route('agents.show', $agent) }}" class="flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">Public Profile</a>
-                <a href="{{ route('home') }}" class="flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">View Website</a>
-            </nav>
+                <a href="#developments" data-target-section="developments" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">🏗️ Developments</a>
+                <a href="#stay-bookings" data-target-section="stay-bookings" class="nav-section-link flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                    <span>📅 Stay Bookings</span>
+                    @if ($bookings->isNotEmpty())
+                        <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold">{{ $bookings->count() }}</span>
+                    @endif
+                </a>
+                <a href="#campaigns" data-target-section="campaigns" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">📣 Campaigns</a>
+                <a href="#profile" data-target-section="profile" class="nav-section-link flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">👤 My Profile</a>
 
-            <div class="mt-10 rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#d9cab3]">Signed in</p>
-                <p class="mt-3 text-lg font-bold text-white">{{ $agent->name }}</p>
-                <p class="text-sm text-[#dfeee4]">Agent</p>
-                <form method="POST" action="{{ route('logout') }}" class="mt-4">
-                    @csrf
-                    <button type="submit" class="w-full rounded-xl bg-[#f8f3eb] px-3 py-2.5 text-sm font-bold text-[#1d3c34] transition hover:bg-white">
-                        Logout
-                    </button>
-                </form>
+                @include('layouts.partials.authorized-sidebar-links')
+            </nav>
             </div>
+
+            @include('dashboard.partials.signed-in-user', ['roleLabel' => 'Agent'])
         </aside>
 
         <main class="flex-1 px-6 py-12">
             <div id="overview" class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between scroll-mt-24">
                 <div>
-                    <p class="text-sm font-bold uppercase tracking-[0.25em] text-[#587165]">Agent Portal</p>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <p class="text-sm font-bold uppercase tracking-[0.25em] text-[#587165]">Agent Portal</p>
+                        @php
+                            $mainTierInfo = $agent->tier_details;
+                        @endphp
+                        <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase text-[#d4af37] border border-[#d4af37]/50">
+                            ★ {{ $mainTierInfo['name'] }} &bull; {{ (int) $agent->effective_split_percentage }}% Split Tier
+                        </span>
+                        @if ($agent->license_verified)
+                            <span class="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5">✓ ERCA Certified</span>
+                        @endif
+                    </div>
                     <h1 class="mt-2 text-4xl font-black text-[#1d3c34]">Welcome, {{ $agent->name }}</h1>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="rounded-full bg-[#f2e4cb] px-3 py-1 text-sm font-semibold text-[#1d3c34]">{{ $agent->email }}</span>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="rounded-full border border-[#cdbb97] bg-white px-4 py-2 text-sm font-semibold text-[#1d3c34] transition hover:bg-[#f1e4cf]">
-                            Logout
+                    <div class="relative" id="agent-messages-icon-wrapper">
+                        <button type="button" id="agent-messages-icon" class="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#cdbb97] bg-white text-[#1d3c34] transition hover:bg-[#f1e4cf]" title="Notifications" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            @if ($unreadInquiries->isNotEmpty())
+                                <span id="agent-messages-icon-badge" class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#9b6c17] px-1 text-[10px] font-black text-white shadow-sm">{{ $unreadInquiries->count() }}</span>
+                            @endif
                         </button>
-                    </form>
+                        <div id="agent-messages-dropdown" class="hidden absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-[#d9cab3] bg-white shadow-xl">
+                            <p class="border-b border-[#f0e8d8] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#587165]">Latest Client Messages</p>
+                            <div class="max-h-72 overflow-y-auto">
+                                @forelse ($inquiries->take(3) as $recentInquiry)
+                                    <button type="button" class="agent-messages-nav-item block w-full rounded-xl px-3 py-2.5 text-left transition hover:bg-[#f3eadc]">
+                                        <span class="flex items-center justify-between gap-2">
+                                            <span class="truncate text-xs font-black text-[#1d3c34]">{{ $recentInquiry->subject }}</span>
+                                            <span class="shrink-0 text-[10px] text-slate-400">{{ $recentInquiry->created_at?->diffForHumans() }}</span>
+                                        </span>
+                                        <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-600">{{ $recentInquiry->name }}</span>
+                                        <span class="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-slate-600">{{ $recentInquiry->message }}</span>
+                                    </button>
+                                @empty
+                                    <p class="px-3 py-3 text-xs text-slate-500">No client messages yet.</p>
+                                @endforelse
+                            </div>
+                            <button type="button" class="agent-messages-nav-item block w-full border-t border-[#f0e8d8] px-3 py-2 text-center text-[11px] font-bold uppercase tracking-wider text-[#1d3c34] transition hover:bg-[#f3eadc]">View all messages</button>
+                        </div>
+                    </div>
+
+                    {{-- Profile Button at top near notification (Clicking displays Edit Profile page) --}}
+                    <a href="#profile" data-target-section="profile" class="nav-section-link group flex items-center gap-2.5 rounded-full border border-[#cdbb97] bg-white py-1 pl-1.5 pr-3.5 text-xs font-bold text-[#1d3c34] shadow-xs transition hover:bg-[#f1e4cf] hover:border-[#1d3c34]/40 cursor-pointer" title="Edit Profile">
+                        <img src="{{ $agent->photo_url }}" alt="{{ $agent->name }}" class="h-8 w-8 rounded-full object-cover ring-1 ring-[#1d3c34]/20">
+                        <div class="flex flex-col text-left">
+                            <span class="text-xs font-bold text-[#1d3c34] leading-tight">{{ $agent->name }}</span>
+                            <span class="text-[10px] font-semibold text-[#587165] leading-tight">Edit Profile</span>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#587165] transition group-hover:text-[#1d3c34]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                    </a>
                 </div>
             </div>
 
@@ -97,6 +195,118 @@
 
             {{-- Overview --}}
             <div data-section="overview" class="section-panel">
+                {{-- Agent CRM Dashboard (SRS: Leads, New Leads, Viewings, Offers, Closed Deals) --}}
+                <div class="rounded-[1.75rem] border border-[#d9cab3] bg-gradient-to-br from-[#1d3c34] to-[#254d43] p-6 text-white shadow-sm">
+                    <p class="text-xs font-black uppercase tracking-[0.25em] text-[#d4af37]">Agent CRM</p>
+                    <h2 class="mt-2 text-2xl font-black tracking-tight text-white">{{ $agent->name }} — Sales Command Center</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-[#dfeee4]">Leads, viewings, offers and commissions for every property you represent.</p>
+
+                    <div class="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
+                            <p class="text-2xl font-black text-white">{{ $crmStats['leads'] }}</p>
+                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#dfeee4]">Leads</p>
+                        </div>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
+                            <p class="text-2xl font-black text-white">{{ $crmStats['new_leads'] }}</p>
+                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#dfeee4]">New Leads</p>
+                        </div>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
+                            <p class="text-2xl font-black text-white">{{ $crmStats['active_viewings'] }}</p>
+                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#dfeee4]">Viewings</p>
+                        </div>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
+                            <p class="text-2xl font-black text-white">{{ $crmStats['active_offers'] }}</p>
+                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#dfeee4]">Offers</p>
+                        </div>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
+                            <p class="text-2xl font-black text-white">{{ $crmStats['closed_deals'] }}</p>
+                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#dfeee4]">Closed Deals</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- CRM Pipeline Funnel + response rate --}}
+                <div class="mt-6 grid gap-4 lg:grid-cols-3">
+                    <div class="rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm lg:col-span-2">
+                        <h3 class="text-lg font-black text-[#1d3c34]">Pipeline</h3>
+                        <p class="text-sm text-[#587165]">New Lead → Contacted → Qualified → Viewing → Negotiation → Offer → Closed</p>
+                        @php
+                            $pipelineStages = [
+                                'new' => 'New Lead',
+                                'contacted' => 'Contacted',
+                                'qualified' => 'Qualified',
+                                'viewing' => 'Viewing',
+                                'negotiating' => 'Negotiation',
+                                'offer' => 'Offer',
+                                'closed' => 'Closed',
+                            ];
+                            $pipelineMax = max(1, collect($pipelineStages)->map(fn ($label, $status) => ($inquiries->where('status', $status)->count()) + ($orders->where('status', $status)->count()))->max());
+                        @endphp
+                        <div class="mt-4 space-y-2.5">
+                            @foreach ($pipelineStages as $pipelineStatus => $pipelineLabel)
+                                @php
+                                    $pipelineCount = $inquiries->where('status', $pipelineStatus)->count() + $orders->where('status', $pipelineStatus)->count();
+                                @endphp
+                                <div class="flex items-center gap-3">
+                                    <span class="w-24 shrink-0 text-[11px] font-bold text-[#587165]">{{ $pipelineLabel }}</span>
+                                    <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-[#e7ddca]">
+                                        <div class="h-full rounded-full bg-[#1d3c34]" style="width: {{ ($pipelineCount / $pipelineMax) * 100 }}%"></div>
+                                    </div>
+                                    <span class="w-8 shrink-0 text-right text-[11px] font-black text-[#1d3c34]">{{ $pipelineCount }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                        <h3 class="text-lg font-black text-[#1d3c34]">Performance</h3>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="font-bold text-[#587165]">Response rate</span>
+                                    <span class="font-black text-[#1d3c34]">{{ $crmStats['response_rate'] }}%</span>
+                                </div>
+                                <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#e7ddca]">
+                                    <div class="h-full rounded-full bg-emerald-600" style="width: {{ $crmStats['response_rate'] }}%"></div>
+                                </div>
+                                <p class="mt-1 text-[11px] text-slate-500">Leads read within 24 hours</p>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="font-bold text-[#587165]">Average rating</span>
+                                <span class="font-black text-[#1d3c34]">{{ number_format((float) $averageRating, 1) }} ★</span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="font-bold text-[#587165]">Active listings</span>
+                                <span class="font-black text-[#1d3c34]">{{ $publishedCount }} / {{ $propertiesCount }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{-- AI Action Assistant Banner --}}
+                @if (isset($actionableTasks) && count($actionableTasks) > 0)
+                    <div class="mt-6 rounded-2xl border border-[#d4af37]/60 bg-gradient-to-r from-[#1d3c34] to-[#254d43] p-5 text-white shadow-md">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="rounded bg-[#d4af37] px-2 py-0.5 text-[10px] font-black uppercase text-[#1d3c34]">🤖 Agent AI Task Assistant</span>
+                                    <span class="text-xs font-bold text-[#dfeee4]">Action Required</span>
+                                </div>
+                                <h3 class="mt-1 text-base font-black text-white">You have {{ count($actionableTasks) }} high-priority action items waiting in your workflow:</h3>
+                            </div>
+                        </div>
+                        <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                            @foreach ($actionableTasks as $task)
+                                <a href="{{ $task['url'] }}" class="flex items-center justify-between rounded-xl bg-white/10 hover:bg-white/20 p-3 transition border border-white/15">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="text-xs font-black">{{ $task['badge'] }}</span>
+                                        <span class="text-xs font-semibold text-[#dfeee4]">{{ $task['title'] }}</span>
+                                    </div>
+                                    <span class="text-xs font-bold text-[#d4af37]">&rarr;</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 @if ($pendingOrders->isNotEmpty())
                     <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#d9cab3] bg-[#fffaf2] p-5 shadow-sm">
                         <div class="flex items-center gap-3">
@@ -116,7 +326,7 @@
                     </div>
                 @endif
 
-                <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <a href="#listings" data-target-section="listings" class="nav-section-link rounded-[1.5rem] border border-[#d9cab3] bg-white p-5 shadow-sm transition hover:shadow-md">
                         <p class="text-sm font-medium text-slate-500">Total Listings</p>
                         <p class="mt-3 text-3xl font-black text-[#1d3c34]">{{ $propertiesCount }}</p>
@@ -133,9 +343,51 @@
                         <p class="text-sm font-medium text-slate-500">Pending Requests</p>
                         <p class="mt-3 text-3xl font-black text-[#b7842d]">{{ $pendingOrders->count() }}</p>
                     </a>
+                    <a href="#commissions" data-target-section="commissions" class="nav-section-link rounded-[1.5rem] border border-[#d4af37]/40 bg-[#fffdfa] p-5 shadow-sm transition hover:shadow-md">
+                        <p class="text-sm font-medium text-[#9b6c17]">Commissions</p>
+                        <p class="mt-3 text-xl font-black text-[#1d3c34]">
+                            {{ number_format(isset($commissions) ? $commissions->sum('commission_amount') : 0, 0) }} <span class="text-xs font-semibold text-slate-400">ETB</span>
+                        </p>
+                    </a>
                 </div>
 
-                <div class="mt-10 grid gap-6 lg:grid-cols-2">
+                {{-- Agent Personal Performance Charts --}}
+                <div class="mt-8 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="h-2.5 w-2.5 rounded-full bg-[#102b25]"></span>
+                                <h2 class="text-xl font-black text-[#1d3c34]">Agent Performance Intelligence</h2>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">Personal deal velocity, portfolio status breakdown, and commission earnings pipeline.</p>
+                        </div>
+                        <span class="rounded-full bg-[#ebdcc9] px-3 py-1 text-xs font-bold text-[#1d3c34]">
+                            ★ {{ $agent->tier_details['name'] }} Tier ({{ (int) $agent->effective_split_percentage }}% Split)
+                        </span>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Chart 1: Agent Property Status Donut -->
+                        <div class="rounded-2xl border border-slate-100 bg-[#fbf9f5] p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-black uppercase tracking-wider text-[#1d3c34]">My Listing Portfolio Status</h3>
+                                <span class="text-[10px] font-bold text-slate-400">Available vs Rented vs Sold</span>
+                            </div>
+                            <div id="agent-property-status-chart" class="min-h-[260px] flex items-center justify-center"></div>
+                        </div>
+
+                        <!-- Chart 2: Agent Commission Flow -->
+                        <div class="rounded-2xl border border-slate-100 bg-[#fbf9f5] p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-black uppercase tracking-wider text-[#1d3c34]">Commission Settlements (ETB)</h3>
+                                <span class="text-[10px] font-bold text-slate-400">Paid vs Pending</span>
+                            </div>
+                            <div id="agent-commission-chart" class="min-h-[260px] flex items-center justify-center"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-10">
                     <div class="rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
                         <div class="flex items-center justify-between gap-3">
                             <h2 class="text-xl font-black text-[#1d3c34]">Recent Listings</h2>
@@ -163,29 +415,6 @@
                             @endforelse
                         </ul>
                         <a href="#listings" data-target-section="listings" class="nav-section-link mt-5 inline-block text-sm font-semibold text-[#1d3c34] hover:text-[#244d43]">View all listings</a>
-                    </div>
-
-                    <div class="rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
-                        <div class="flex items-center justify-between gap-3">
-                            <h2 class="text-xl font-black text-[#1d3c34]">Recent Client Messages</h2>
-                            <a href="#messages" data-target-section="messages" class="nav-section-link rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-bold text-[#9b6c17]">
-                                {{ $unreadInquiries->count() }} new
-                            </a>
-                        </div>
-                        <ul class="mt-5 space-y-4">
-                            @forelse ($inquiries->take(4) as $inq)
-                                <li class="border-b border-[#e7ddca] pb-3 last:border-b-0 last:pb-0">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <p class="text-sm font-bold text-[#1d3c34]">{{ $inq->name }}</p>
-                                        <span class="text-xs text-slate-400">{{ $inq->created_at?->diffForHumans() }}</span>
-                                    </div>
-                                    <p class="mt-1 line-clamp-2 text-xs text-slate-600">{{ $inq->message }}</p>
-                                </li>
-                            @empty
-                                <li class="text-sm text-slate-500">No client messages yet.</li>
-                            @endforelse
-                        </ul>
-                        <a href="#messages" data-target-section="messages" class="nav-section-link mt-5 inline-block text-sm font-semibold text-[#1d3c34] hover:text-[#244d43]">View all messages</a>
                     </div>
                 </div>
             </div>
@@ -328,6 +557,12 @@
                         </div>
                     @endforelse
                 </div>
+
+                @if ($orders instanceof \Illuminate\Pagination\LengthAwarePaginator && $orders->hasPages())
+                    <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                        {{ $orders->fragment('orders')->links() }}
+                    </div>
+                @endif
             </section>
 
             {{-- My Listings --}}
@@ -340,6 +575,14 @@
                     <button type="button" id="agent-add-listing-toggle" class="rounded-full bg-[#1d3c34] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#254d43]" data-label-create="+ Add Property" data-label-close="Close Form">+ Add Property</button>
                 </div>
                 <p class="mt-2 text-xs font-bold uppercase tracking-[0.14em] text-[#587165]">{{ $propertiesCount }} total · {{ $publishedCount }} live on site</p>
+                @php $averageQuality = $properties->count() > 0 ? (int) round(collect($listingQuality)->avg()) : 0; @endphp
+                <div class="mt-2 flex items-center gap-2">
+                    <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#587165]">Listing quality</span>
+                    <div class="h-2 w-28 overflow-hidden rounded-full bg-[#e7ddca]">
+                        <div class="h-full rounded-full {{ $averageQuality >= 70 ? 'bg-emerald-600' : ($averageQuality >= 40 ? 'bg-amber-500' : 'bg-rose-500') }}" style="width: {{ $averageQuality }}%"></div>
+                    </div>
+                    <span class="text-[11px] font-black text-[#1d3c34]">{{ $averageQuality }}% average completeness</span>
+                </div>
 
                 {{-- Edit listing form (revealed when editing a property) --}}
                 @if ($propertyToEdit)
@@ -351,6 +594,51 @@
                             </div>
                             <a href="{{ route('agent.portal', ['section' => 'listings']) }}" class="rounded-full border border-[#d9cab3] bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-[#f1e4cf]">Cancel</a>
                         </div>
+
+                        {{-- All other listing actions, available while editing --}}
+                        <div class="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[#e7ddca] bg-white px-3.5 py-2.5">
+                            <span class="mr-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Actions</span>
+
+                            <button type="button" onclick="openPropertyDocumentModal({{ $propertyToEdit->id }}, '{{ addslashes($propertyToEdit->title) }}')" class="rounded-full border border-emerald-600/30 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100" title="Upload Title Deed (Carta), Site Plan, or Municipal Documents">
+                                + Carta / Docs
+                            </button>
+
+                            <form method="POST" action="{{ route('agent.properties.togglePublish', $propertyToEdit) }}">
+                                @csrf
+                                <button type="submit" class="rounded-full border border-[#b9a98b] bg-white px-3 py-1.5 text-xs font-bold text-[#1d3c34] transition hover:bg-[#f1e4cf]">
+                                    {{ $propertyToEdit->is_active ? 'Unpublish' : 'Publish' }}
+                                </button>
+                            </form>
+
+                            @php
+                                $editSoldStatus = $propertyToEdit->type === 'rent' ? 'rented' : 'sold';
+                                $editMarkLabel = $propertyToEdit->type === 'rent' ? 'Mark Rented' : 'Mark Sold';
+                            @endphp
+                            <form method="POST" action="{{ route('agent.properties.toggleSold', $propertyToEdit) }}">
+                                @csrf
+                                <button type="submit" class="rounded-full border border-[#d9cab3] bg-[#f8f3eb] px-3 py-1.5 text-xs font-bold text-[#1d3c34] transition hover:bg-[#f0e4cf]">
+                                    {{ $propertyToEdit->status === $editSoldStatus ? 'Mark Available' : $editMarkLabel }}
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ route('agent.properties.archive', $propertyToEdit) }}">
+                                @csrf
+                                <button type="submit" class="rounded-full border border-[#d9cab3] bg-[#f9f4ed] px-3 py-1.5 text-xs font-bold text-[#1d3c34] transition hover:bg-[#f0e4cf]" {{ $propertyToEdit->status === 'archived' ? 'disabled' : '' }}>
+                                    Archive
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ route('agent.properties.destroy', $propertyToEdit) }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="rounded-full border border-[#d9cab3] bg-[#fff1f0] px-3 py-1.5 text-xs font-bold text-[#a24339] transition hover:bg-[#ffe4e1]" data-confirm="Delete this listing?">Delete</button>
+                            </form>
+
+                            @if ($propertyToEdit->is_active)
+                                <a href="{{ route('properties.show', $propertyToEdit->slug) }}" class="text-xs font-semibold text-[#2d5d4d] hover:underline">View</a>
+                            @endif
+                        </div>
+
                         <form method="POST" action="{{ route('agent.properties.update', $propertyToEdit) }}" enctype="multipart/form-data" class="grid gap-4 md:grid-cols-2">
                             @csrf
                             @method('PUT')
@@ -371,9 +659,20 @@
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-semibold text-slate-700">Category</label>
+                                @php
+                                    $editCat = old('category', $propertyToEdit->property_category ?? $propertyToEdit->category ?? 'home');
+                                    $categoryOptions = [
+                                        'home' => 'Home / House',
+                                        'villa' => 'Villa',
+                                        'apartment' => 'Apartment',
+                                        'condominium' => 'Condominium',
+                                        'guest_house' => 'Guest House (Short Stay)',
+                                        'hotel' => 'Hotel (Short Stay)',
+                                    ];
+                                @endphp
                                 <select name="category" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                                    @foreach (['home', 'villa', 'apartment'] as $categoryOption)
-                                        <option value="{{ $categoryOption }}" @selected(old('category', $propertyToEdit->property_category ?? $propertyToEdit->category) === $categoryOption)>{{ ucfirst($categoryOption) }}</option>
+                                    @foreach ($categoryOptions as $catKey => $catLabel)
+                                        <option value="{{ $catKey }}" @selected($editCat === $catKey)>{{ $catLabel }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -389,18 +688,128 @@
                                 <label class="mb-1 block text-sm font-semibold text-slate-700">Area (sq ft)</label>
                                 <input type="number" name="area" min="0" value="{{ old('area', $propertyToEdit->area) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                             </div>
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-slate-700">City</label>
-                                <input type="text" name="city" value="{{ old('city', $propertyToEdit->city) }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                            </div>
                             <div class="md:col-span-2">
-                                <label class="mb-1 block text-sm font-semibold text-slate-700">Address</label>
-                                <input type="text" name="address" value="{{ old('address', $propertyToEdit->address) }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                <label class="mb-1 block text-sm font-semibold text-slate-700">Address / Street</label>
+                                <input type="text" name="address" value="{{ old('address', $propertyToEdit->address) }}" placeholder="e.g. Namibia St, Near Medhanialem Mall" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            </div>
+
+                            {{-- GIS Location & Sub-City (SRS §47–§56) --}}
+                            <div class="md:col-span-2 rounded-2xl border border-[#ecd9be] bg-[#fffaf2] p-4.5">
+                                <div class="flex items-center justify-between mb-3 border-b border-[#ecd9be] pb-2.5">
+                                    <div>
+                                        <h4 class="text-sm font-black text-[#1d3c34]">GIS Geolocation &amp; Sub-City Taxonomy</h4>
+                                        <p class="text-xs text-slate-500">Ethiopian administrative sub-city, woreda, neighborhood, and GPS mapping coordinates</p>
+                                    </div>
+                                    <span class="rounded-full bg-[#102b25]/10 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#102b25]">
+                                        SRS §47–§56
+                                    </span>
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Sub-City</label>
+                                        <select name="subcity" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                            <option value="">Select Sub-City...</option>
+                                            @foreach (['Bole', 'Kirkos', 'Yeka', 'Nifas Silk-Lafto', 'Lideta', 'Arada', 'Addis Ketema', 'Gulele', 'Kolfe Keranio', 'Akaky Kaliti', 'Lemi Kura'] as $sc)
+                                                <option value="{{ $sc }}" {{ old('subcity', $propertyToEdit->subcity) === $sc ? 'selected' : '' }}>{{ $sc }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Woreda</label>
+                                        <input type="text" name="woreda" value="{{ old('woreda', $propertyToEdit->woreda) }}" placeholder="e.g. Woreda 03" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Neighborhood</label>
+                                        <input type="text" name="neighborhood" value="{{ old('neighborhood', $propertyToEdit->neighborhood) }}" placeholder="e.g. Medhanialem, CMC, Sarbet" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">City / Region</label>
+                                        <input type="text" name="city" value="{{ old('city', $propertyToEdit->city ?? 'Addis Ababa') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    @include('layouts.partials.location-picker', [
+                                        'pickerId' => 'edit-property-location-map',
+                                        'latInputId' => 'edit-property-latitude',
+                                        'lngInputId' => 'edit-property-longitude',
+                                        'lat' => $propertyToEdit->latitude,
+                                        'lng' => $propertyToEdit->longitude,
+                                        'pickerHelp' => 'Drag the pin to the exact plot location, or pick a sub-city to recenter.',
+                                    ])
+                                </div>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="mb-1 block text-sm font-semibold text-slate-700">Description</label>
                                 <textarea name="description" rows="3" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('description', $propertyToEdit->description) }}</textarea>
                             </div>
+
+                            {{-- Ethiopian Physical Specifications & Utility Infrastructure (Module 1) --}}
+                            <div class="md:col-span-2 rounded-2xl border border-[#ecd9be] bg-[#fffaf2] p-4.5">
+                                <div class="flex items-center justify-between mb-3 border-b border-[#ecd9be] pb-2.5">
+                                    <div>
+                                        <h4 class="text-sm font-black text-[#1d3c34]">Physical Specifications & Utilities</h4>
+                                        <p class="text-xs text-slate-500">Verified architectural parameters and infrastructure readiness</p>
+                                    </div>
+                                    <span class="rounded-full bg-[#102b25]/10 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#102b25]">
+                                        Verified Specifications
+                                    </span>
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Building Area (sqm)</label>
+                                        <input type="number" name="building_area" min="0" value="{{ old('building_area', $propertyToEdit->building_area) }}" placeholder="e.g. 400" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Stories / Total Floors</label>
+                                        <input type="number" name="floors" min="0" value="{{ old('floors', $propertyToEdit->floors ?? 1) }}" placeholder="e.g. 1 for G+0" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Parking Spaces</label>
+                                        <input type="number" name="parking_spaces" min="0" value="{{ old('parking_spaces', $propertyToEdit->parking_spaces ?? 1) }}" placeholder="e.g. 1" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-bold text-slate-700">Asset Condition</label>
+                                        <select name="condition" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                            <option value="new" {{ old('condition', $propertyToEdit->condition) === 'new' ? 'selected' : '' }}>Brand New / Off-Plan</option>
+                                            <option value="excellent" {{ old('condition', $propertyToEdit->condition ?? 'excellent') === 'excellent' ? 'selected' : '' }}>Excellent</option>
+                                            <option value="good" {{ old('condition', $propertyToEdit->condition) === 'good' ? 'selected' : '' }}>Good</option>
+                                            <option value="renovated" {{ old('condition', $propertyToEdit->condition) === 'renovated' ? 'selected' : '' }}>Renovated</option>
+                                            <option value="under_construction" {{ old('condition', $propertyToEdit->condition) === 'under_construction' ? 'selected' : '' }}>Under Construction</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 pt-3 border-t border-[#ecd9be]">
+                                    <label class="block text-xs font-black uppercase tracking-wider text-[#587165] mb-2">Ethiopian Utility Readiness</label>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-semibold text-slate-700">
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_electricity" value="1" {{ old('has_electricity', $propertyToEdit->has_electricity ?? true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>3-Phase / Electric</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_water" value="1" {{ old('has_water', $propertyToEdit->has_water ?? true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>Municipal Water Line</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_water_tank" value="1" {{ old('has_water_tank', $propertyToEdit->has_water_tank ?? true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>Water Reservoir Tank</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_generator" value="1" {{ old('has_generator', $propertyToEdit->has_generator ?? false) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>Backup Standby Generator</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_solar" value="1" {{ old('has_solar', $propertyToEdit->has_solar ?? false) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>Solar Energy System</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                            <input type="checkbox" name="has_security" value="1" {{ old('has_security', $propertyToEdit->has_security ?? true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                            <span>24/7 Gated Security</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="md:col-span-2">
                                 <div class="flex items-center justify-between mb-1">
                                     <label class="block text-sm font-semibold text-slate-700">Property Photos & Cover Image</label>
@@ -567,9 +976,20 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-semibold text-slate-700">Category</label>
+                            @php
+                                $createCat = old('category', 'home');
+                                $createCategoryOptions = [
+                                    'home' => 'Home / House',
+                                    'villa' => 'Villa',
+                                    'apartment' => 'Apartment',
+                                    'condominium' => 'Condominium',
+                                    'guest_house' => 'Guest House (Short Stay)',
+                                    'hotel' => 'Hotel (Short Stay)',
+                                ];
+                            @endphp
                             <select name="category" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                                @foreach (['home', 'villa', 'apartment'] as $categoryOption)
-                                    <option value="{{ $categoryOption }}" @selected(old('category', 'home') === $categoryOption)>{{ ucfirst($categoryOption) }}</option>
+                                @foreach ($createCategoryOptions as $catKey => $catLabel)
+                                    <option value="{{ $catKey }}" @selected($createCat === $catKey)>{{ $catLabel }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -585,18 +1005,128 @@
                             <label class="mb-1 block text-sm font-semibold text-slate-700">Area (sq ft)</label>
                             <input type="number" name="area" min="0" value="{{ old('area') }}" required class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-slate-700">City</label>
-                            <input type="text" name="city" value="{{ old('city') }}" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                        </div>
                         <div class="md:col-span-2">
-                            <label class="mb-1 block text-sm font-semibold text-slate-700">Address</label>
-                            <input type="text" name="address" value="{{ old('address') }}" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <label class="mb-1 block text-sm font-semibold text-slate-700">Address / Street</label>
+                            <input type="text" name="address" value="{{ old('address') }}" placeholder="e.g. Namibia St, Near Medhanialem Mall" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        {{-- GIS Location & Sub-City (SRS §47–§56) --}}
+                        <div class="md:col-span-2 rounded-2xl border border-[#ecd9be] bg-[#fffaf2] p-4.5">
+                            <div class="flex items-center justify-between mb-3 border-b border-[#ecd9be] pb-2.5">
+                                <div>
+                                    <h4 class="text-sm font-black text-[#1d3c34]">GIS Geolocation &amp; Sub-City Taxonomy</h4>
+                                    <p class="text-xs text-slate-500">Ethiopian administrative sub-city, woreda, neighborhood, and GPS mapping coordinates</p>
+                                </div>
+                                <span class="rounded-full bg-[#102b25]/10 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#102b25]">
+                                    SRS §47–§56
+                                </span>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Sub-City</label>
+                                    <select name="subcity" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                        <option value="">Select Sub-City...</option>
+                                        @foreach (['Bole', 'Kirkos', 'Yeka', 'Nifas Silk-Lafto', 'Lideta', 'Arada', 'Addis Ketema', 'Gulele', 'Kolfe Keranio', 'Akaky Kaliti', 'Lemi Kura'] as $sc)
+                                            <option value="{{ $sc }}" {{ old('subcity') === $sc ? 'selected' : '' }}>{{ $sc }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Woreda</label>
+                                    <input type="text" name="woreda" value="{{ old('woreda') }}" placeholder="e.g. Woreda 03" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Neighborhood</label>
+                                    <input type="text" name="neighborhood" value="{{ old('neighborhood') }}" placeholder="e.g. Medhanialem, CMC, Sarbet" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">City / Region</label>
+                                    <input type="text" name="city" value="{{ old('city', 'Addis Ababa') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                @include('layouts.partials.location-picker', [
+                                    'pickerId' => 'create-property-location-map',
+                                    'latInputId' => 'create-property-latitude',
+                                    'lngInputId' => 'create-property-longitude',
+                                    'lat' => old('latitude'),
+                                    'lng' => old('longitude'),
+                                    'pickerHelp' => 'Click the map or drag the pin to set the exact plot coordinates.',
+                                ])
+                            </div>
                         </div>
                         <div class="md:col-span-2">
                             <label class="mb-1 block text-sm font-semibold text-slate-700">Description</label>
                             <textarea name="description" rows="3" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('description') }}</textarea>
                         </div>
+
+                        {{-- Ethiopian Physical Specifications & Utility Infrastructure (Module 1) --}}
+                        <div class="md:col-span-2 rounded-2xl border border-[#ecd9be] bg-[#fffaf2] p-4.5">
+                            <div class="flex items-center justify-between mb-3 border-b border-[#ecd9be] pb-2.5">
+                                <div>
+                                    <h4 class="text-sm font-black text-[#1d3c34]">Physical Specifications & Utilities</h4>
+                                    <p class="text-xs text-slate-500">Verified architectural parameters and infrastructure readiness</p>
+                                </div>
+                                <span class="rounded-full bg-[#102b25]/10 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#102b25]">
+                                    Verified Specifications
+                                </span>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Building Area (sqm)</label>
+                                    <input type="number" name="building_area" min="0" value="{{ old('building_area') }}" placeholder="e.g. 400" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Stories / Total Floors</label>
+                                    <input type="number" name="floors" min="0" value="{{ old('floors', 1) }}" placeholder="e.g. 1 for G+0" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Parking Spaces</label>
+                                    <input type="number" name="parking_spaces" min="0" value="{{ old('parking_spaces', 1) }}" placeholder="e.g. 1" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-bold text-slate-700">Asset Condition</label>
+                                    <select name="condition" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                        <option value="new" {{ old('condition') === 'new' ? 'selected' : '' }}>Brand New / Off-Plan</option>
+                                        <option value="excellent" {{ old('condition', 'excellent') === 'excellent' ? 'selected' : '' }}>Excellent</option>
+                                        <option value="good" {{ old('condition') === 'good' ? 'selected' : '' }}>Good</option>
+                                        <option value="renovated" {{ old('condition') === 'renovated' ? 'selected' : '' }}>Renovated</option>
+                                        <option value="under_construction" {{ old('condition') === 'under_construction' ? 'selected' : '' }}>Under Construction</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 pt-3 border-t border-[#ecd9be]">
+                                <label class="block text-xs font-black uppercase tracking-wider text-[#587165] mb-2">Ethiopian Utility Readiness</label>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-semibold text-slate-700">
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_electricity" value="1" {{ old('has_electricity', true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>3-Phase / Electric</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_water" value="1" {{ old('has_water', true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>Municipal Water Line</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_water_tank" value="1" {{ old('has_water_tank', true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>Water Reservoir Tank</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_generator" value="1" {{ old('has_generator', false) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>Backup Standby Generator</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_solar" value="1" {{ old('has_solar', false) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>Solar Energy System</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl bg-white p-2.5 border border-[#d9cab3] hover:border-[#1d3c34] cursor-pointer">
+                                        <input type="checkbox" name="has_security" value="1" {{ old('has_security', true) ? 'checked' : '' }} class="h-4 w-4 rounded border-[#d9cab3] text-[#1d3c34] focus:ring-[#1d3c34]">
+                                        <span>24/7 Gated Security</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="md:col-span-2">
                             <div class="flex items-center justify-between mb-1">
                                 <label class="block text-sm font-semibold text-slate-700">Property Photos & Cover Image</label>
@@ -670,6 +1200,7 @@
                                 <th class="px-5 py-4 font-semibold">Price</th>
                                 <th class="px-5 py-4 font-semibold">Type</th>
                                 <th class="px-5 py-4 font-semibold">Details</th>
+                                <th class="px-5 py-4 font-semibold">Verification</th>
                                 <th class="px-5 py-4 font-semibold">Status</th>
                                 <th class="px-5 py-4 font-semibold">Actions</th>
                             </tr>
@@ -697,6 +1228,18 @@
                                         {{ $property->bedrooms }} bed · {{ $property->bathrooms }} bath<br>
                                         {{ number_format($property->area) }} sq ft
                                     </td>
+                                    <td class="px-5 py-4 whitespace-nowrap">
+                                        <div class="flex flex-col gap-1">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black {{ ($property->verification_level ?? 0) >= 4 ? 'bg-[#102a24] text-[#e8c374]' : (($property->verification_level ?? 0) >= 3 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700') }}">
+                                                <svg class="h-3 w-3 {{ ($property->verification_level ?? 0) >= 3 ? 'text-emerald-500' : 'text-slate-400' }}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/></svg>
+                                                L{{ $property->verification_level ?? 0 }}: {{ $property->verification_level_label }}
+                                            </span>
+                                            @if ($property->title_deed_number)
+                                                <span class="text-[11px] font-mono text-slate-500">Carta: {{ $property->title_deed_number }}</span>
+                                            @endif
+                                            <span class="text-[11px] text-slate-400">{{ $property->documents_count ?? $property->documents->count() }} doc(s)</span>
+                                        </div>
+                                    </td>
                                     <td class="px-5 py-4">
                                         <span class="rounded-full {{ $property->is_active ? 'bg-[#dfeee4] text-[#1d3c34]' : 'bg-[#f9ecd0] text-[#9b6c17]' }} px-2.5 py-1 text-xs font-bold">
                                             {{ $property->is_active ? 'Published' : 'Unpublished' }}
@@ -707,6 +1250,9 @@
                                     </td>
                                     <td class="px-5 py-4">
                                         <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" onclick="openPropertyDocumentModal({{ $property->id }}, '{{ addslashes($property->title) }}')" class="rounded-full border border-emerald-600/30 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition" title="Upload Title Deed (Carta), Site Plan, or Municipal Documents">
+                                                + Carta / Docs
+                                            </button>
                                             <a href="{{ route('agent.portal', ['section' => 'listings', 'edit_property' => $property->id]) }}" class="rounded-full bg-[#1d3c34] px-3 py-2 text-xs font-bold text-white">Edit</a>
                                             <form method="POST" action="{{ route('agent.properties.togglePublish', $property) }}">
                                                 @csrf
@@ -749,7 +1295,286 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if ($properties instanceof \Illuminate\Pagination\LengthAwarePaginator && $properties->hasPages())
+                    <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                        {{ $properties->fragment('listings')->links() }}
+                    </div>
+                @endif
             </section>
+
+            {{-- ═══════════════════ AGENT DEVELOPMENTS & OFF-PLAN (MODULE 3) ═══════════════════ --}}
+            {{-- STAY BOOKINGS FOR MY LISTINGS --}}
+            <section id="stay-bookings" data-section="stay-bookings" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Stay Platform</span>
+                            <h2 class="text-2xl font-black text-[#1d3c34]">Stay Bookings on My Listings</h2>
+                        </div>
+                        <p class="mt-1 text-sm text-slate-500">Guest-house and short-stay reservations booked against the properties you manage.</p>
+                    </div>
+                    <a href="{{ route('stays.index') }}" target="_blank" class="rounded-full border border-[#d9cab3] bg-[#fffaf2] px-4 py-2 text-xs font-bold text-[#1d3c34] transition hover:bg-[#f0e4cf]">
+                        View Public Stays &rarr;
+                    </a>
+                </div>
+
+                @if ($bookings->isNotEmpty())
+                    <div class="mt-6 overflow-x-auto rounded-[1.25rem] border border-[#e7ddca]">
+                        <table class="min-w-full divide-y divide-[#e7ddca] text-left text-sm">
+                            <thead class="bg-[#f9f4ed] text-xs font-bold uppercase tracking-wider text-[#60716c]">
+                                <tr>
+                                    <th class="px-5 py-3">Reference</th>
+                                    <th class="px-5 py-3">Stay / Property</th>
+                                    <th class="px-5 py-3">Guest Details</th>
+                                    <th class="px-5 py-3">Dates &amp; Nights</th>
+                                    <th class="px-5 py-3">Total Amount</th>
+                                    <th class="px-5 py-3">Payment</th>
+                                    <th class="px-5 py-3">Status</th>
+                                    <th class="px-5 py-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[#e7ddca] bg-white text-xs">
+                                @foreach ($bookings as $booking)
+                                    @php
+                                        $statusColors = [
+                                            'confirmed' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                                            'checked_in' => 'bg-blue-100 text-blue-800 border-blue-300',
+                                            'completed' => 'bg-purple-100 text-purple-800 border-purple-300',
+                                            'cancelled' => 'bg-red-100 text-red-800 border-red-300',
+                                            'pending' => 'bg-amber-100 text-amber-800 border-amber-300',
+                                        ];
+                                        [$paymentLabel, $paymentClasses] = $booking->payment_status_badge;
+                                    @endphp
+                                    <tr class="transition hover:bg-[#fefbf6]">
+                                        <td class="px-5 py-4">
+                                            <p class="font-mono font-bold text-[#1d3c34]">{{ $booking->booking_reference }}</p>
+                                            <span class="text-[10px] text-slate-400">Booked {{ $booking->created_at?->format('M d, Y') }}</span>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            @if ($booking->property)
+                                                <a href="{{ route('properties.show', $booking->property->slug) }}" class="block max-w-[200px] truncate font-bold text-[#1d3c34] hover:underline">
+                                                    {{ $booking->property->title }}
+                                                </a>
+                                                <span class="text-[11px] text-slate-500">{{ $booking->property->city }}</span>
+                                            @else
+                                                <span class="text-slate-400">Listing removed</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <p class="font-bold text-slate-800">{{ $booking->guest_name }}</p>
+                                            <p class="text-slate-500">{{ $booking->guest_phone }}</p>
+                                            <p class="text-[10px] text-slate-400">{{ $booking->guest_email }}</p>
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-4">
+                                            <p class="font-semibold text-slate-700">{{ $booking->check_in_date?->format('M d, Y') }} &rarr; {{ $booking->check_out_date?->format('M d, Y') }}</p>
+                                            <span class="rounded bg-[#edf2ee] px-2 py-0.5 text-[10px] font-bold text-[#2d5d4d]">{{ $booking->total_nights }} Nights ({{ $booking->guests_count }} {{ $booking->guests_count === 1 ? 'Guest' : 'Guests' }})</span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-4 text-sm font-black text-[#102b25]">
+                                            {{ $booking->formatted_total }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-4">
+                                            <span class="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider {{ $paymentClasses }}">
+                                                {{ $paymentLabel }}
+                                            </span>
+                                            @if ($booking->isPaid())
+                                                <a href="{{ route('payments.receipt', $booking->latestPayment()?->transaction_number) }}" class="mt-1 block text-[10px] font-bold text-[#1d3c34] hover:underline">Receipt &rarr;</a>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-4">
+                                            <span class="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider {{ $statusColors[$booking->status] ?? 'bg-slate-100 text-slate-700 border-slate-300' }}">
+                                                {{ str_replace('_', ' ', $booking->status) }}
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-4">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <form method="POST" action="{{ route('bookings.update-status', $booking) }}" class="inline-flex items-center">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <select name="status" onchange="this.form.submit()" class="rounded-lg border border-[#d9cab3] bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none">
+                                                        <option value="confirmed" {{ $booking->status === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                                                        <option value="checked_in" {{ $booking->status === 'checked_in' ? 'selected' : '' }}>Checked In</option>
+                                                        <option value="completed" {{ $booking->status === 'completed' ? 'selected' : '' }}>Completed</option>
+                                                        <option value="cancelled" {{ $booking->status === 'cancelled' ? 'selected' : '' }}>Cancel</option>
+                                                    </select>
+                                                </form>
+                                                <form method="POST" action="{{ route('bookings.destroy', $booking) }}" data-confirm="Delete this stay booking permanently?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="inline-flex items-center gap-1 rounded-full border border-[#c86b5c] bg-[#fef3f1] px-3 py-1 text-xs font-bold text-[#a24339] transition hover:bg-[#fbe4e0]">
+                                                        Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if ($bookings instanceof \Illuminate\Pagination\LengthAwarePaginator && $bookings->hasPages())
+                        <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                            {{ $bookings->fragment('stay-bookings')->links() }}
+                        </div>
+                    @endif
+                @else
+                    <div class="mt-6 rounded-2xl border border-dashed border-[#d9cab3] bg-[#fffdfa] p-10 text-center">
+                        <span class="text-3xl">🧳</span>
+                        <h3 class="mt-2 text-base font-bold text-[#1d3c34]">No Stay Bookings Yet</h3>
+                        <p class="mt-1 text-xs text-slate-500">Guest reservations made through the Airbnb-style stay booking engine on your listings will appear here.</p>
+                    </div>
+                @endif
+            </section>
+
+            <section id="developments" data-section="developments" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#f0e4cf] pb-5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded bg-[#102b25] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-[#d4af37]">Off-Plan</span>
+                            <h2 class="text-2xl font-black text-[#1d3c34]">My Off-Plan Developments</h2>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">Post and manage real estate development projects, towers, unit inventories, and construction milestones.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="openCreateProjectModal()" class="inline-flex items-center gap-1.5 rounded-full bg-[#102b25] px-4 py-2 text-xs font-bold text-[#d4af37] hover:bg-[#1d3c34] transition shadow-xs cursor-pointer">
+                            <span>+ Post Development</span>
+                        </button>
+                        <a href="{{ route('developments.index') }}" target="_blank" class="inline-flex items-center gap-1.5 rounded-full border border-[#d9cab3] bg-[#fffdfa] px-4 py-2 text-xs font-bold text-[#1d3c34] hover:bg-[#f5ecdd] transition">
+                            <span>Public Directory</span>
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Stat Cards --}}
+                <div class="mt-6 grid gap-4 sm:grid-cols-3">
+                    <div class="rounded-2xl border border-[#d9cab3] bg-[#fffdfa] p-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-[#587165]">My Projects</span>
+                        <p class="mt-2 text-2xl font-black text-[#1d3c34]">{{ $projectsCount ?? 0 }}</p>
+                        <span class="text-[11px] text-slate-500">Active off-plan projects</span>
+                    </div>
+                    <div class="rounded-2xl border border-[#d9cab3] bg-[#edf3ee] p-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-[#2d5d4d]">Total Inventory Units</span>
+                        <p class="mt-2 text-2xl font-black text-[#0f5132]">
+                            {{ isset($projects) ? $projects->sum(fn($p) => $p->units->count()) : 0 }}
+                        </p>
+                        <span class="text-[11px] text-slate-500">Managed in portfolio</span>
+                    </div>
+                    <div class="rounded-2xl border border-[#d9cab3] bg-[#fdf8e6] p-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-[#9b6c17]">Buyer Reservations</span>
+                        <p class="mt-2 text-2xl font-black text-[#9b6c17]">
+                            {{ isset($projects) ? $projects->sum(fn($p) => $p->reservations()->count()) : 0 }}
+                        </p>
+                        <span class="text-[11px] text-slate-500">Prospective buyer leads</span>
+                    </div>
+                </div>
+
+                {{-- Projects Table --}}
+                <div class="mt-8">
+                    <h3 class="text-sm font-black uppercase tracking-wider text-[#1d3c34] mb-3">Developments Under My Management</h3>
+                    @if (isset($projects) && $projects->isNotEmpty())
+                        <div class="overflow-x-auto rounded-2xl border border-[#d9cab3]/80">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-[#102b25] text-white">
+                                    <tr>
+                                        <th class="px-4 py-3 font-bold uppercase">Project Code</th>
+                                        <th class="px-4 py-3 font-bold uppercase">Development Name</th>
+                                        <th class="px-4 py-3 font-bold uppercase">Developer</th>
+                                        <th class="px-4 py-3 font-bold uppercase">Location</th>
+                                        <th class="px-4 py-3 font-bold uppercase">Completion</th>
+                                        <th class="px-4 py-3 font-bold uppercase text-center">Available Units</th>
+                                        <th class="px-4 py-3 font-bold uppercase">Starting Price</th>
+                                        <th class="px-4 py-3 font-bold uppercase text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-[#f0e4cf] bg-white text-slate-700">
+                                    @foreach ($projects as $prj)
+                                        <tr class="hover:bg-[#fffdfa]">
+                                            <td class="px-4 py-3 font-mono font-bold text-[#1d3c34] whitespace-nowrap">
+                                                {{ $prj->project_code }}
+                                            </td>
+                                            <td class="px-4 py-3 font-bold text-[#1d3c34]">
+                                                <a href="{{ route('developments.show', $prj->slug) }}" class="hover:underline">
+                                                    {{ $prj->name }}
+                                                </a>
+                                            </td>
+                                            <td class="px-4 py-3 text-slate-600 font-semibold">
+                                                {{ $prj->developer_name }}
+                                            </td>
+                                            <td class="px-4 py-3 text-slate-600">
+                                                {{ $prj->subcity ?? $prj->city }}
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="h-2 w-16 overflow-hidden rounded-full bg-slate-200">
+                                                        <div class="h-full bg-[#0f5132]" style="width: {{ $prj->overall_completion_percentage }}%"></div>
+                                                    </div>
+                                                    <span class="font-bold text-[#1d3c34]">{{ $prj->overall_completion_percentage }}%</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <span class="rounded-full bg-[#eef7f2] px-2.5 py-0.5 font-bold text-[#0f5132]">
+                                                    {{ $prj->available_units_count }} / {{ $prj->units->count() }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 font-bold text-[#1d3c34] whitespace-nowrap">
+                                                {{ $prj->formatted_starting_price }}
+                                            </td>
+                                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    <a href="{{ route('developments.show', $prj->slug) }}" class="inline-flex items-center gap-1 rounded-xl bg-[#1d3c34] px-2.5 py-1.5 text-xs font-bold text-white hover:bg-[#254d43] transition">
+                                                        Showcase
+                                                    </a>
+                                                    <button type="button" onclick="openEditProjectModal({{ json_encode($prj) }})" class="rounded-xl border border-[#d9cab3] bg-[#fffaf0] px-2.5 py-1.5 text-xs font-bold text-[#9b6c17] hover:bg-[#f5ecdd] transition cursor-pointer">
+                                                        Edit
+                                                    </button>
+                                                    <button type="button" onclick="openAddUnitModal({{ $prj->id }}, '{{ addslashes($prj->name) }}')" class="rounded-xl border border-[#d9cab3] bg-white px-2.5 py-1.5 text-xs font-bold text-[#1d3c34] hover:bg-[#f5ecdd] transition cursor-pointer">
+                                                        + Unit
+                                                    </button>
+                                                    <form method="POST" action="{{ route('developments.destroy', $prj) }}" onsubmit="return confirm('Are you sure you want to delete this development project?')" class="inline">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="rounded-xl border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100 transition cursor-pointer">
+                                                            Delete
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if ($projects instanceof \Illuminate\Pagination\LengthAwarePaginator && $projects->hasPages())
+                            <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                                {{ $projects->fragment('developments')->links() }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="rounded-2xl border border-dashed border-[#d9cab3] bg-[#fffdfa] p-10 text-center">
+                            <span class="text-3xl">🏗️</span>
+                            <h3 class="mt-2 text-base font-bold text-[#1d3c34]">No Off-Plan Developments Posted Yet</h3>
+                            <p class="mt-1 text-xs text-slate-500">You can post master developments, add inventory units, and track buyer leads.</p>
+                            <button type="button" onclick="openCreateProjectModal()" class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#1d3c34] px-5 py-2 text-xs font-bold text-white hover:bg-[#254d43] transition">
+                                + Post Your First Development
+                            </button>
+                        </div>
+                    @endif
+                </div>
+
+                @include('developments.partials.create-project-modal')
+                @include('developments.partials.edit-project-modal')
+                @include('developments.partials.add-unit-modal')
+            </section>
+
+            {{-- ═══════════════════ MODULE 4: VIEWINGS & NEGOTIATION DESKS ═══════════════════ --}}
+            @include('properties.partials.viewings-desk')
+            @include('properties.partials.offers-desk')
+            @include('properties.partials.leases-desk')
+            @include('properties.partials.commissions-desk')
 
             {{-- Client messages --}}
             <section id="messages" data-section="messages" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
@@ -834,6 +1659,12 @@
                         </div>
                     @endforelse
                 </div>
+
+                @if ($inquiries instanceof \Illuminate\Pagination\LengthAwarePaginator && $inquiries->hasPages())
+                    <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                        {{ $inquiries->fragment('inquiries')->links() }}
+                    </div>
+                @endif
             </section>
 
             {{-- Client reviews / feedback received --}}
@@ -869,6 +1700,151 @@
                     @empty
                         <div class="rounded-[1.5rem] border border-dashed border-[#d9cab3] bg-[#fffaf2] p-10 text-center">
                             <p class="text-sm text-slate-600">No client reviews yet. When clients leave feedback on your public profile, it will appear here.</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                @if ($feedbacks instanceof \Illuminate\Pagination\LengthAwarePaginator && $feedbacks->hasPages())
+                    <div class="mt-6 border-t border-[#e7ddca] pt-4">
+                        {{ $feedbacks->fragment('feedback')->links() }}
+                    </div>
+                @endif
+            </section>
+
+            {{-- Marketing Campaigns Desk --}}
+            <section id="campaigns" data-section="campaigns" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#f0e8d8] pb-6">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded bg-[#d4af37] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-[#1d3c34]">Marketing Pipeline</span>
+                            <h2 class="text-2xl font-black text-[#1d3c34]">My Promotional Campaigns</h2>
+                        </div>
+                        <p class="mt-1 text-xs sm:text-sm text-slate-500">
+                            Launch marketing promotions, diaspora investor campaigns, and featured showcases for your properties.
+                        </p>
+                    </div>
+
+                    <button type="button" onclick="document.getElementById('new-campaign-modal').classList.toggle('hidden')" class="rounded-xl bg-[#1d3c34] hover:bg-[#254d43] px-4 py-2.5 text-xs font-bold text-white transition flex items-center gap-2 cursor-pointer">
+                        <span>+ Launch New Campaign</span>
+                    </button>
+                </div>
+
+                {{-- Campaign Creation Modal / Collapsible Form --}}
+                <div id="new-campaign-modal" class="hidden mt-6 rounded-2xl border border-[#d4af37]/40 bg-[#fdfaf5] p-6 shadow-sm">
+                    <h3 class="text-base font-black text-[#1d3c34] mb-1">Create Promotional Campaign</h3>
+                    <p class="text-xs text-slate-500 mb-4">Submitted campaigns are reviewed and approved by the Campaign Desk before going live.</p>
+
+                    <form method="POST" action="{{ route('campaigns.store') }}" class="grid gap-4 md:grid-cols-2">
+                        @csrf
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Campaign Title *</label>
+                            <input type="text" name="title" required placeholder="e.g. Exclusive Bole Luxury Penthouse Diaspora Special" class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34] focus:ring-1 focus:ring-[#1d3c34]">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Target Property</label>
+                            <select name="property_id" class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]">
+                                <option value="">-- Choose from your properties --</option>
+                                @foreach ($properties as $prop)
+                                    <option value="{{ $prop->id }}">{{ $prop->title }} (ETB {{ number_format($prop->price) }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Campaign Type *</label>
+                            <select name="campaign_type" required class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]">
+                                <option value="featured_listing">Featured Listing Showcase</option>
+                                <option value="diaspora_promo">Diaspora Investor Opportunity</option>
+                                <option value="seasonal_discount">Seasonal Price Promotion</option>
+                                <option value="open_house">Open House Weekend</option>
+                                <option value="project_launch">Off-Plan Project Launch</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Target Audience</label>
+                            <select name="target_audience" class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]">
+                                <option value="diaspora">Ethiopian Diaspora (US / Europe / Middle East)</option>
+                                <option value="luxury">High-Net-Worth Luxury Buyers</option>
+                                <option value="first_time_buyers">First-Time Homeowners</option>
+                                <option value="investors">Rental Yield Investors</option>
+                                <option value="tenants">Executive Expat Tenants</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Campaign Budget (ETB)</label>
+                            <input type="number" name="budget" placeholder="e.g. 50000" class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Promotional Headline *</label>
+                            <input type="text" name="headline" required placeholder="e.g. Turnkey Investment with 14% Annual Dollar-Indexed Rental Yield" class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Description &amp; Key Highlights *</label>
+                            <textarea name="description" rows="3" required placeholder="Describe prime features, neighborhood access, title deed security, and financial upside..." class="w-full rounded-xl border border-[#d9cab3] bg-white p-2.5 text-xs text-[#1d3c34]"></textarea>
+                        </div>
+
+                        <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
+                            <button type="button" onclick="document.getElementById('new-campaign-modal').classList.add('hidden')" class="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800">
+                                Cancel
+                            </button>
+                            <button type="submit" class="rounded-xl bg-[#1d3c34] hover:bg-[#254d43] px-5 py-2.5 text-xs font-bold text-white transition shadow-sm">
+                                Submit Campaign to Review Desk &rarr;
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Agent Campaigns Table / Cards --}}
+                <div class="mt-6 space-y-4">
+                    @forelse ($campaigns as $campaign)
+                        @php
+                            [$badgeLabel, $badgeClasses] = $campaign->status_badge;
+                        @endphp
+                        <div class="rounded-2xl border border-[#d9cab3] bg-white p-5 shadow-2xs hover:shadow-sm transition">
+                            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                <div class="space-y-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider border {{ $badgeClasses }}">
+                                            {{ $badgeLabel }}
+                                        </span>
+                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                            {{ ucfirst(str_replace('_', ' ', $campaign->campaign_type)) }}
+                                        </span>
+                                        <span class="text-xs text-slate-400">
+                                            {{ $campaign->created_at?->diffForHumans() }}
+                                        </span>
+                                    </div>
+                                    <h3 class="text-base font-black text-[#1d3c34]">{{ $campaign->title }}</h3>
+                                    <p class="text-xs font-bold text-[#8a5d13] italic">"{{ $campaign->headline }}"</p>
+                                    @if ($campaign->property)
+                                        <p class="text-xs text-slate-700">
+                                            Promoting: <span class="font-bold text-[#1d3c34]">{{ $campaign->property->title }}</span>
+                                        </p>
+                                    @endif
+                                    @if ($campaign->review_notes)
+                                        <div class="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-900 border border-amber-200">
+                                            <span class="font-bold">Campaign Officer Feedback:</span> {{ $campaign->review_notes }}
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="shrink-0 text-right space-y-1">
+                                    <span class="block text-xs font-bold text-slate-600">Performance</span>
+                                    <span class="block text-sm font-black text-[#1d3c34]">{{ $campaign->views_count }} Views &middot; {{ $campaign->leads->count() }} Leads</span>
+                                    <span class="block text-[11px] font-semibold text-slate-600">Budget: ETB {{ number_format($campaign->budget, 2) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-[#d9cab3] bg-[#fffaf2] p-8 text-center">
+                            <span class="text-3xl">📣</span>
+                            <p class="mt-2 text-xs font-bold text-[#1d3c34]">No campaigns launched yet</p>
+                            <p class="mt-1 text-xs text-slate-500">Promote your properties to diaspora investors and local buyers with targeted marketing campaigns.</p>
                         </div>
                     @endforelse
                 </div>
@@ -909,6 +1885,38 @@
                     </div>
 
                     <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Service Locations</label>
+                        @php $serviceLocations = old('service_locations', $agent->service_locations ?? []) ?: [null]; @endphp
+                        <div class="space-y-2" id="agent-service-locations">
+                            @foreach ($serviceLocations as $serviceLocation)
+                                <input type="text" name="service_locations[]" value="{{ $serviceLocation }}" placeholder="e.g. Bole, Addis Ababa" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            @endforeach
+                        </div>
+                        <button type="button" onclick="document.getElementById('agent-service-locations').insertAdjacentHTML('beforeend', '<input type=&quot;text&quot; name=&quot;service_locations[]&quot; placeholder=&quot;e.g. CMC, Addis Ababa&quot; class=&quot;w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]&quot;>')" class="mt-2 text-xs font-bold text-[#1d3c34] hover:underline">+ Add service location</button>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Languages Spoken</label>
+                        @php $languages = old('languages', $agent->languages ?? []) ?: [null]; @endphp
+                        <div class="space-y-2" id="agent-languages">
+                            @foreach ($languages as $language)
+                                <input type="text" name="languages[]" value="{{ $language }}" placeholder="e.g. Amharic, English" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            @endforeach
+                        </div>
+                        <button type="button" onclick="document.getElementById('agent-languages').insertAdjacentHTML('beforeend', '<input type=&quot;text&quot; name=&quot;languages[]&quot; placeholder=&quot;e.g. Afaan Oromoo&quot; class=&quot;w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]&quot;>')" class="mt-2 text-xs font-bold text-[#1d3c34] hover:underline">+ Add language</button>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-slate-700">Phone Privacy</label>
+                        <select name="phone_privacy" class="w-full rounded-xl border border-[#d9cab3] bg-[#fdfaf5] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <option value="show" {{ old('phone_privacy', $agent->phone_privacy ?? 'show') === 'show' ? 'selected' : '' }}>Show phone on listings</option>
+                            <option value="hide" {{ old('phone_privacy', $agent->phone_privacy ?? 'show') === 'hide' ? 'selected' : '' }}>Hide phone</option>
+                            <option value="messaging_only" {{ old('phone_privacy', $agent->phone_privacy ?? 'show') === 'messaging_only' ? 'selected' : '' }}>Platform messaging only</option>
+                        </select>
+                        <p class="mt-1 text-[11px] text-slate-500">Controls how buyers and tenants can reach you from your public profile.</p>
+                    </div>
+
+                    <div>
                         <div class="mb-1 flex items-center justify-between">
                             <label class="block text-sm font-semibold text-slate-700">New Password (optional)</label>
                             <button type="button" onclick="generateStrongPassword('#agent-profile-password')" class="text-xs font-semibold text-[#1d3c34] hover:underline">
@@ -939,6 +1947,356 @@
                         </button>
                     </div>
                 </form>
+            </section>
+            {{-- Leads & Pipeline (SRS Inquiry System statuses) --}}
+            <section id="leads-pipeline" data-section="leads-pipeline" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Agent CRM</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Leads &amp; Pipeline</h2>
+                        <p class="mt-1 text-sm text-slate-600">Every inquiry about your listings advances through the sales pipeline: New → Contacted → Qualified → Viewing → Negotiating → Offer → Closed.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $inquiries->total() }} leads</span>
+                </div>
+
+                <div class="mt-6 overflow-x-auto rounded-2xl border border-[#e7ddca]">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#f9f4ed] text-[10px] font-bold uppercase tracking-wider text-[#1d3c34]">
+                            <tr>
+                                <th class="p-3">Lead</th>
+                                <th class="p-3">Contact</th>
+                                <th class="p-3">Subject</th>
+                                <th class="p-3">Received</th>
+                                <th class="p-3">Pipeline Stage</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#f0e8d8]">
+                            @forelse ($inquiries as $inquiry)
+                                <tr class="transition hover:bg-[#fbf8f3]" @if (! $inquiry->read_at) style="background:#fffdf9" @endif>
+                                    <td class="p-3 font-bold text-[#1d3c34]">
+                                        {{ $inquiry->name }}
+                                        @if (! $inquiry->read_at)
+                                            <span class="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700">new</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-3 text-[#587165]">
+                                        {{ $inquiry->email }}
+                                        <span class="block text-[10px]">{{ $inquiry->phone }}</span>
+                                    </td>
+                                    <td class="p-3 text-[#587165]">{{ $inquiry->subject ?? '—' }}</td>
+                                    <td class="p-3 text-[#587165]">{{ $inquiry->created_at?->format('M d, Y') }}</td>
+                                    <td class="p-3">
+                                        <span class="rounded-full bg-[#edf2ee] px-2.5 py-0.5 text-[11px] font-bold text-[#1d3c34]">{{ ucfirst($inquiry->status ?? 'new') }}</span>
+                                    </td>
+                                    <td class="p-3">
+                                        <form action="{{ route('inquiries.update-status', $inquiry) }}" method="POST" class="flex items-center gap-1">
+                                            @csrf
+                                            @method('PUT')
+                                            <select name="status" class="rounded-lg border border-[#d9cab3] bg-white px-2 py-1 text-[10px]">
+                                                @foreach (['new', 'contacted', 'qualified', 'viewing', 'negotiating', 'offer', 'closed', 'lost'] as $pipelineStatus)
+                                                    <option value="{{ $pipelineStatus }}" {{ ($inquiry->status ?? 'new') === $pipelineStatus ? 'selected' : '' }}>{{ ucfirst($pipelineStatus) }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" class="rounded-full bg-[#1d3c34] px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-[#254d43] cursor-pointer">Move</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-sm font-semibold text-[#587165]">No leads yet — new inquiries about your listings appear here.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($inquiries->hasPages())
+                    <div class="mt-4">{{ $inquiries->links() }}</div>
+                @endif
+            </section>
+
+            {{-- Viewings --}}
+            <section id="viewings" data-section="viewings" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Agent CRM</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Viewings</h2>
+                        <p class="mt-1 text-sm text-slate-600">Appointment requests for your listings: Requested → Confirmed → Rescheduled → Completed / Cancelled / No-show.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $viewings->count() }} appointments</span>
+                </div>
+
+                <div class="mt-6 overflow-x-auto rounded-2xl border border-[#e7ddca]">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#f9f4ed] text-[10px] font-bold uppercase tracking-wider text-[#1d3c34]">
+                            <tr>
+                                <th class="p-3">Reference</th>
+                                <th class="p-3">Property</th>
+                                <th class="p-3">Buyer</th>
+                                <th class="p-3">When</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#f0e8d8]">
+                            @forelse ($viewings as $viewing)
+                                <tr class="transition hover:bg-[#fbf8f3]">
+                                    <td class="p-3 font-mono text-[11px] font-bold text-[#587165]">{{ $viewing->viewing_reference }}</td>
+                                    <td class="p-3 font-bold text-[#1d3c34]">{{ $viewing->property->title ?? 'Removed property' }}</td>
+                                    <td class="p-3 text-[#587165]">
+                                        {{ $viewing->buyer_name }}
+                                        <span class="block text-[10px]">{{ $viewing->buyer_phone }}</span>
+                                    </td>
+                                    <td class="p-3 text-[#587165]">{{ $viewing->viewing_date }} · {{ $viewing->viewing_time }}</td>
+                                    <td class="p-3">
+                                        <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-[10px] font-bold text-[#9b6c17]">{{ ucwords(str_replace('_', ' ', $viewing->status)) }}</span>
+                                    </td>
+                                    <td class="p-3">
+                                        <form action="{{ route('viewings.update-status', $viewing) }}" method="POST" class="flex items-center gap-1">
+                                            @csrf
+                                            @method('PUT')
+                                            <select name="status" class="rounded-lg border border-[#d9cab3] bg-white px-2 py-1 text-[10px]">
+                                                @foreach (['requested', 'confirmed', 'rescheduled', 'completed', 'cancelled', 'no_show'] as $viewingStatus)
+                                                    <option value="{{ $viewingStatus }}" {{ $viewing->status === $viewingStatus ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $viewingStatus)) }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" class="rounded-full bg-[#1d3c34] px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-[#254d43] cursor-pointer">Set</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-sm font-semibold text-[#587165]">No viewing appointments yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {{-- Offers & Negotiations --}}
+            <section id="offers-negotiations" data-section="offers-negotiations" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Agent CRM</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Offers &amp; Negotiations</h2>
+                        <p class="mt-1 text-sm text-slate-600">Buyer offers with counteroffers — every negotiation event stays on the record.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $offers->count() }} offers</span>
+                </div>
+
+                <div class="mt-6 space-y-3">
+                    @forelse ($offers as $offer)
+                        <div class="rounded-2xl border border-[#e7ddca] bg-[#fbf8f3] p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-black text-[#1d3c34]">{{ $offer->property->title ?? 'Removed property' }}</p>
+                                    <p class="mt-0.5 text-[11px] text-slate-500">
+                                        {{ $offer->offer_reference }} · {{ $offer->buyer_name }} · asking {{ number_format((float) ($offer->original_price ?? 0)) }} ETB
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-lg font-black text-[#1d3c34]">{{ number_format((float) ($offer->current_counter_amount ?? $offer->offered_price)) }} ETB</p>
+                                    <span class="rounded-full bg-[#f9ecd0] px-2 py-0.5 text-[10px] font-bold text-[#9b6c17]">{{ ucfirst($offer->status) }}</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 flex flex-wrap gap-1.5">
+                                <form action="{{ route('offers.accept', $offer) }}" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <button type="submit" class="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 cursor-pointer">Accept</button>
+                                </form>
+                                <form action="{{ route('offers.reject', $offer) }}" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <button type="submit" class="rounded-full bg-rose-600 px-3 py-1 text-[10px] font-bold text-white transition hover:bg-rose-700 cursor-pointer">Reject</button>
+                                </form>
+                                <form action="{{ route('offers.counter', $offer) }}" method="POST" class="flex items-center gap-1">
+                                    @csrf
+                                    <input type="number" name="counter_amount" min="0" step="0.01" placeholder="Counter amount" class="w-32 rounded-lg border border-[#d9cab3] bg-white px-2 py-1 text-[10px]">
+                                    <button type="submit" class="rounded-full bg-[#1d3c34] px-3 py-1 text-[10px] font-bold text-white transition hover:bg-[#254d43] cursor-pointer">Counter</button>
+                                </form>
+                            </div>
+
+                            @if ($offer->negotiations->isNotEmpty())
+                                <div class="mt-3 rounded-xl border border-[#e7ddca] bg-white p-3">
+                                    <p class="text-[10px] font-black uppercase tracking-wider text-[#587165]">Negotiation history</p>
+                                    <div class="mt-1.5 space-y-1">
+                                        @foreach ($offer->negotiations->take(6) as $negotiation)
+                                            <p class="text-[11px] text-[#587165]">
+                                                <span class="font-bold text-[#1d3c34]">{{ ucwords(str_replace('_', ' ', $negotiation->sender_type ?? 'agent')) }}</span>
+                                                @if (filled($negotiation->amount ?? null)) offered {{ number_format((float) $negotiation->amount) }} ETB @endif
+                                                @if (filled($negotiation->message ?? null)) — “{{ \Illuminate\Support\Str::limit($negotiation->message, 80) }}” @endif
+                                            </p>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-[#d9cab3] bg-[#fbf8f3] py-12 text-center">
+                            <span class="text-3xl">🤝</span>
+                            <p class="mt-2 text-sm font-semibold text-[#587165]">No offers to review yet.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </section>
+
+            {{-- Lease and Rental --}}
+            <section id="leases" data-section="leases" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Agent CRM</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Lease and Rental</h2>
+                        <p class="mt-1 text-sm text-slate-600">Leases you brokered, with rent schedule status for each tenant.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $leases->count() }} leases</span>
+                </div>
+
+                <div class="mt-6 overflow-x-auto rounded-2xl border border-[#e7ddca]">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#f9f4ed] text-[10px] font-bold uppercase tracking-wider text-[#1d3c34]">
+                            <tr>
+                                <th class="p-3">Lease</th>
+                                <th class="p-3">Property</th>
+                                <th class="p-3">Tenant</th>
+                                <th class="p-3">Period</th>
+                                <th class="p-3">Monthly Rent</th>
+                                <th class="p-3">Schedule</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#f0e8d8]">
+                            @forelse ($leases as $lease)
+                                <tr class="transition hover:bg-[#fbf8f3]">
+                                    <td class="p-3 font-mono text-[11px] font-bold text-[#587165]">{{ $lease->lease_code }}</td>
+                                    <td class="p-3 font-bold text-[#1d3c34]">{{ $lease->property->title ?? 'Removed property' }}</td>
+                                    <td class="p-3 text-[#587165]">
+                                        {{ $lease->tenant_name }}
+                                        <span class="block text-[10px]">{{ $lease->tenant_phone }}</span>
+                                    </td>
+                                    <td class="p-3 text-[#587165]">{{ $lease->start_date }} → {{ $lease->end_date }}</td>
+                                    <td class="p-3 font-bold text-[#1d3c34]">{{ number_format((float) $lease->monthly_rent) }} ETB</td>
+                                    <td class="p-3 text-[#587165]">
+                                        @php $unpaid = $lease->schedules->where('status', '!=', 'paid')->count(); @endphp
+                                        {{ $lease->schedules->count() - $unpaid }} paid · {{ $unpaid }} outstanding
+                                    </td>
+                                    <td class="p-3">
+                                        <span class="rounded-full {{ $lease->status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-[#f9ecd0] text-[#9b6c17]' }} px-2 py-0.5 text-[10px] font-bold">{{ ucfirst($lease->status) }}</span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-sm font-semibold text-[#587165]">No leases brokered yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {{-- Commissions --}}
+            <section id="commissions" data-section="commissions" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Commission Engine</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Commissions</h2>
+                        <p class="mt-1 text-sm text-slate-600">Rates are configured per company, property type, agent, transaction and date — here is everything credited to you.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $commissions->count() }} events</span>
+                </div>
+
+                <div class="mt-6 overflow-x-auto rounded-2xl border border-[#e7ddca]">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-[#f9f4ed] text-[10px] font-bold uppercase tracking-wider text-[#1d3c34]">
+                            <tr>
+                                <th class="p-3">Reference</th>
+                                <th class="p-3">Property</th>
+                                <th class="p-3">Role</th>
+                                <th class="p-3">Rate</th>
+                                <th class="p-3">Amount</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#f0e8d8]">
+                            @forelse ($commissions as $commission)
+                                <tr class="transition hover:bg-[#fbf8f3]">
+                                    <td class="p-3 font-mono text-[11px] font-bold text-[#587165]">COM-{{ $commission->id }}</td>
+                                    <td class="p-3 font-bold text-[#1d3c34]">{{ $commission->property->title ?? 'Removed property' }}</td>
+                                    <td class="p-3 text-[#587165]">
+                                        @if ($commission->listing_agent_id === $agent->id) Listing @endif
+                                        @if ($commission->selling_agent_id === $agent->id) Selling @endif
+                                        @if ($commission->referral_agent_id === $agent->id) Referral @endif
+                                        @if ($commission->agent_id === $agent->id && ! $commission->listing_agent_id && ! $commission->selling_agent_id && ! $commission->referral_agent_id) Direct @endif
+                                    </td>
+                                    <td class="p-3 text-[#587165]">{{ rtrim(rtrim(number_format((float) ($commission->commission_rate ?? 0), 2), '0'), '.') }}%</td>
+                                    <td class="p-3 font-bold text-[#1d3c34]">{{ number_format((float) ($commission->commission_amount ?? 0)) }} ETB</td>
+                                    <td class="p-3">
+                                        <span class="rounded-full {{ ($commission->status ?? '') === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-[#f9ecd0] text-[#9b6c17]' }} px-2 py-0.5 text-[10px] font-bold">{{ ucfirst($commission->status ?? 'pending') }}</span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-sm font-semibold text-[#587165]">No commission events yet — they appear when your deals close.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {{-- Clients --}}
+            <section id="clients" data-section="clients" class="section-panel mt-10 hidden scroll-mt-24 rounded-[1.75rem] border border-[#d9cab3] bg-white p-6 shadow-sm md:p-8">
+                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-5">
+                    <div>
+                        <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">Agent CRM</span>
+                        <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Clients</h2>
+                        <p class="mt-1 text-sm text-slate-600">Buyers and tenants who moved from leads into orders or leases on your listings.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">{{ $crmStats['clients'] }} clients</span>
+                </div>
+
+                @if ($orders->count() === 0 && $leases->count() === 0)
+                    <div class="mt-6 rounded-2xl border border-dashed border-[#d9cab3] bg-[#fbf8f3] py-12 text-center">
+                        <span class="text-3xl">👥</span>
+                        <p class="mt-2 text-sm font-semibold text-[#587165]">No clients yet — closed deals appear here.</p>
+                    </div>
+                @else
+                    <div class="mt-6 overflow-x-auto rounded-2xl border border-[#e7ddca]">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-[#f9f4ed] text-[10px] font-bold uppercase tracking-wider text-[#1d3c34]">
+                                <tr>
+                                    <th class="p-3">Client</th>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3">Property</th>
+                                    <th class="p-3">Value</th>
+                                    <th class="p-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[#f0e8d8]">
+                                @foreach ($orders as $order)
+                                    <tr class="transition hover:bg-[#fbf8f3]">
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ $order->name ?? 'Walk-in client' }}</td>
+                                        <td class="p-3 text-[#587165]">Purchase</td>
+                                        <td class="p-3 text-[#587165]">{{ $order->property->title ?? '—' }}</td>
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ number_format((float) ($order->offer_amount ?? 0)) }} ETB</td>
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ ucfirst($order->status ?? 'pending') }}</td>
+                                    </tr>
+                                @endforeach
+                                @foreach ($leases as $lease)
+                                    <tr class="transition hover:bg-[#fbf8f3]">
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ $lease->tenant_name }}</td>
+                                        <td class="p-3 text-[#587165]">Tenant</td>
+                                        <td class="p-3 text-[#587165]">{{ $lease->property->title ?? '—' }}</td>
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ number_format((float) $lease->monthly_rent) }} ETB/mo</td>
+                                        <td class="p-3 font-bold text-[#1d3c34]">{{ ucfirst($lease->status ?? 'active') }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </section>
         </main>
     </div>
@@ -983,6 +2341,12 @@
 
                 navLinks.forEach(link => {
                     const active = link.dataset.targetSection === sectionName;
+                    if (!link.closest('aside')) {
+                        link.classList.toggle('ring-2', active);
+                        link.classList.toggle('ring-[#1d3c34]', active);
+                        link.classList.toggle('bg-[#f1e4cf]', active);
+                        return;
+                    }
                     link.classList.toggle('bg-white/10', active);
                     link.classList.toggle('text-white', active);
                     link.classList.toggle('text-[#dfeee4]', !active);
@@ -1000,10 +2364,6 @@
                     event.preventDefault();
                     activateSection(target);
                     history.replaceState(null, '', '#' + target);
-                    const targetPanel = document.querySelector('[data-section="' + target + '"]');
-                    if (targetPanel) {
-                        targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
                 });
             });
 
@@ -1024,15 +2384,6 @@
                 activateSection(initialSection);
             }
 
-            if (params.has('edit_property')) {
-                const editPanel = document.getElementById('edit-listing-' + params.get('edit_property'));
-                if (editPanel) {
-                    setTimeout(function () {
-                        editPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 50);
-                }
-            }
-
             // "+ Add Property" button toggles the create-listing form.
             const addToggle = document.getElementById('agent-add-listing-toggle');
             const addPanel = document.getElementById('agent-listing-create-panel');
@@ -1045,10 +2396,39 @@
                 addToggle.addEventListener('click', function () {
                     const willShow = addPanel.classList.toggle('hidden') === false;
                     addToggle.textContent = willShow ? (addToggle.dataset.labelClose || 'Close Form') : (addToggle.dataset.labelCreate || '+ Add Property');
+                });
+            }
 
-                    if (willShow) {
-                        addPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Top-right notification icon: preview the latest client messages, then jump to the messages section.
+            const messagesIcon = document.getElementById('agent-messages-icon');
+            const messagesDropdown = document.getElementById('agent-messages-dropdown');
+            if (messagesIcon && messagesDropdown) {
+                const closeMessagesDropdown = function () {
+                    messagesDropdown.classList.add('hidden');
+                    messagesIcon.setAttribute('aria-expanded', 'false');
+                };
+
+                messagesIcon.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    const isOpen = messagesDropdown.classList.toggle('hidden') === false;
+                    messagesIcon.setAttribute('aria-expanded', String(isOpen));
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!messagesIcon.contains(event.target) && !messagesDropdown.contains(event.target)) {
+                        closeMessagesDropdown();
                     }
+                });
+
+                document.querySelectorAll('.agent-messages-nav-item').forEach(function (item) {
+                    item.addEventListener('click', function (event) {
+                        const navLink = document.querySelector('.nav-section-link[data-target-section="messages"]');
+                        if (navLink) {
+                            event.preventDefault();
+                            closeMessagesDropdown();
+                            navLink.click();
+                        }
+                    });
                 });
             }
 
@@ -1073,6 +2453,16 @@
                         card.classList.add('border-[#d9cab3]', 'bg-white');
                         if (badge) {
                             badge.remove();
+                        }
+
+                        const iconBadge = document.getElementById('agent-messages-icon-badge');
+                        if (iconBadge) {
+                            const remaining = Math.max(0, (parseInt(iconBadge.textContent, 10) || 0) - 1);
+                            if (remaining > 0) {
+                                iconBadge.textContent = remaining;
+                            } else {
+                                iconBadge.remove();
+                            }
                         }
 
                         fetch(card.dataset.readUrl, {
@@ -1367,8 +2757,72 @@
                     toast.classList.add('opacity-0', 'translate-y-2');
                 }, 2800);
             }
+
+            // Agent Portal Overview Charts
+            const agentChartData = @json($agentCharts ?? null);
+            if (agentChartData && typeof ApexCharts !== 'undefined') {
+                // 1. Agent Property Status Donut
+                const propStatusEl = document.querySelector("#agent-property-status-chart");
+                if (propStatusEl && agentChartData.property_status) {
+                    if (agentChartData.property_status.has_data) {
+                        new ApexCharts(propStatusEl, {
+                            chart: { type: 'donut', height: 260, fontFamily: 'inherit' },
+                            series: agentChartData.property_status.series || [],
+                            labels: agentChartData.property_status.labels || [],
+                            colors: ['#1d3c34', '#3b82f6', '#d4af37', '#94a3b8'],
+                            plotOptions: {
+                                pie: {
+                                    donut: {
+                                        size: '65%',
+                                        labels: {
+                                            show: true,
+                                            total: { show: true, label: 'Listings', formatter: () => agentChartData.property_status.total || 0 }
+                                        }
+                                    }
+                                }
+                            },
+                            legend: { position: 'bottom', fontSize: '11px' }
+                        }).render();
+                    } else {
+                        propStatusEl.innerHTML = '<div class="text-center p-6 text-slate-400 text-xs font-semibold">No property listings found. Post a listing to view analytics.</div>';
+                    }
+                }
+
+                // 2. Agent Commission Flow Donut
+                const commEl = document.querySelector("#agent-commission-chart");
+                if (commEl && agentChartData.commission_breakdown) {
+                    if (agentChartData.commission_breakdown.has_data) {
+                        new ApexCharts(commEl, {
+                            chart: { type: 'donut', height: 260, fontFamily: 'inherit' },
+                            series: agentChartData.commission_breakdown.series || [],
+                            labels: agentChartData.commission_breakdown.labels || [],
+                            colors: ['#1d3c34', '#d4af37'],
+                            plotOptions: {
+                                pie: {
+                                    donut: {
+                                        size: '65%',
+                                        labels: {
+                                            show: true,
+                                            total: {
+                                                show: true,
+                                                label: 'Total Comm.',
+                                                formatter: () => new Intl.NumberFormat('en-US', { notation: 'compact' }).format(agentChartData.commission_breakdown.total || 0) + ' ETB'
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            legend: { position: 'bottom', fontSize: '11px' }
+                        }).render();
+                    } else {
+                        commEl.innerHTML = '<div class="text-center p-6 text-slate-400 text-xs font-semibold">No commissions recorded yet. Close your first deal to see earnings!</div>';
+                    }
+                }
+            }
         });
     </script>
+    @include('properties.partials.upload-document-modal')
     @include('layouts.partials.confirm-modal')
+    @include('layouts.partials.sidebar-scroll-preserver')
 </body>
 </html>

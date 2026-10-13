@@ -171,8 +171,12 @@ class RoleManagementController extends Controller
             'permission_mode' => ['nullable', 'string', 'in:role_default,all,custom'],
             'granted_permission_ids' => ['nullable', 'array'],
             'granted_permission_ids.*' => ['integer', 'exists:permissions,id'],
+            'granted_permissions' => ['nullable', 'array'],
+            'granted_permissions.*' => ['integer', 'exists:permissions,id'],
             'denied_permission_ids' => ['nullable', 'array'],
             'denied_permission_ids.*' => ['integer', 'exists:permissions,id'],
+            'denied_permissions' => ['nullable', 'array'],
+            'denied_permissions.*' => ['integer', 'exists:permissions,id'],
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -201,8 +205,10 @@ class RoleManagementController extends Controller
             $grantedIds = Permission::query()->pluck('id')->all();
             $deniedIds = [];
         } else {
-            $grantedIds = array_unique(array_map('intval', $validated['granted_permission_ids'] ?? []));
-            $deniedIds = array_diff(array_unique(array_map('intval', $validated['denied_permission_ids'] ?? [])), $grantedIds);
+            $rawGranted = $validated['granted_permission_ids'] ?? $validated['granted_permissions'] ?? [];
+            $rawDenied = $validated['denied_permission_ids'] ?? $validated['denied_permissions'] ?? [];
+            $grantedIds = array_unique(array_map('intval', $rawGranted));
+            $deniedIds = array_diff(array_unique(array_map('intval', $rawDenied)), $grantedIds);
         }
 
         $now = now();

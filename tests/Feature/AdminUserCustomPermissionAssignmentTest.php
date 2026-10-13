@@ -168,3 +168,117 @@ test('non-admin cannot update user permissions', function () {
 
     $response->assertForbidden();
 });
+
+test('sidebar does not show granted access desks when user has role default permissions', function () {
+    $buyer = User::factory()->create(['role' => 'buyer']);
+
+    $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
+
+    $response->assertOk();
+    $response->assertDontSee(route('seller.dashboard'));
+    $response->assertDontSee(route('developer.portal'));
+    $response->assertDontSee(route('finance.index'));
+});
+
+test('sidebar dynamically renders granted capability desk when admin grants permissions to user', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $buyer = User::factory()->create(['role' => 'buyer']);
+
+    // Admin grants properties.create and projects.create to buyer
+    $permIds = Permission::whereIn('key', ['properties.create', 'projects.create'])->pluck('id')->all();
+
+    $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
+        'permission_mode' => 'custom',
+        'granted_permissions' => $permIds,
+    ])->assertRedirect();
+
+    $buyer->refresh();
+
+    // Buyer visits dashboard; sidebar now includes Granted Access section with links
+    $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
+
+    $response->assertOk();
+    $response->assertSee('Granted Access');
+    $response->assertSee('Properties &amp; Listings', false);
+    $response->assertSee(route('seller.dashboard'));
+    $response->assertSee('Developer &amp; Projects', false);
+    $response->assertSee(route('developer.portal'));
+
+    // And buyer can successfully access the granted desks
+    $this->actingAs($buyer)->get(route('seller.dashboard'))->assertOk();
+    $this->actingAs($buyer)->get(route('developer.portal'))->assertOk();
+});
+
+test('sidebar dynamically shows all desks when admin grants everything and hides them when reset', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $buyer = User::factory()->create(['role' => 'buyer']);
+
+    // Admin grants everything
+    $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
+        'permission_mode' => 'all',
+    ])->assertRedirect();
+
+    $buyer->refresh();
+
+    $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
+    $response->assertOk();
+    $response->assertSee('Granted Access');
+    $response->assertSee(route('seller.dashboard'));
+    $response->assertSee(route('developer.portal'));
+    $response->assertSee(route('host.dashboard'));
+    $response->assertSee(route('finance.index'));
+
+    // Admin resets to role default
+    $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
+        'permission_mode' => 'role_default',
+    ])->assertRedirect();
+
+    $buyer->refresh();
+
+    $responseReset = $this->actingAs($buyer)->get(route('buyer.dashboard'));
+    $responseReset->assertOk();
+    $responseReset->assertDontSee(route('seller.dashboard'));
+    $responseReset->assertDontSee(route('developer.portal'));
+    $responseReset->assertDontSee(route('finance.index'));
+});
+
+test('developer portal renders granted access links when developer has additional permissions', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $developer = User::factory()->create(['role' => 'developer']);
+
+    // Admin grants CRM permission to developer
+    $permId = Permission::where('key', 'crm.view')->value('id');
+
+    $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $developer), [
+        'permission_mode' => 'custom',
+        'granted_permissions' => [$permId],
+    ])->assertRedirect();
+
+    $developer->refresh();
+
+    $response = $this->actingAs($developer)->get(route('developer.portal'));
+    $response->assertOk();
+    $response->assertSee('Granted Access');
+    $response->assertSee(route('agent.portal'));
+});
+
+test('agent portal renders granted access links when agent has developer permissions', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $agentUser = User::factory()->create(['role' => 'agent']);
+    $agentUser->ensureAgentProfile();
+
+    // Admin grants projects.create permission to agent
+    $permId = Permission::where('key', 'projects.create')->value('id');
+
+    $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $agentUser), [
+        'permission_mode' => 'custom',
+        'granted_permissions' => [$permId],
+    ])->assertRedirect();
+
+    $agentUser->refresh();
+
+    $response = $this->actingAs($agentUser)->get(route('agent.portal'));
+    $response->assertOk();
+    $response->assertSee('Granted Access');
+    $response->assertSee(route('developer.portal'));
+});
