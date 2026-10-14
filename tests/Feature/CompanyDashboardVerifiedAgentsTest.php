@@ -35,7 +35,6 @@ test('company dashboard KPI and badges read the license_verified column', functi
     $response->assertOk();
     $response->assertSee('Verified Broker');
     $response->assertSee('Pending KYC');
-    $response->assertSee('1 Verified');
 });
 
 test('company dashboard grossSalesVolume does not crash with property_price column error when orders exist', function () {

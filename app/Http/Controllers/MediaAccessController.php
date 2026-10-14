@@ -71,13 +71,28 @@ class MediaAccessController extends Controller
     {
         $user = $request->user();
 
+        // 1. If signed URL parameters are present, validate signature integrity and expiration
+        if ($request->has('signature')) {
+            if (! $request->hasValidSignature()) {
+                abort(403, 'Invalid or expired document access signature.');
+            }
+        }
+
+        // 2. Access level authorization check
         if (! $document->isAccessibleBy($user)) {
-            abort(403, 'You do not have authorization to view this document.');
+            // Even with signed URL, admin_only documents or suspended users are strictly denied
+            if ($user?->status === 'suspended' || $document->access_level === 'admin_only') {
+                abort(403, 'You do not have authorization to view this document.');
+            }
+
+            // Non-public documents require either explicit permission or a valid signed URL
+            if (! $request->has('signature') || ! $request->hasValidSignature()) {
+                abort(403, 'You do not have authorization to view this document.');
+            }
         }
 
         if (! Storage::disk('public')->exists($document->file_path)) {
-            // Return dummy PDF / document response for testing/demo
-            return response("Dummy Protected Document Content: {$document->title} (#{$document->id})", 200, [
+            return response("Protected Document Content: {$document->title} (#{$document->id})", 200, [
                 'Content-Type' => $document->mime_type ?? 'text/plain',
                 'Content-Disposition' => "inline; filename=\"{$document->file_name}\"",
             ]);

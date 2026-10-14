@@ -20,7 +20,7 @@ test('admin can register users with newly assignable roles: cleaner and investor
         'role' => $role,
     ]);
 
-    $response->assertRedirect(route('dashboard').'#users');
+    $response->assertRedirect(route('dashboard', ['section' => 'users']));
     $response->assertSessionHas('success');
 
     $created = User::where('email', "test_{$role}@example.com")->first();

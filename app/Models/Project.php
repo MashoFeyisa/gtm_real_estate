@@ -20,6 +20,7 @@ class Project extends Model
         'name',
         'slug',
         'developer_name',
+        'developer_user_id',
         'developer_phone',
         'developer_email',
         'developer_verified',
@@ -129,6 +130,11 @@ class Project extends Model
     public function agent(): BelongsTo
     {
         return $this->belongsTo(Agent::class);
+    }
+
+    public function developer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'developer_user_id');
     }
 
     public function scopePublished(Builder $query): Builder

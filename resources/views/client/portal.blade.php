@@ -2237,7 +2237,7 @@
             const navLinks = document.querySelectorAll('.nav-section-link');
             const sections = document.querySelectorAll('[data-section]');
 
-            function activateSection(target) {
+            function activateSection(target, updateHash = true) {
                 sections.forEach(sec => {
                     if (sec.dataset.section === target) {
                         sec.classList.remove('hidden');

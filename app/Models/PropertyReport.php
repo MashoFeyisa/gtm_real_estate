@@ -21,6 +21,12 @@ class PropertyReport extends Model
         'status',
         'resolved_by',
         'resolution_notes',
+        'is_fraud_flagged',
+        'action_taken',
+    ];
+
+    protected $casts = [
+        'is_fraud_flagged' => 'boolean',
     ];
 
     protected static function booted(): void

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 class ProfessionalServiceRequest extends Model
 {
@@ -31,5 +32,15 @@ class ProfessionalServiceRequest extends Model
     public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
+    }
+
+    public function getQuoteAmountAttribute(): ?float
+    {
+        return $this->fee !== null ? (float) $this->fee : null;
+    }
+
+    public function getScheduledAtAttribute(): ?Carbon
+    {
+        return $this->appointment_date;
     }
 }

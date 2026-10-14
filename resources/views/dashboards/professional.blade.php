@@ -25,6 +25,10 @@
             <span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase text-white">{{ $appointments->count() + $reports->count() }}</span>
         </a>
     @endif
+    <a href="#profile-rates" data-target-section="profile-rates" class="nav-section-link flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+        <span>👤</span>
+        <span>Profile &amp; Rates</span>
+    </a>
 @endsection
 
 @section('content')
@@ -97,14 +101,34 @@
                                     {{ ucfirst(str_replace('_', ' ', $req->status)) }}
                                 </span>
                             </td>
-                            <td class="py-3 px-4 text-right">
+                            <td class="py-3 px-4 text-right space-x-1">
                                 @if ($req->status === 'requested')
                                     <form method="POST" action="{{ route('professional.requests.status', $req) }}" class="inline">
                                         @csrf
                                         <input type="hidden" name="status" value="accepted">
                                         <button type="submit" class="rounded-full bg-[#1d3c34] px-3 py-1 text-xs font-bold text-white hover:bg-[#254d43]">Accept</button>
                                     </form>
+                                    <button type="button" onclick="document.getElementById('quote-modal-{{ $req->id }}').classList.toggle('hidden')" class="rounded-full bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">
+                                        Quote Fee
+                                    </button>
+                                    <form method="POST" action="{{ route('professional.requests.status', $req) }}" class="inline">
+                                        @csrf
+                                        <input type="hidden" name="status" value="declined">
+                                        <button type="submit" class="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-rose-100 hover:text-rose-700">Decline</button>
+                                    </form>
+                                @elseif ($req->status === 'quote_submitted')
+                                    <button type="button" onclick="document.getElementById('apt-modal-{{ $req->id }}').classList.toggle('hidden')" class="rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700">
+                                        Schedule
+                                    </button>
+                                    <form method="POST" action="{{ route('professional.requests.status', $req) }}" class="inline">
+                                        @csrf
+                                        <input type="hidden" name="status" value="in_progress">
+                                        <button type="submit" class="rounded-full bg-blue-700 px-3 py-1 text-xs font-bold text-white hover:bg-blue-800">Start Work</button>
+                                    </form>
                                 @elseif ($req->status === 'accepted')
+                                    <button type="button" onclick="document.getElementById('apt-modal-{{ $req->id }}').classList.toggle('hidden')" class="rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700">
+                                        Schedule
+                                    </button>
                                     <form method="POST" action="{{ route('professional.requests.status', $req) }}" class="inline">
                                         @csrf
                                         <input type="hidden" name="status" value="in_progress">
@@ -117,6 +141,56 @@
                                 @else
                                     <span class="text-xs font-bold text-emerald-700">✓ Completed</span>
                                 @endif
+                            </td>
+                        </tr>
+
+                        {{-- Fee Quote Modal --}}
+                        <tr id="quote-modal-{{ $req->id }}" class="hidden bg-[#fdfbf7]">
+                            <td colspan="6" class="p-6">
+                                <div class="rounded-2xl border border-amber-300 bg-white p-5 shadow-xs">
+                                    <h4 class="font-black text-sm text-[#1d3c34] mb-3">Submit Fee Quotation Proposal (#{{ $req->request_code }})</h4>
+                                    <form method="POST" action="{{ route('professional.requests.quote', $req) }}" class="space-y-3">
+                                        @csrf
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs font-bold text-slate-700">Fee Amount (ETB) *</label>
+                                                <input type="number" step="0.01" min="1" name="fee" value="{{ old('fee', $req->fee ?: 5000) }}" required class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-bold text-slate-700">Estimated Duration (Days)</label>
+                                                <input type="number" min="1" max="365" name="estimated_days" value="3" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-700">Quotation Notes / Terms</label>
+                                            <textarea name="quote_notes" rows="2" placeholder="Fee covers initial on-site physical inspection, valuation certification, and registry search..." class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs"></textarea>
+                                        </div>
+                                        <div class="flex justify-end gap-2 pt-2">
+                                            <button type="button" onclick="document.getElementById('quote-modal-{{ $req->id }}').classList.add('hidden')" class="rounded-full px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                                            <button type="submit" class="rounded-full bg-amber-600 px-5 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Submit Formal Quote</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {{-- Appointment Scheduling Modal --}}
+                        <tr id="apt-modal-{{ $req->id }}" class="hidden bg-[#fdfbf7]">
+                            <td colspan="6" class="p-6">
+                                <div class="rounded-2xl border border-indigo-200 bg-white p-5 shadow-xs">
+                                    <h4 class="font-black text-sm text-[#1d3c34] mb-3">Schedule Site Inspection Appointment (#{{ $req->request_code }})</h4>
+                                    <form method="POST" action="{{ route('professional.requests.appointment', $req) }}" class="space-y-3">
+                                        @csrf
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-700">Appointment Date &amp; Time *</label>
+                                            <input type="datetime-local" name="appointment_date" required class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs">
+                                        </div>
+                                        <div class="flex justify-end gap-2 pt-2">
+                                            <button type="button" onclick="document.getElementById('apt-modal-{{ $req->id }}').classList.add('hidden')" class="rounded-full px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                                            <button type="submit" class="rounded-full bg-indigo-600 px-5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700">Confirm Appointment</button>
+                                        </div>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
 
@@ -194,6 +268,52 @@
                 @endforelse
             </div>
         </div>
+    </div>
+
+    {{-- 3. Professional Profile & Rates Configuration --}}
+    <div id="profile-rates" data-section="profile-rates" class="section-panel hidden scroll-mt-6 rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between border-b border-[#e7ddca] pb-4">
+            <div>
+                <h3 class="text-xl font-black text-[#1d3c34]">Professional Profile &amp; Service Rates</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Configure your professional credentials, hourly and fixed rates, and client-facing bio.</p>
+            </div>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-bold">Verified Practitioner</span>
+        </div>
+
+        <form method="POST" action="{{ route('professional.profile.update') }}" class="mt-6 space-y-6">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700">Profession / Specialty *</label>
+                    <input type="text" name="profession" value="{{ old('profession', auth()->user()->profession) }}" placeholder="e.g. Certified Property Valuer, Real Estate Lawyer, Structural Engineer" class="mt-1 w-full rounded-2xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700">Hourly Rate (ETB)</label>
+                    <input type="number" step="0.01" min="0" name="hourly_rate" value="{{ old('hourly_rate', auth()->user()->hourly_rate) }}" placeholder="e.g. 1500.00" class="mt-1 w-full rounded-2xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700">License / Bar / Registration #</label>
+                    <input type="text" name="license_number" value="{{ old('license_number', auth()->user()->license_number) }}" placeholder="e.g. MOUDC-ETH-2026-VAL" class="mt-1 w-full rounded-2xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-medium font-mono">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700">Professional Bio &amp; Credentials</label>
+                    <textarea name="bio" rows="4" placeholder="Over 10 years experience in real estate cadastral surveys, legal title transfer, and residential valuation across Addis Ababa..." class="mt-1 w-full rounded-2xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-medium">{{ old('bio', auth()->user()->bio) }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700">Portfolio &amp; Past Experience Summary</label>
+                    <textarea name="portfolio_summary" rows="4" placeholder="Completed boundary certifications for 200+ properties, high-rise structural reviews, and commercial lease dispute arbitration..." class="mt-1 w-full rounded-2xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-medium">{{ old('portfolio_summary', auth()->user()->portfolio_summary) }}</textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-4 border-t border-[#e7ddca]">
+                <button type="submit" class="rounded-full bg-[#1d3c34] px-6 py-2.5 text-xs font-bold text-white hover:bg-[#254d43] shadow-xs">
+                    Save Professional Profile &amp; Rates
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

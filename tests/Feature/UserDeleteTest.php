@@ -11,7 +11,9 @@ test('admin can delete a user via standard form request', function () {
     $response->assertRedirect(route('dashboard').'#users');
     $response->assertSessionHas('success', 'User deleted successfully.');
 
-    $this->assertDatabaseMissing('users', ['id' => $user->id]);
+    // Users are soft-deleted so financial records and audit logs keep a valid reference.
+    $this->assertSoftDeleted('users', ['id' => $user->id]);
+    expect(User::find($user->id))->toBeNull();
 });
 
 test('admin can delete a user via ajax json request', function () {
@@ -27,7 +29,9 @@ test('admin can delete a user via ajax json request', function () {
         'section' => 'users',
     ]);
 
-    $this->assertDatabaseMissing('users', ['id' => $user->id]);
+    // Users are soft-deleted so financial records and audit logs keep a valid reference.
+    $this->assertSoftDeleted('users', ['id' => $user->id]);
+    expect(User::find($user->id))->toBeNull();
 });
 
 test('admin cannot delete their own account', function () {

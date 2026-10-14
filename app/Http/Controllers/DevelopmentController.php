@@ -13,6 +13,7 @@ use App\Models\UnitReservation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -529,23 +530,36 @@ class DevelopmentController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if ($unit->status === 'sold' || $unit->status === 'blocked') {
-            return back()->withErrors(['unit_error' => 'This unit is no longer available for reservation.']);
+        try {
+            $reservation = DB::transaction(function () use ($project, $unit, $request) {
+                $lockedUnit = ProjectUnit::where('id', $unit->id)->lockForUpdate()->firstOrFail();
+
+                if ($lockedUnit->status !== 'available') {
+                    throw new \RuntimeException('This unit is no longer available for reservation.');
+                }
+
+                $res = UnitReservation::create([
+                    'project_id' => $project->id,
+                    'unit_id' => $lockedUnit->id,
+                    'user_id' => auth()->id(),
+                    'buyer_name' => $request->buyer_name,
+                    'buyer_email' => $request->buyer_email,
+                    'buyer_phone' => $request->buyer_phone,
+                    'status' => 'pending',
+                    'notes' => $request->notes,
+                ]);
+
+                // Transition unit status to reserved
+                $lockedUnit->update(['status' => 'reserved']);
+
+                return $res;
+            });
+        } catch (\RuntimeException $e) {
+            return back()->withErrors([
+                'unit_id' => $e->getMessage(),
+                'unit_error' => $e->getMessage(),
+            ]);
         }
-
-        $reservation = UnitReservation::create([
-            'project_id' => $project->id,
-            'unit_id' => $unit->id,
-            'user_id' => auth()->id(),
-            'buyer_name' => $request->buyer_name,
-            'buyer_email' => $request->buyer_email,
-            'buyer_phone' => $request->buyer_phone,
-            'status' => 'pending',
-            'notes' => $request->notes,
-        ]);
-
-        // Transition unit status to reserved
-        $unit->update(['status' => 'reserved']);
 
         return back()->with('developer_reservation_success', [
             'reference' => $reservation->reservation_reference,

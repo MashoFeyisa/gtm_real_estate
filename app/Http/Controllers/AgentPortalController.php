@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PropertyFormRequest;
 use App\Mail\OrderStatusUpdate;
 use App\Models\Agent;
+use App\Models\AgentClient;
+use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\Commission;
 use App\Models\Inquiry;
@@ -30,6 +32,10 @@ class AgentPortalController extends Controller
      */
     public function index(Request $request)
     {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot open individual agent dashboards.');
+        }
+
         $agent = $request->user()->ensureAgentProfile();
         $notifications = $request->user()->notifications()->latest()->take(20)->get();
         Booking::completeExpiredReservations();
@@ -77,10 +83,13 @@ class AgentPortalController extends Controller
             fn (Property $property) => [$property->id => $this->propertyQualityScore($property)]
         );
 
-        return view('agent.portal', [
+        $clients = $agent->clients()->latest()->paginate(12, ['*'], 'clients_page')->withQueryString();
+
+        return view('dashboards.agent', [
             'agent' => $agent,
             'crmStats' => $crmStats,
             'listingQuality' => $listingQuality,
+            'clients' => $clients,
             'orders' => $orders,
             'bookings' => $bookings,
             'pendingOrders' => $pendingOrders,
@@ -539,6 +548,7 @@ class AgentPortalController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:agents,email,'.$agent->id, 'unique:users,email,'.$agent->user_id],
             'phone' => ['nullable', 'string', 'max:255'],
+            'license_number' => ['nullable', 'string', 'max:100'],
             'bio' => ['nullable', 'string', 'max:1000'],
             'service_locations' => ['nullable', 'array', 'max:20'],
             'service_locations.*' => ['nullable', 'string', 'max:100'],
@@ -579,6 +589,14 @@ class AgentPortalController extends Controller
             }
             $agent->account->update($accountData);
         }
+
+        AuditLog::log(
+            action: 'agent.profile_updated',
+            entity: $agent,
+            newValue: collect($data)->except('password')->all(),
+            user: $request->user(),
+            request: $request
+        );
 
         return redirect()->route('agent.portal')->with('success', 'Your profile was updated successfully.');
     }
@@ -691,5 +709,214 @@ class AgentPortalController extends Controller
 
         return redirect()->route('agent.portal', ['#messages'])
             ->with('success', 'The message was deleted successfully.');
+    }
+
+    /**
+     * Store a direct client profile in the agent CRM.
+     */
+    public function storeClient(Request $request): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot manage agent clients.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'lead_source' => ['nullable', 'in:walk_in,portal,referral,social,direct'],
+            'stage' => ['nullable', 'in:new_lead,contacted,qualified,viewing,negotiation,offer,closed'],
+            'budget' => ['nullable', 'numeric', 'min:0'],
+            'preferred_type' => ['nullable', 'string', 'max:100'],
+            'preferred_location' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $client = $agent->clients()->create($validated);
+
+        AuditLog::log(
+            action: 'agent.client_created',
+            entity: $client,
+            newValue: $validated,
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', 'Client profile registered in CRM pipeline.');
+    }
+
+    /**
+     * Update an agent direct client profile.
+     */
+    public function updateClient(Request $request, AgentClient $client): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot update agent clients.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        if ((int) $client->agent_id !== (int) $agent->id) {
+            abort(403, 'Access denied: You cannot update another agent\'s client.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'lead_source' => ['nullable', 'in:walk_in,portal,referral,social,direct'],
+            'stage' => ['nullable', 'in:new_lead,contacted,qualified,viewing,negotiation,offer,closed'],
+            'budget' => ['nullable', 'numeric', 'min:0'],
+            'preferred_type' => ['nullable', 'string', 'max:100'],
+            'preferred_location' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $client->update($validated);
+
+        AuditLog::log(
+            action: 'agent.client_updated',
+            entity: $client,
+            newValue: $validated,
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', 'Client record updated.');
+    }
+
+    /**
+     * Delete an agent direct client.
+     */
+    public function destroyClient(Request $request, AgentClient $client): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot delete agent clients.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        if ((int) $client->agent_id !== (int) $agent->id) {
+            abort(403, 'Access denied: You cannot delete another agent\'s client.');
+        }
+
+        $client->delete();
+
+        AuditLog::log(
+            action: 'agent.client_deleted',
+            entity: $client,
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', 'Client removed from CRM.');
+    }
+
+    /**
+     * Transition an agent client through CRM lead pipeline stages.
+     */
+    public function updateClientStage(Request $request, AgentClient $client): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot advance agent pipeline.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        if ((int) $client->agent_id !== (int) $agent->id) {
+            abort(403, 'Access denied: You cannot advance another agent\'s client pipeline.');
+        }
+
+        $validated = $request->validate([
+            'stage' => ['required', 'in:new_lead,contacted,qualified,viewing,negotiation,offer,closed'],
+        ]);
+
+        $client->update(['stage' => $validated['stage']]);
+
+        AuditLog::log(
+            action: 'agent.client_stage_updated',
+            entity: $client,
+            newValue: ['stage' => $validated['stage']],
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', "Lead stage advanced to '".ucfirst(str_replace('_', ' ', $validated['stage']))."'.");
+    }
+
+    /**
+     * Update inquiry stage and lead source.
+     */
+    public function updateInquiryStage(Request $request, Inquiry $inquiry): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot update inquiry stage.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        if ((int) $inquiry->agent_id !== (int) $agent->id) {
+            abort(403, 'Access denied: You cannot update another agent\'s inquiry.');
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:new,contacted,qualified,viewing,negotiation,offer,closed,responded,archived'],
+            'lead_source' => ['nullable', 'in:walk_in,portal,referral,social,direct'],
+        ]);
+
+        $inquiry->update($validated);
+
+        AuditLog::log(
+            action: 'agent.inquiry_stage_updated',
+            entity: $inquiry,
+            newValue: $validated,
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', "Inquiry status updated to '{$validated['status']}'.");
+    }
+
+    /**
+     * Reply directly to a client inquiry thread.
+     */
+    public function replyInquiry(Request $request, Inquiry $inquiry): RedirectResponse
+    {
+        if ($request->user()?->isAdmin()) {
+            abort(403, 'Admin boundary: Administrators cannot reply to agent inquiries.');
+        }
+
+        $agent = $request->user()->ensureAgentProfile();
+
+        if ((int) $inquiry->agent_id !== (int) $agent->id) {
+            abort(403, 'Access denied: You cannot reply to another agent\'s inquiry.');
+        }
+
+        $validated = $request->validate([
+            'reply_message' => ['required', 'string', 'max:3000'],
+            'status' => ['nullable', 'string', 'in:new,contacted,qualified,viewing,negotiation,offer,closed,responded'],
+        ]);
+
+        $status = $validated['status'] ?? 'responded';
+        $timestamp = now()->toDayDateTimeString();
+        $updatedMessage = trim((string) $inquiry->message)."\n\n[Agent {$agent->name} on {$timestamp}]:\n".$validated['reply_message'];
+
+        $inquiry->update([
+            'message' => $updatedMessage,
+            'status' => $status,
+            'read_at' => now(),
+        ]);
+
+        AuditLog::log(
+            action: 'agent.inquiry_replied',
+            entity: $inquiry,
+            newValue: ['status' => $status],
+            user: $request->user(),
+            request: $request
+        );
+
+        return back()->with('success', 'Reply submitted and inquiry marked as responded.');
     }
 }

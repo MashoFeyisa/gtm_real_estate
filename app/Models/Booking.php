@@ -30,6 +30,10 @@ class Booking extends Model
             'service_fee' => 'float',
             'security_deposit' => 'float',
             'total_amount' => 'float',
+            'refund_amount' => 'float',
+            'checked_in_at' => 'datetime',
+            'checked_out_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -138,6 +142,24 @@ class Booking extends Model
             ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
             ->whereDate('check_out_date', '<=', now()->toDateString())
             ->update(['status' => 'completed']);
+    }
+
+    /**
+     * Expire pending stay bookings whose hold window has elapsed without payment.
+     */
+    public static function expireUnpaidHolds(int $holdHours = 24): int
+    {
+        return static::query()
+            ->where('status', 'pending')
+            ->where(function (Builder $q) {
+                $q->whereNull('payment_status')
+                    ->orWhereNotIn('payment_status', ['paid', 'awaiting_confirmation']);
+            })
+            ->where('created_at', '<=', Carbon::now()->subHours($holdHours))
+            ->update([
+                'status' => 'cancelled',
+                'cancelled_at' => Carbon::now(),
+            ]);
     }
 
     public function scopeActive(Builder $query): Builder

@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\AuditLog;
 use App\Models\Commission;
+use App\Models\CompanyWhiteLabel;
 use App\Models\FinancialLedger;
 use App\Models\FrontDeskShift;
+use App\Models\Invoice;
 use App\Models\Lease;
 use App\Models\Payment;
+use App\Models\PayoutRequest;
 use App\Models\RentSchedule;
 use App\Notifications\CommissionGeneratedNotification;
 use App\Services\AnalyticsService;
@@ -15,6 +19,7 @@ use App\Services\WorkflowIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -35,6 +40,13 @@ class FinancialReportingController extends Controller
             'tax.manage',
             'tax.view',
             'payments.manage',
+            'refunds.manage',
+            'refunds.view',
+            'invoices.manage',
+            'invoices.view',
+            'subscriptions.manage',
+            'subscriptions.view',
+            'payouts.view',
         ]);
 
         if (! $user || (! $user->isAdmin() && ! $user->isFinanceOfficer() && ! $hasFinancePerm && ! $user->agentProfile)) {
@@ -45,9 +57,7 @@ class FinancialReportingController extends Controller
         $isFinanceOfficer = $user->isFinanceOfficer();
         $canViewPlatformBooks = $isAdmin || $isFinanceOfficer || $hasFinancePerm;
 
-        // Agents join this desk only for their own deals: scope every ledger,
-        // payment and shift query below to their portfolio. The platform-wide
-        // books stay reserved for Admin and Finance Officers.
+        // Agents join this desk only for their own deals
         $scopedAgent = (! $canViewPlatformBooks) ? $user->agentProfile : null;
 
         $dateFilter = $request->input('period', 'this_month');
@@ -106,14 +116,14 @@ class FinancialReportingController extends Controller
             });
         }
 
-        $commissions = (clone $commissionsQuery)->latest()->get();
-        $pendingCommissionsCount = $commissions->where('status', 'pending')->count();
-        $totalPendingCommissions = (float) $commissions->where('status', 'pending')->sum('commission_amount');
-        $totalPaidCommissions = (float) $commissions->where('status', 'paid')->sum('commission_amount');
-        $totalWithholdingTax = (float) $commissions->where('status', 'paid')->sum('withholding_tax_amount');
-        $totalNetPaidOut = (float) $commissions->where('status', 'paid')->sum('net_payout_amount');
-        $companyRetainedCommissions = (float) $commissions->sum('company_retained_amount');
-        $coBrokeredDealsCount = $commissions->where('split_type', 'co_brokered')->count();
+        $commissions = (clone $commissionsQuery)->latest()->paginate(10, ['*'], 'commissions_page')->withQueryString();
+        $totalPendingCommissions = (float) (clone $commissionsQuery)->where('status', 'pending')->sum('commission_amount');
+        $totalPaidCommissions = (float) (clone $commissionsQuery)->where('status', 'paid')->sum('commission_amount');
+        $totalNetPaidOut = (float) (clone $commissionsQuery)->where('status', 'paid')->sum('net_payout_amount');
+        $totalWithholdingTax = (float) (clone $commissionsQuery)->where('status', 'paid')->sum('withholding_tax_amount');
+        $companyRetainedCommissions = (float) (clone $commissionsQuery)->sum('company_retained_amount');
+        $pendingCommissionsCount = (clone $commissionsQuery)->where('status', 'pending')->count();
+        $coBrokeredDealsCount = (clone $commissionsQuery)->where('split_type', 'co_brokered')->count();
 
         $stats = [
             'gross_inflow' => $grossInflow,
@@ -135,16 +145,14 @@ class FinancialReportingController extends Controller
             'co_brokered_deals_count' => $coBrokeredDealsCount,
         ];
 
-        // Lease & rental collection desk (SRS §84–§88). Finance Officers manage existing
-        // agreements here but are not permitted to register new lease agreements.
+        // Leases
         $leaseQuery = Lease::query()->with(['property', 'agent', 'schedules.payment']);
         if (! $isAdmin && ! $isFinanceOfficer && $user->agentProfile) {
             $leaseQuery->where('agent_id', $user->agentProfile->id);
         }
         $leases = $leaseQuery->latest()->get();
 
-        // Transactions awaiting finance confirmation (short stays, earnest deposits,
-        // unit reservations and bank rent payments).
+        // Pending payments
         $pendingPayments = Payment::query()
             ->with(['property', 'user', 'payable'])
             ->where('status', 'pending')
@@ -154,6 +162,15 @@ class FinancialReportingController extends Controller
             }))
             ->latest()
             ->get();
+
+        // Refundable payments
+        $completedPayments = Payment::query()
+            ->with(['property', 'user'])
+            ->whereIn('status', ['completed', 'partially_refunded'])
+            ->latest()
+            ->take(30)
+            ->get();
+
         $rentSchedules = RentSchedule::query()
             ->whereIn('lease_id', $leases->pluck('id'))
             ->with('lease.property')
@@ -169,10 +186,15 @@ class FinancialReportingController extends Controller
             ->latest()
             ->get();
 
+        // Batch 4: Invoices, Payouts, Subscriptions
+        $invoices = Invoice::query()->with(['user', 'property'])->latest()->paginate(10, ['*'], 'invoices_page')->withQueryString();
+        $payouts = PayoutRequest::query()->with(['user', 'processor'])->latest()->paginate(10, ['*'], 'payouts_page')->withQueryString();
+        $subscriptions = CompanyWhiteLabel::query()->with('user')->latest()->get();
+
         $actionableTasks = app(WorkflowIntegrationService::class)->getActorActionableTasks($user);
         $financeCharts = $scopedAgent ? null : app(AnalyticsService::class)->getFinanceChartData();
 
-        return view('dashboard.finance', compact(
+        return view('dashboards.finance', compact(
             'ledgers',
             'commissions',
             'stats',
@@ -182,10 +204,310 @@ class FinancialReportingController extends Controller
             'leases',
             'rentSchedules',
             'pendingPayments',
+            'completedPayments',
             'frontDeskShifts',
+            'invoices',
+            'payouts',
+            'subscriptions',
             'actionableTasks',
             'financeCharts'
         ));
+    }
+
+    /**
+     * Process refund as a financial adjustment entry in the ledger (SRS §132).
+     * Financial records are never overwritten, only adjusted.
+     */
+    public function issueRefund(Request $request, Payment $payment): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('refunds.manage'))) {
+            abort(403, 'Permission denied: refunds.manage required to issue refunds.');
+        }
+
+        $validated = $request->validate([
+            'refund_amount' => ['required', 'numeric', 'min:1', 'max:'.$payment->amount],
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $refundAmount = (float) $validated['refund_amount'];
+        $reason = $validated['reason'];
+
+        DB::transaction(function () use ($payment, $refundAmount, $reason, $user) {
+            $isFullRefund = $refundAmount >= (float) $payment->amount;
+
+            $payment->update([
+                'status' => $isFullRefund ? 'refunded' : 'partially_refunded',
+                'refunded_amount' => (float) $payment->refunded_amount + $refundAmount,
+                'refund_reason' => $reason,
+            ]);
+
+            // Add immutable financial adjustment entry to ledger
+            $ledgerCode = 'LED-ADJ-REF-'.strtoupper(substr(uniqid(), -8));
+            FinancialLedger::create([
+                'ledger_code' => $ledgerCode,
+                'payment_id' => $payment->id,
+                'entry_type' => 'debit',
+                'category' => 'refund_adjustment',
+                'amount' => $refundAmount,
+                'currency' => $payment->currency ?? 'ETB',
+                'description' => "Refund adjustment for Payment #{$payment->transaction_number}: {$reason}",
+                'reference' => $payment->transaction_number,
+                'user_id' => $user->id,
+            ]);
+
+            AuditLog::log(
+                user: $user,
+                action: 'payment.refund_issued',
+                entity: $payment,
+                oldValue: ['status' => $payment->getOriginal('status'), 'refunded_amount' => $payment->getOriginal('refunded_amount')],
+                newValue: ['status' => $payment->status, 'refunded_amount' => $payment->refunded_amount, 'adjustment_code' => $ledgerCode],
+                reason: "Refund adjustment: {$reason}",
+            );
+        });
+
+        return back()->with('success', "Refund adjustment of {$refundAmount} ETB recorded for Payment #{$payment->transaction_number}.");
+    }
+
+    /**
+     * Create tax-compliant invoice with 15% VAT and 2% Withholding Tax.
+     */
+    public function storeInvoice(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('invoices.manage') && ! $user->hasPermission('invoices.create'))) {
+            abort(403, 'Permission denied: invoices.manage permission required.');
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'user_id' => ['nullable', 'exists:users,id'],
+            'property_id' => ['nullable', 'exists:properties,id'],
+            'subtotal' => ['required', 'numeric', 'min:1'],
+            'due_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $subtotal = (float) $validated['subtotal'];
+        $vatRate = 15.00;
+        $vatAmount = round($subtotal * 0.15, 2);
+        $whtRate = 2.00;
+        $whtAmount = round($subtotal * 0.02, 2);
+        $totalAmount = round($subtotal + $vatAmount - $whtAmount, 2);
+
+        $invoice = Invoice::create([
+            'invoice_number' => 'INV-ETH-'.date('Y').'-'.strtoupper(substr(uniqid(), -6)),
+            'title' => $validated['title'],
+            'user_id' => $validated['user_id'] ?? null,
+            'property_id' => $validated['property_id'] ?? null,
+            'subtotal' => $subtotal,
+            'vat_rate' => $vatRate,
+            'vat_amount' => $vatAmount,
+            'withholding_tax_rate' => $whtRate,
+            'withholding_tax_amount' => $whtAmount,
+            'total_amount' => $totalAmount,
+            'status' => 'unpaid',
+            'due_date' => $validated['due_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'items' => [
+                ['description' => $validated['title'], 'amount' => $subtotal],
+            ],
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'invoice.created',
+            entity: $invoice,
+            oldValue: null,
+            newValue: ['invoice_number' => $invoice->invoice_number, 'total_amount' => $invoice->total_amount],
+            reason: 'Finance Officer created tax invoice',
+            request: $request
+        );
+
+        return back()->with('success', "Invoice {$invoice->invoice_number} created successfully.");
+    }
+
+    /**
+     * Update invoice payment status.
+     */
+    public function updateInvoiceStatus(Request $request, Invoice $invoice): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('invoices.manage') && ! $user->hasPermission('invoices.update'))) {
+            abort(403, 'Permission denied: invoices.manage permission required.');
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:paid,cancelled,overdue,unpaid'],
+        ]);
+
+        $oldStatus = $invoice->status;
+        $invoice->update([
+            'status' => $validated['status'],
+            'paid_at' => $validated['status'] === 'paid' ? now() : null,
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'invoice.status_updated',
+            entity: $invoice,
+            oldValue: ['status' => $oldStatus],
+            newValue: ['status' => $invoice->status],
+            reason: "Invoice status updated to {$invoice->status}",
+            request: $request
+        );
+
+        return back()->with('success', "Invoice {$invoice->invoice_number} marked as {$invoice->status}.");
+    }
+
+    /**
+     * Submit Payout request with 2% withholding tax.
+     */
+    public function storePayoutRequest(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(401);
+        }
+
+        $validated = $request->validate([
+            'gross_amount' => ['required', 'numeric', 'min:100'],
+            'role' => ['nullable', 'string', 'in:host,seller,agent,professional'],
+            'payment_method' => ['required', 'string', 'in:bank_transfer,telebirr,cbe_birr'],
+            'bank_name' => ['nullable', 'string', 'max:100'],
+            'account_number' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $gross = (float) $validated['gross_amount'];
+        $wht = round($gross * 0.02, 2); // 2% Ethiopian withholding tax
+        $net = round($gross - $wht, 2);
+
+        $payout = PayoutRequest::create([
+            'payout_code' => 'PAY-REQ-'.strtoupper(substr(uniqid(), -8)),
+            'user_id' => $user->id,
+            'role' => $validated['role'] ?? ($user->role ?: 'host'),
+            'gross_amount' => $gross,
+            'withholding_tax' => $wht,
+            'net_amount' => $net,
+            'payment_method' => $validated['payment_method'],
+            'bank_name' => $validated['bank_name'] ?? null,
+            'account_number' => $validated['account_number'] ?? null,
+            'status' => 'pending',
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'payout.requested',
+            entity: $payout,
+            oldValue: null,
+            newValue: ['gross_amount' => $gross, 'net_amount' => $net],
+            reason: 'User submitted payout request',
+            request: $request
+        );
+
+        return back()->with('success', "Payout request {$payout->payout_code} for {$net} ETB submitted (after 2% WHT: {$wht} ETB).");
+    }
+
+    /**
+     * Approve, reject, or disburse payout request.
+     */
+    public function processPayout(Request $request, PayoutRequest $payout): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('payouts.update') && ! $user->hasPermission('payments.manage'))) {
+            abort(403, 'Permission denied: payouts.update permission required.');
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', 'string', 'in:approve,reject,disburse'],
+            'transaction_reference' => ['nullable', 'string', 'max:100'],
+            'rejection_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $oldStatus = $payout->status;
+
+        if ($validated['decision'] === 'disburse') {
+            DB::transaction(function () use ($payout, $validated, $user) {
+                $payout->update([
+                    'status' => 'disbursed',
+                    'transaction_reference' => $validated['transaction_reference'] ?? 'DISB-'.date('YmdHis'),
+                    'processed_by' => $user->id,
+                    'processed_at' => now(),
+                ]);
+
+                // Create ledger debit entry for payout disbursement
+                FinancialLedger::create([
+                    'ledger_code' => 'LED-OUT-'.strtoupper(substr(uniqid(), -8)),
+                    'entry_type' => 'debit',
+                    'category' => 'payout',
+                    'amount' => $payout->net_amount,
+                    'currency' => 'ETB',
+                    'description' => "Payout disbursement #{$payout->payout_code} to user #{$payout->user_id}",
+                    'reference' => $payout->transaction_reference,
+                    'user_id' => $user->id,
+                ]);
+            });
+        } elseif ($validated['decision'] === 'approve') {
+            $payout->update([
+                'status' => 'approved',
+                'processed_by' => $user->id,
+            ]);
+        } else {
+            // reject
+            $payout->update([
+                'status' => 'rejected',
+                'rejection_reason' => $validated['rejection_reason'] ?? 'Rejected by finance audit.',
+                'processed_by' => $user->id,
+                'processed_at' => now(),
+            ]);
+        }
+
+        AuditLog::log(
+            user: $user,
+            action: 'payout.processed',
+            entity: $payout,
+            oldValue: ['status' => $oldStatus],
+            newValue: ['status' => $payout->status, 'ref' => $payout->transaction_reference],
+            reason: "Finance decision: {$validated['decision']}",
+            request: $request
+        );
+
+        return back()->with('success', "Payout #{$payout->payout_code} set to ".strtoupper($payout->status).'.');
+    }
+
+    /**
+     * Update corporate subscription.
+     */
+    public function updateSubscription(Request $request, CompanyWhiteLabel $subscription): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('subscriptions.manage'))) {
+            abort(403, 'Permission denied: subscriptions.manage permission required.');
+        }
+
+        $validated = $request->validate([
+            'subscription_tier' => ['required', 'string', 'in:standard,premium,enterprise'],
+            'months' => ['required', 'integer', 'min:1', 'max:36'],
+        ]);
+
+        $oldTier = $subscription->subscription_tier;
+        $subscription->update([
+            'subscription_tier' => $validated['subscription_tier'],
+            'subscription_expires_at' => now()->addMonths((int) $validated['months']),
+            'is_active' => true,
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'subscription.extended',
+            entity: $subscription,
+            oldValue: ['tier' => $oldTier],
+            newValue: ['tier' => $subscription->subscription_tier, 'expires_at' => $subscription->subscription_expires_at],
+            reason: "Finance Officer updated subscription to {$subscription->subscription_tier} for {$validated['months']} months",
+            request: $request
+        );
+
+        return back()->with('success', "Subscription for {$subscription->company_name} updated to {$subscription->subscription_tier}.");
     }
 
     /**
@@ -297,7 +619,6 @@ class FinancialReportingController extends Controller
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
-            // UTF-8 BOM for Excel compatibility with Amharic characters
             fwrite($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [

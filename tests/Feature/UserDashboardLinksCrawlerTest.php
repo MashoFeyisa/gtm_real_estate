@@ -24,7 +24,7 @@ test('public pages load with HTTP 200 and valid navigational structure', functio
     }
 });
 
-test('all 17 dashboards load with 200 and internal navigational links do not 404 or 500', function () {
+test('all 21 persona dashboards load with 200 and internal navigational links do not 404 or 500', function () {
     $userDashboards = [
         'buyer@realestate.com' => '/dashboard/buyer',
         'tenant@realestate.com' => '/dashboard/tenant',
@@ -32,17 +32,21 @@ test('all 17 dashboards load with 200 and internal navigational links do not 404
         'investor@realestate.com' => '/dashboard/investor',
         'owner@realestate.com' => '/dashboard/seller',
         'host@realestate.com' => '/dashboard/host',
-        'agent@realestate.com' => '/agent-portal',
+        'agent@realestate.com' => '/dashboard/agent',
         'company@realestate.com' => '/company',
-        'developer@realestate.com' => '/developer-portal',
+        'developer@realestate.com' => '/dashboard/developer',
         'propertymanager@realestate.com' => '/dashboard/property-manager',
         'service@realestate.com' => '/dashboard/professional',
         'cleaner@realestate.com' => '/dashboard/cleaner',
         'admin@realestate.com' => '/dashboard',
         'verification@realestate.com' => '/dashboard/verification-officer',
         'moderator@realestate.com' => '/dashboard/moderator',
-        'finance@realestate.com' => '/finance',
+        'finance@realestate.com' => '/dashboard/finance',
         'support@realestate.com' => '/dashboard/customer-support',
+        'guest@realestate.com' => '/dashboard/guest',
+        'landlord@realestate.com' => '/persona-portal',
+        'campaign@realestate.com' => '/dashboard/campaign',
+        'verifycompany@realestate.com' => '/verification-company',
     ];
 
     foreach ($userDashboards as $email => $dashboardUri) {
@@ -109,4 +113,15 @@ test('role security boundaries strictly enforce 403 on unauthorized dashboard ac
             "Buyer unexpectedly accessed {$route} with status {$response->status()}"
         );
     }
+});
+
+test('legacy dashboard URLs redirect to unified dashboards or serve unified workspaces', function () {
+    $user = User::factory()->create();
+    $agent = User::where('role', 'agent')->first() ?? User::factory()->create(['role' => 'agent']);
+    $developer = User::where('role', 'developer')->first() ?? User::factory()->create(['role' => 'developer']);
+
+    $this->actingAs($agent)->get('/agent-portal')->assertOk();
+    $this->actingAs($developer)->get('/developer-portal')->assertOk();
+    $this->actingAs($user)->get('/traveler/dashboard')->assertRedirect('/dashboard/guest');
+    $this->actingAs($user)->get('/dashboard/landlord')->assertRedirect('/dashboard/seller');
 });

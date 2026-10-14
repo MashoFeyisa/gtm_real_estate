@@ -32,21 +32,32 @@ class Lease extends Model
         'duration_months',
         'monthly_rent',
         'security_deposit',
+        'deposit_status',
+        'deposit_deductions',
+        'deposit_refunded',
+        'deposit_deduction_reason',
+        'deposit_returned_at',
         'payment_frequency',
         'grace_period_days',
         'late_fee_percentage',
         'status',
+        'signed_at',
+        'tenant_signature',
         'terms_and_conditions',
         'agreement_document_path',
         'notes',
     ];
 
     protected $casts = [
+        'signed_at' => 'datetime',
+        'deposit_returned_at' => 'datetime',
         'start_date' => 'date',
         'end_date' => 'date',
         'duration_months' => 'integer',
         'monthly_rent' => 'decimal:2',
         'security_deposit' => 'decimal:2',
+        'deposit_deductions' => 'decimal:2',
+        'deposit_refunded' => 'decimal:2',
         'late_fee_percentage' => 'decimal:2',
     ];
 

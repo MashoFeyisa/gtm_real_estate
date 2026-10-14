@@ -347,20 +347,28 @@ Route::middleware('auth')->group(function () {
 
     // Seyid Real Estate Company Actor Dashboard & Operations
     Route::get('/company', [CompanyDashboardController::class, 'index'])->name('company.dashboard');
+    Route::get('/dashboard/company', [CompanyDashboardController::class, 'index'])->name('company.dashboard.unified');
     Route::post('/company/branches', [CompanyDashboardController::class, 'storeBranch'])->name('company.branches.store');
     Route::put('/company/branches/{branch}', [CompanyDashboardController::class, 'updateBranch'])->name('company.branches.update');
     Route::delete('/company/branches/{branch}', [CompanyDashboardController::class, 'deleteBranch'])->name('company.branches.destroy');
+    Route::post('/company/agents', [CompanyDashboardController::class, 'storeAgent'])->name('company.agents.store');
+    Route::put('/company/agents/{agent}', [CompanyDashboardController::class, 'updateAgent'])->name('company.agents.update');
+    Route::post('/company/agents/{agent}/toggle-active', [CompanyDashboardController::class, 'toggleAgentActive'])->name('company.agents.toggleActive');
+    Route::delete('/company/agents/{agent}', [CompanyDashboardController::class, 'deleteAgent'])->name('company.agents.destroy');
     Route::post('/company/clients', [CompanyDashboardController::class, 'storeClient'])->name('company.clients.store');
     Route::put('/company/clients/{client}', [CompanyDashboardController::class, 'updateClient'])->name('company.clients.update');
     Route::delete('/company/clients/{client}', [CompanyDashboardController::class, 'deleteClient'])->name('company.clients.destroy');
+    Route::post('/company/clients/{client}/reassign', [CompanyDashboardController::class, 'reassignClient'])->name('company.clients.reassign');
 
-    // Company listing management (SRS: create, edit, publish, suspend, status, delete)
+    // Company listing management (SRS: create, edit, publish, suspend, status, delete, merge)
     Route::get('/company/listings/{property}/edit-form', [CompanyListingController::class, 'editForm'])->name('company.listings.edit-form');
     Route::post('/company/listings', [CompanyListingController::class, 'store'])->name('company.listings.store');
     Route::put('/company/listings/{property}', [CompanyListingController::class, 'update'])->name('company.listings.update');
     Route::delete('/company/listings/{property}', [CompanyListingController::class, 'destroy'])->name('company.listings.destroy');
     Route::post('/company/listings/{property}/publish', [CompanyListingController::class, 'togglePublish'])->name('company.listings.publish');
     Route::post('/company/listings/{property}/status/{status}', [CompanyListingController::class, 'setStatus'])->name('company.listings.status');
+    Route::post('/company/listings/merge', [CompanyDashboardController::class, 'mergeListings'])->name('company.listings.merge');
+    Route::post('/company/subscription', [CompanyDashboardController::class, 'updateSubscription'])->name('company.subscription.update');
 
     Route::post('/dashboard/branches', [WorkerManagementController::class, 'storeBranch'])->name('dashboard.branches.store');
     Route::put('/dashboard/branches/{branch}', [WorkerManagementController::class, 'updateBranch'])->name('dashboard.branches.update');
@@ -381,6 +389,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/dashboard/settings', [SiteSettingsController::class, 'updateSettings'])->name('dashboard.settings.update');
     Route::post('/dashboard/profile', [WorkerManagementController::class, 'updateProfile'])->name('dashboard.profile.update');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/security', [ProfileController::class, 'updateSecurity'])->name('profile.security');
+    Route::post('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences');
+    Route::post('/profile/deactivate', [ProfileController::class, 'deactivate'])->name('profile.deactivate');
+    Route::get('/profile/history', [ProfileController::class, 'loginHistory'])->name('profile.history');
     Route::put('/dashboard/testimonials/{testimonial}', [WorkerManagementController::class, 'updateTestimonial'])->name('dashboard.testimonials.update');
     Route::delete('/dashboard/testimonials/{testimonial}', [WorkerManagementController::class, 'deleteTestimonial'])->name('dashboard.testimonials.destroy');
     Route::post('/dashboard/testimonials/{id}/restore', [WorkerManagementController::class, 'restoreTestimonial'])->name('dashboard.testimonials.restore');
@@ -416,12 +428,21 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'agent'])->group(function () {
     Route::get('/agent-portal', [AgentPortalController::class, 'index'])->name('agent.portal');
+    Route::get('/dashboard/agent', [AgentPortalController::class, 'index'])->name('agent.dashboard');
     Route::patch('/agent-portal/orders/{order}/status', [AgentPortalController::class, 'updateOrderStatus'])->name('agent.orders.status');
     Route::post('/agent-portal/orders/{order}/generate-agreement', [AgentPortalController::class, 'generateAgreement'])->name('agent.orders.generateAgreement');
     Route::delete('/agent-portal/orders/{order}', [AgentPortalController::class, 'deleteOrder'])->name('agent.orders.destroy');
     Route::put('/agent-portal/profile', [AgentPortalController::class, 'updateProfile'])->name('agent.profile.update');
     Route::post('/agent-portal/inquiries/{inquiry}/read', [AgentPortalController::class, 'markInquiryRead'])->name('agent.inquiries.read');
     Route::delete('/agent-portal/inquiries/{inquiry}', [AgentPortalController::class, 'deleteInquiry'])->name('agent.inquiries.destroy');
+    Route::post('/agent/inquiries/{inquiry}/reply', [AgentPortalController::class, 'replyInquiry'])->name('agent.inquiries.reply');
+    Route::post('/agent/inquiries/{inquiry}/stage', [AgentPortalController::class, 'updateInquiryStage'])->name('agent.inquiries.stage');
+
+    // Agent CRM direct clients
+    Route::post('/agent/clients', [AgentPortalController::class, 'storeClient'])->name('agent.clients.store');
+    Route::put('/agent/clients/{client}', [AgentPortalController::class, 'updateClient'])->name('agent.clients.update');
+    Route::delete('/agent/clients/{client}', [AgentPortalController::class, 'destroyClient'])->name('agent.clients.destroy');
+    Route::post('/agent/clients/{client}/stage', [AgentPortalController::class, 'updateClientStage'])->name('agent.clients.stage');
 
     // Agent-owned listing management
     Route::post('/agent-portal/properties', [AgentPortalController::class, 'storeProperty'])->name('agent.properties.store');
@@ -468,6 +489,7 @@ Route::post('/properties/{property}/offers', [ViewingOfferController::class, 'su
 Route::middleware('auth')->group(function () {
     Route::put('/bookings/{booking}/status', [StayBookingController::class, 'updateStatus'])->name('bookings.update-status');
     Route::post('/bookings/{booking}/pay', [StayBookingController::class, 'pay'])->name('bookings.pay');
+    Route::post('/stays/{booking}/pay', [StayBookingController::class, 'pay'])->name('stays.pay');
     Route::delete('/bookings/{booking}', [StayBookingController::class, 'destroy'])->name('bookings.destroy');
     Route::post('/developments', [DevelopmentController::class, 'store'])->name('developments.store');
     Route::put('/developments/{project}', [DevelopmentController::class, 'update'])->name('developments.update');
@@ -519,8 +541,15 @@ Route::middleware('auth')->group(function () {
         return back()->with('success', 'All notifications marked as read.');
     })->name('notifications.mark-all-read');
 
-    // Financial Reporting, Commission Settlement & Tax Desk (SRS §126–§135)
+    // Financial Reporting, Commission Settlement, Refunds & Invoicing Desk (SRS §126–§135)
     Route::get('/finance', [FinancialReportingController::class, 'index'])->name('finance.index');
+    Route::get('/dashboard/finance', [FinancialReportingController::class, 'index'])->name('finance.dashboard');
+    Route::post('/finance/payments/{payment}/refund', [FinancialReportingController::class, 'issueRefund'])->name('finance.payments.refund');
+    Route::post('/finance/invoices', [FinancialReportingController::class, 'storeInvoice'])->name('finance.invoices.store');
+    Route::patch('/finance/invoices/{invoice}/status', [FinancialReportingController::class, 'updateInvoiceStatus'])->name('finance.invoices.status');
+    Route::post('/finance/payouts', [FinancialReportingController::class, 'storePayoutRequest'])->name('finance.payouts.store');
+    Route::patch('/finance/payouts/{payout}', [FinancialReportingController::class, 'processPayout'])->name('finance.payouts.process');
+    Route::patch('/finance/subscriptions/{subscription}', [FinancialReportingController::class, 'updateSubscription'])->name('finance.subscriptions.update');
     Route::post('/commissions/{commission}/settle', [FinancialReportingController::class, 'settleCommission'])->name('commissions.settle');
     Route::get('/commissions/{commission}/voucher', [FinancialReportingController::class, 'voucher'])->name('commissions.voucher');
     Route::get('/finance/export-csv', [FinancialReportingController::class, 'exportCsv'])->name('finance.export-csv');
@@ -532,6 +561,16 @@ Route::middleware('auth')->group(function () {
 
     // Developer Projects, Buildings, Units & Construction Desk
     Route::get('/developer-portal', [DeveloperPortalController::class, 'index'])->name('developer.portal');
+    Route::get('/dashboard/developer', [DeveloperPortalController::class, 'index'])->name('developer.dashboard');
+    Route::post('/developer/projects/{project}/buildings', [DeveloperPortalController::class, 'storeBuilding'])->name('developer.buildings.store');
+    Route::delete('/developer/buildings/{building}', [DeveloperPortalController::class, 'destroyBuilding'])->name('developer.buildings.destroy');
+    Route::post('/developer/buildings/{building}/generate-units', [DeveloperPortalController::class, 'generateBulkUnits'])->name('developer.buildings.generate-units');
+    Route::post('/developer/projects/{project}/milestones', [DeveloperPortalController::class, 'storeMilestone'])->name('developer.milestones.store');
+    Route::put('/developer/projects/{project}/milestones/{milestone}', [DeveloperPortalController::class, 'updateMilestone'])->name('developer.milestones.update');
+    Route::delete('/developer/projects/{project}/milestones/{milestone}', [DeveloperPortalController::class, 'destroyMilestone'])->name('developer.milestones.destroy');
+    Route::post('/developer/projects/{project}/payment-plans', [DeveloperPortalController::class, 'storePaymentPlan'])->name('developer.payment-plans.store');
+    Route::delete('/developer/payment-plans/{plan}', [DeveloperPortalController::class, 'destroyPaymentPlan'])->name('developer.payment-plans.destroy');
+    Route::put('/developer/reservations/{reservation}/status', [DeveloperPortalController::class, 'updateReservationStatus'])->name('developer.reservations.status');
 
     // Hotel & Guesthouse Front Desk Receptionist & Host Desk
     Route::get('/receptionist', [ReceptionistDashboardController::class, 'index'])->name('receptionist.dashboard');
@@ -569,39 +608,115 @@ Route::middleware('auth')->group(function () {
     // ── Dedicated Per-User Dashboards & Workflows (All 17 Roles) ───────────
     Route::get('/dashboard/buyer', [BuyerDashboardController::class, 'index'])->name('buyer.dashboard');
     Route::post('/buyer/saved-searches', [BuyerDashboardController::class, 'storeSavedSearch'])->name('buyer.saved-searches.store');
+    Route::put('/buyer/saved-searches/{savedSearch}', [BuyerDashboardController::class, 'updateSavedSearch'])->name('buyer.saved-searches.update');
     Route::delete('/buyer/saved-searches/{savedSearch}', [BuyerDashboardController::class, 'destroySavedSearch'])->name('buyer.saved-searches.destroy');
+    Route::put('/buyer/viewings/{viewing}/reschedule', [BuyerDashboardController::class, 'rescheduleViewing'])->name('buyer.viewings.reschedule');
+    Route::put('/buyer/viewings/{viewing}/cancel', [BuyerDashboardController::class, 'cancelViewing'])->name('buyer.viewings.cancel');
+    Route::put('/buyer/offers/{offer}/withdraw', [BuyerDashboardController::class, 'withdrawOffer'])->name('buyer.offers.withdraw');
+    Route::put('/buyer/reservations/{reservation}/cancel', [BuyerDashboardController::class, 'cancelReservation'])->name('buyer.reservations.cancel');
+    Route::post('/buyer/documents', [BuyerDashboardController::class, 'uploadDocument'])->name('buyer.documents.upload');
+    Route::delete('/buyer/documents/{document}', [BuyerDashboardController::class, 'destroyDocument'])->name('buyer.documents.destroy');
+    Route::post('/buyer/inquiries/{inquiry}/reply', [BuyerDashboardController::class, 'replyInquiry'])->name('buyer.inquiries.reply');
 
     Route::get('/dashboard/tenant', [TenantDashboardController::class, 'index'])->name('tenant.dashboard');
+    Route::post('/tenant/applications', [TenantDashboardController::class, 'storeApplication'])->name('tenant.applications.store');
+    Route::put('/tenant/applications/{application}', [TenantDashboardController::class, 'updateApplication'])->name('tenant.applications.update');
+    Route::put('/tenant/applications/{application}/withdraw', [TenantDashboardController::class, 'withdrawApplication'])->name('tenant.applications.withdraw');
+    Route::post('/tenant/leases/{lease}/sign', [TenantDashboardController::class, 'signLease'])->name('tenant.leases.sign');
+    Route::post('/tenant/maintenance', [TenantDashboardController::class, 'submitMaintenance'])->name('tenant.maintenance.store');
+    Route::put('/tenant/maintenance/{ticket}', [TenantDashboardController::class, 'updateMaintenance'])->name('tenant.maintenance.update');
+    Route::put('/tenant/maintenance/{ticket}/close', [TenantDashboardController::class, 'closeMaintenance'])->name('tenant.maintenance.close');
+    Route::post('/tenant/messages/{inquiry}', [TenantDashboardController::class, 'replyMessage'])->name('tenant.messages.reply');
+    Route::post('/tenant/documents', [TenantDashboardController::class, 'uploadDocument'])->name('tenant.documents.upload');
+    Route::delete('/tenant/documents/{document}', [TenantDashboardController::class, 'destroyDocument'])->name('tenant.documents.destroy');
+    Route::get('/tenant/rent-schedules/{schedule}/receipt', [TenantDashboardController::class, 'receipt'])->name('tenant.rent.receipt');
+
     Route::get('/dashboard/guest', [GuestDashboardController::class, 'index'])->name('guest.dashboard');
+    Route::redirect('/dashboard/traveler', '/dashboard/guest');
+    Route::redirect('/traveler/dashboard', '/dashboard/guest');
+    Route::post('/dashboard/guest/bookings/{booking}/modify', [GuestDashboardController::class, 'modifyBooking'])->name('guest.bookings.modify');
+    Route::post('/dashboard/guest/bookings/{booking}/cancel', [GuestDashboardController::class, 'cancelBooking'])->name('guest.bookings.cancel');
+    Route::post('/dashboard/guest/bookings/{booking}/check-in', [GuestDashboardController::class, 'checkIn'])->name('guest.bookings.check-in');
+    Route::post('/dashboard/guest/bookings/{booking}/check-out', [GuestDashboardController::class, 'checkOut'])->name('guest.bookings.check-out');
+    Route::get('/dashboard/guest/bookings/{booking}/receipt', [GuestDashboardController::class, 'receipt'])->name('guest.bookings.receipt');
+    Route::post('/dashboard/guest/reviews', [GuestDashboardController::class, 'storeReview'])->name('guest.reviews.store');
+    Route::put('/dashboard/guest/reviews/{review}', [GuestDashboardController::class, 'updateReview'])->name('guest.reviews.update');
+    Route::delete('/dashboard/guest/reviews/{review}', [GuestDashboardController::class, 'destroyReview'])->name('guest.reviews.destroy');
+    Route::delete('/dashboard/guest/saved-stays/{favorite}', [GuestDashboardController::class, 'unsaveStay'])->name('guest.saved-stays.destroy');
 
     Route::get('/dashboard/investor', [InvestorDashboardController::class, 'index'])->name('investor.dashboard');
     Route::post('/investor/portfolios', [InvestorDashboardController::class, 'storePortfolio'])->name('investor.portfolios.store');
 
     Route::get('/dashboard/seller', [SellerDashboardController::class, 'index'])->name('seller.dashboard');
+    Route::redirect('/dashboard/landlord', '/dashboard/seller');
+    Route::redirect('/dashboard/property-owner', '/dashboard/seller');
     Route::post('/seller/listings', [SellerDashboardController::class, 'storeListing'])->name('seller.listings.store');
     Route::put('/seller/listings/{property}', [SellerDashboardController::class, 'updateListing'])->name('seller.listings.update');
+    Route::delete('/seller/properties/{property}', [SellerDashboardController::class, 'destroyProperty'])->name('seller.properties.destroy');
     Route::post('/seller/listings/{property}/publish', [SellerDashboardController::class, 'togglePublish'])->name('seller.listings.publish');
     Route::post('/seller/listings/{property}/status/{status}', [SellerDashboardController::class, 'updateListingStatus'])->name('seller.listings.status');
+    Route::post('/seller/properties/{property}/photos', [SellerDashboardController::class, 'uploadPhotos'])->name('seller.photos.upload');
+    Route::delete('/seller/photos/{image}', [SellerDashboardController::class, 'deletePhoto'])->name('seller.photos.destroy');
+    Route::post('/seller/photos/{image}/cover', [SellerDashboardController::class, 'setCoverPhoto'])->name('seller.photos.cover');
+    Route::post('/seller/properties/{property}/documents', [SellerDashboardController::class, 'uploadDocument'])->name('seller.documents.upload');
+    Route::delete('/seller/documents/{document}', [SellerDashboardController::class, 'destroyDocument'])->name('seller.documents.destroy');
+    Route::post('/seller/inquiries/{inquiry}/reply', [SellerDashboardController::class, 'replyInquiry'])->name('seller.inquiries.reply');
+    Route::post('/seller/leases', [SellerDashboardController::class, 'createLease'])->name('seller.leases.store');
+    Route::put('/seller/leases/{lease}/renew', [SellerDashboardController::class, 'renewLease'])->name('seller.leases.renew');
+    Route::put('/seller/leases/{lease}/terminate', [SellerDashboardController::class, 'terminateLease'])->name('seller.leases.terminate');
+    Route::post('/seller/rent-schedules/{schedule}/pay', [SellerDashboardController::class, 'recordRentPayment'])->name('seller.rent.record');
+    Route::put('/seller/rent-schedules/{schedule}/mark-late', [SellerDashboardController::class, 'markInstallmentLate'])->name('seller.rent.mark-late');
+    Route::post('/seller/leases/{lease}/deposits/deduct', [SellerDashboardController::class, 'deductDeposit'])->name('seller.deposits.deduct');
+    Route::post('/seller/leases/{lease}/deposits/return', [SellerDashboardController::class, 'returnDeposit'])->name('seller.deposits.return');
+    Route::post('/seller/maintenance/{ticket}/assign', [SellerDashboardController::class, 'assignMaintenance'])->name('seller.maintenance.assign');
+    Route::post('/seller/maintenance/{ticket}/complete', [SellerDashboardController::class, 'completeMaintenance'])->name('seller.maintenance.complete');
 
     Route::get('/dashboard/host', [HostDashboardController::class, 'index'])->name('host.dashboard');
     Route::post('/host/stays', [HostDashboardController::class, 'storeStayListing'])->name('host.stays.store');
+    Route::put('/host/stays/{property}', [HostDashboardController::class, 'updateStayListing'])->name('host.stays.update');
+    Route::delete('/host/stays/{property}', [HostDashboardController::class, 'destroyStayListing'])->name('host.stays.destroy');
     Route::post('/host/stays/{property}/publish', [HostDashboardController::class, 'togglePublishStay'])->name('host.stays.publish');
+    Route::put('/host/stays/{property}/pricing', [HostDashboardController::class, 'updatePricing'])->name('host.pricing.update');
+    Route::put('/host/stays/{property}/rules', [HostDashboardController::class, 'updateRulesAndManual'])->name('host.rules.update');
+    Route::post('/host/stays/{property}/calendar/block', [HostDashboardController::class, 'blockCalendarDates'])->name('host.calendar.block');
+    Route::delete('/host/stays/calendar/{booking}/unblock', [HostDashboardController::class, 'unblockCalendarDates'])->name('host.calendar.unblock');
+    Route::post('/host/stays/{property}/calendar/external', [HostDashboardController::class, 'recordExternalReservation'])->name('host.calendar.external');
+    Route::post('/host/bookings/{booking}/accept', [HostDashboardController::class, 'acceptBooking'])->name('host.bookings.accept');
+    Route::post('/host/bookings/{booking}/reject', [HostDashboardController::class, 'rejectBooking'])->name('host.bookings.reject');
+    Route::post('/host/bookings/{booking}/check-in', [HostDashboardController::class, 'checkInGuest'])->name('host.bookings.check-in');
+    Route::post('/host/bookings/{booking}/check-out', [HostDashboardController::class, 'checkOutGuest'])->name('host.bookings.check-out');
+    Route::post('/host/stays/{property}/cleaning', [HostDashboardController::class, 'storeCleaningTask'])->name('host.cleaning.store');
+    Route::put('/host/cleaning/{cleaningTask}/complete', [HostDashboardController::class, 'completeCleaningTask'])->name('host.cleaning.complete');
     Route::post('/host/reviews/{review}/reply', [HostDashboardController::class, 'replyReview'])->name('host.reviews.reply');
     Route::get('/dashboard/property-manager', [PropertyManagerDashboardController::class, 'index'])->name('property-manager.dashboard');
-    Route::post('/property-manager/cleaning/dispatch', [PropertyManagerDashboardController::class, 'dispatchCleaning'])->name('property_manager.cleaning.dispatch');
+    Route::post('/property-manager/buildings', [PropertyManagerDashboardController::class, 'storeBuilding'])->name('property_manager.buildings.store');
     Route::post('/property-manager/units', [PropertyManagerDashboardController::class, 'storeUnit'])->name('property_manager.units.store');
     Route::put('/property-manager/units/{property}', [PropertyManagerDashboardController::class, 'updateUnit'])->name('property_manager.units.update');
+    Route::delete('/property-manager/units/{property}', [PropertyManagerDashboardController::class, 'destroyUnit'])->name('property_manager.units.destroy');
+    Route::patch('/property-manager/units/{property}/status/{status}', [PropertyManagerDashboardController::class, 'transitionUnitStatus'])->name('property_manager.units.status');
+    Route::put('/property-manager/rent-schedules/{schedule}/adjust', [PropertyManagerDashboardController::class, 'adjustRentSchedule'])->name('property_manager.rent.adjust');
+    Route::post('/property-manager/rent-schedules/{schedule}/escalate', [PropertyManagerDashboardController::class, 'escalateDelinquency'])->name('property_manager.rent.escalate');
+    Route::post('/property-manager/properties/{property}/inspections', [PropertyManagerDashboardController::class, 'storeInspection'])->name('property_manager.inspections.store');
+    Route::put('/property-manager/maintenance/{ticket}/assign', [PropertyManagerDashboardController::class, 'assignMaintenanceContractor'])->name('property_manager.maintenance.assign');
+    Route::put('/property-manager/maintenance/{ticket}/close', [PropertyManagerDashboardController::class, 'closeMaintenance'])->name('property_manager.maintenance.close');
+    Route::post('/property-manager/cleaning/dispatch', [PropertyManagerDashboardController::class, 'dispatchCleaning'])->name('property_manager.cleaning.dispatch');
+    Route::put('/property-manager/cleaning/{task}/complete', [PropertyManagerDashboardController::class, 'completeCleaning'])->name('property_manager.cleaning.complete');
 
     Route::get('/dashboard/professional', [ProfessionalDashboardController::class, 'index'])->name('professional.dashboard');
     Route::post('/professional/requests/{serviceRequest}/status', [ProfessionalDashboardController::class, 'updateStatus'])->name('professional.requests.status');
     Route::post('/professional/requests/{serviceRequest}/report', [ProfessionalDashboardController::class, 'uploadReport'])->name('professional.requests.report');
     Route::patch('/professional/requests/{requestItem}', [ProfessionalDashboardController::class, 'updateRequestStatus'])->name('professional.requests.update');
+    Route::post('/professional/profile', [ProfessionalDashboardController::class, 'updateProfile'])->name('professional.profile.update');
+    Route::post('/professional/requests/{serviceRequest}/quote', [ProfessionalDashboardController::class, 'submitQuote'])->name('professional.requests.quote');
+    Route::post('/professional/requests/{serviceRequest}/appointment', [ProfessionalDashboardController::class, 'scheduleAppointment'])->name('professional.requests.appointment');
 
     Route::get('/dashboard/cleaner', [CleanerDashboardController::class, 'index'])->name('cleaner.dashboard');
     Route::patch('/cleaner/tasks/{task}', [CleanerDashboardController::class, 'updateStatus'])->name('cleaner.tasks.update-status');
 
     Route::get('/dashboard/verification-officer', [VerificationOfficerDashboardController::class, 'index'])->name('verification-officer.dashboard');
     Route::patch('/verification-officer/documents/{document}', [VerificationOfficerDashboardController::class, 'documentDecision'])->name('verification-officer.documents.decision');
+    Route::patch('/verification-officer/identities/{targetUser}', [VerificationOfficerDashboardController::class, 'identityDecision'])->name('verification-officer.identities.decision');
+    Route::patch('/verification-officer/properties/{property}/trust-level', [VerificationOfficerDashboardController::class, 'propertyTrustLevel'])->name('verification-officer.properties.trust-level');
     Route::patch('/verification-officer/companies/{agent}', [VerificationOfficerDashboardController::class, 'companyDecision'])->name('verification-officer.companies.decision');
     Route::patch('/verification-officer/developers/{project}', [VerificationOfficerDashboardController::class, 'developerDecision'])->name('verification-officer.developers.decision');
 
@@ -609,9 +724,18 @@ Route::middleware('auth')->group(function () {
     Route::patch('/moderator/listings/{listing}', [ModeratorDashboardController::class, 'listingDecision'])->name('moderator.listings.decision');
     Route::patch('/moderator/reports/{report}', [ModeratorDashboardController::class, 'reportDecision'])->name('moderator.reports.decision');
     Route::patch('/moderator/reviews/{review}', [ModeratorDashboardController::class, 'reviewDecision'])->name('moderator.reviews.decision');
+    Route::delete('/moderator/reviews/{review}', [ModeratorDashboardController::class, 'deleteReview'])->name('moderator.reviews.destroy');
+    Route::post('/moderator/listings/merge', [ModeratorDashboardController::class, 'mergeListings'])->name('moderator.listings.merge');
 
     Route::get('/dashboard/customer-support', [CustomerSupportDashboardController::class, 'index'])->name('customer-support.dashboard');
+    Route::post('/customer-support/tickets', [CustomerSupportDashboardController::class, 'storeTicket'])->name('customer-support.tickets.store');
     Route::patch('/customer-support/tickets/{ticket}', [CustomerSupportDashboardController::class, 'ticketReply'])->name('customer-support.tickets.reply');
+    Route::post('/customer-support/tickets/{ticket}/assign', [CustomerSupportDashboardController::class, 'assignTicket'])->name('customer-support.tickets.assign');
+    Route::post('/customer-support/tickets/{ticket}/escalate', [CustomerSupportDashboardController::class, 'escalateTicket'])->name('customer-support.tickets.escalate');
+    Route::post('/customer-support/tickets/{ticket}/close', [CustomerSupportDashboardController::class, 'closeTicket'])->name('customer-support.tickets.close');
+    Route::post('/customer-support/disputes', [CustomerSupportDashboardController::class, 'storeDispute'])->name('customer-support.disputes.store');
+    Route::patch('/customer-support/disputes/{dispute}/stage', [CustomerSupportDashboardController::class, 'updateDisputeStage'])->name('customer-support.disputes.stage');
+    Route::post('/customer-support/users/{targetUser}/assist', [CustomerSupportDashboardController::class, 'assistUser'])->name('customer-support.users.assist');
 
     Route::get('/dashboard/campaign', [CampaignController::class, 'index'])->name('campaign.dashboard');
 });
@@ -621,6 +745,7 @@ Route::post('/campaigns/{campaign}/leads', [CampaignController::class, 'recordLe
 
 // Public Payment Submission & Receipt Routes
 Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
+Route::post('/payments/callback', [PaymentController::class, 'handleGatewayCallback'])->name('payments.callback');
 Route::get('/payments/{transactionNumber}/receipt', [PaymentController::class, 'receipt'])->middleware('auth')->name('payments.receipt');
 
 // Permission-Gated Media & Document Access (Phase 4)

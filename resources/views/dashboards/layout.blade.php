@@ -36,13 +36,14 @@
     <div class="flex min-h-screen">
         {{-- Sticky Isolated Left Sidebar --}}
         <aside id="role-sidebar" class="dashboard-sidebar sidebar-scroll-area w-72 shrink-0 border-r border-[#d9cab3] bg-[#1d3c34] p-6 text-[#f8f3eb] flex flex-col justify-between fixed md:sticky z-50 md:z-auto -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out dark:border-slate-800" style="position: sticky; top: 0; height: 100dvh; overflow-y: auto;">
-            <div>
-                <div class="flex items-center justify-between">
+            <div class="flex-1 flex flex-col min-h-0">
+                {{-- Brand Header --}}
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
                     <a href="{{ route('home') }}" class="flex items-center gap-3">
-                        <img src="{{ $siteBrand['logoUrl'] ?? asset('images/luxury/hero-skyline.jpg') }}" alt="{{ $siteBrand['name'] ?? config('app.name', 'GTM Real Estate') }} Logo" class="h-10 w-10 rounded-xl object-contain ring-2 ring-[#d9cab3] bg-white/10" loading="lazy">
+                        <img src="{{ $siteBrand['logoUrl'] ?? asset('images/luxury/hero-skyline.jpg') }}" alt="{{ $siteBrand['name'] ?? config('app.name', 'GTM Real Estate') }} Logo" class="h-9 w-9 rounded-xl object-contain ring-2 ring-[#d9cab3] bg-white/10" loading="lazy">
                         <div>
-                            <span class="text-xl font-black tracking-tight text-white block leading-tight">{{ $siteBrand['name'] ?? config('app.name', 'GTM Real Estate') }}</span>
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-[#d4af37]">
+                            <span class="text-lg font-black tracking-tight text-white block leading-tight">{{ $siteBrand['name'] ?? config('app.name', 'GTM Real Estate') }}</span>
+                            <span class="text-[9px] font-bold uppercase tracking-wider text-[#d4af37]">
                                 @yield('portal_name', ucfirst(str_replace('_', ' ', auth()->user()->role ?? 'Workspace')))
                             </span>
                         </div>
@@ -53,18 +54,55 @@
                     </button>
                 </div>
 
+                {{-- 1. Profile block at the top --}}
+                @if (auth()->check())
+                    @php
+                        $user = auth()->user();
+                        $personaConfig = collect(config('personas.personas', []))->first(function ($p) use ($user) {
+                            return ($p['role'] ?? null) === $user->role || in_array($user->role ?? '', $p['legacy_roles'] ?? [], true);
+                        });
+                        $resolvedRoleBadge = $personaConfig['label'] ?? ucfirst(str_replace('_', ' ', $user->role ?? 'Member'));
+                    @endphp
+                    <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition cursor-pointer group shadow-xs" onclick="openProfileModal('info')" title="Open Profile Management">
+                        <div class="text-[9px] font-bold uppercase tracking-wider text-[#dfeee4]/60 mb-1">Signed in</div>
+                        <div class="flex items-center gap-3">
+                            @if ($user->photo_url)
+                                <img src="{{ $user->photo_url }}" alt="{{ $user->name }}" class="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-[#d4af37] group-hover:ring-white transition" loading="lazy">
+                            @else
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#102b25] text-xs font-black text-[#d4af37] ring-2 ring-[#d4af37] group-hover:ring-white transition">
+                                    {{ $user->initials ?: 'GT' }}
+                                </span>
+                            @endif
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-xs font-black text-white group-hover:text-[#d4af37] transition">{{ $user->name }}</p>
+                                <span class="mt-0.5 inline-block rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#f8e7b9]">
+                                    {{ $resolvedRoleBadge }}
+                                </span>
+                            </div>
+                            <span class="text-xs text-slate-400 group-hover:text-white transition" title="Edit Profile">⚙️</span>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Sidebar Skeleton placeholder for layout height stability while permissions/badges evaluate --}}
                 <div class="sidebar-skeleton hidden pointer-events-none opacity-0 h-0 overflow-hidden" aria-hidden="true">
                     <div class="h-9 w-full rounded-xl bg-white/5 animate-pulse mb-2"></div>
                     <div class="h-9 w-full rounded-xl bg-white/5 animate-pulse mb-2"></div>
                 </div>
 
-                <nav class="mt-8 space-y-2 min-h-[420px]" aria-label="Role dashboard navigation">
-                    <a href="{{ route('home') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-[#dfeee4] transition hover:bg-white/5">
+                {{-- Navigation Links --}}
+                <nav class="mt-5 space-y-1.5 overflow-y-auto pr-1 flex-1 sidebar-scroll-area" aria-label="Role dashboard navigation">
+                    {{-- 2. Home & Overview (Every user sees these two) --}}
+                    <a href="{{ route('home') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-[#dfeee4] transition hover:bg-white/10">
                         <span>🏠</span>
                         <span>Home</span>
                     </a>
+                    <a href="#overview" data-target-section="overview" class="nav-section-link flex items-center gap-2.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/15">
+                        <span>📊</span>
+                        <span>Overview</span>
+                    </a>
 
+                    {{-- 3. Permission-driven menu groups --}}
                     @hasSection('sidebar-nav')
                         @yield('sidebar-nav')
                     @else
@@ -73,9 +111,18 @@
 
                     @include('layouts.partials.authorized-sidebar-links')
                 </nav>
-            </div>
 
-            @include('dashboard.partials.signed-in-user')
+                {{-- 4. Logout at the bottom --}}
+                <div class="pt-4 border-t border-white/10 mt-auto">
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-[#f8f3eb] transition hover:bg-rose-600/80 hover:text-white cursor-pointer shadow-xs">
+                            <span>🚪</span>
+                            <span>Sign Out</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
         </aside>
 
         {{-- Main Viewport Area --}}
@@ -193,6 +240,10 @@
                                     </span>
                                 </div>
                                 <div class="py-1">
+                                    <button type="button" onclick="openProfileModal('info'); document.getElementById('topbar-profile-dropdown').classList.add('hidden')" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f8f3eb] dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer">
+                                        <span>⚙️</span>
+                                        <span>Profile Settings</span>
+                                    </button>
                                     <a href="{{ route('home') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f8f3eb] dark:text-slate-200 dark:hover:bg-slate-700">
                                         <span>🏠</span>
                                         <span>Marketplace Home</span>
@@ -367,6 +418,7 @@
             });
         });
     </script>
+    @include('dashboards.partials.profile-management-modal')
     @yield('scripts')
 </body>
 </html>

@@ -41,6 +41,10 @@ class Property extends Model
         'available_to' => 'date',
         'cleaning_fee' => 'float',
         'service_fee' => 'float',
+        'weekend_price' => 'float',
+        'seasonal_price' => 'float',
+        'minimum_stay' => 'integer',
+        'instant_booking_enabled' => 'boolean',
         'verification_level' => 'integer',
         'verified_badges' => 'array',
         'verified_at' => 'datetime',
@@ -128,9 +132,12 @@ class Property extends Model
             default => 'RES',
         };
 
-        $seq = str_pad((string) ($this->id ?: random_int(100000, 999999)), 8, '0', STR_PAD_LEFT);
+        do {
+            $seq = (string) ($this->id ? str_pad((string) $this->id, 8, '0', STR_PAD_LEFT) : random_int(10000000, 99999999));
+            $code = "ETH-{$cityCode}-{$areaCode}-{$cat}-{$seq}";
+        } while (static::query()->where('property_code', $code)->where('id', '!=', $this->id ?? 0)->exists());
 
-        return "ETH-{$cityCode}-{$areaCode}-{$cat}-{$seq}";
+        return $code;
     }
 
     /**
@@ -262,6 +269,21 @@ class Property extends Model
     public function leases(): HasMany
     {
         return $this->hasMany(Lease::class)->latest();
+    }
+
+    public function parentBuilding(): BelongsTo
+    {
+        return $this->belongsTo(Property::class, 'parent_id');
+    }
+
+    public function units(): HasMany
+    {
+        return $this->hasMany(Property::class, 'parent_id')->latest();
+    }
+
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(PropertyInspection::class)->latest();
     }
 
     public function isAvailableForDates(string $checkIn, string $checkOut): bool

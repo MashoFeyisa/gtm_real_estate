@@ -33,6 +33,7 @@ class PropertyOffer extends Model
         'current_counter_amount',
         'latest_counter_by',
         'message',
+        'supporting_document_path',
         'order_id',
         'lease_id',
         'closing_status',

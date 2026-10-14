@@ -61,17 +61,38 @@
          * Open the auth modal, optionally with a redirect URL and action context.
          *
          * @param {string} [redirectUrl]
-         * @param {'like'|'favorite'} [action]
+         * @param {'like'|'favorite'|'booking'|'messaging'|'inquiry'|'offer'|'viewing'|'collection'} [action]
          */
         window.openAuthModal = function (redirectUrl, action) {
-            if (action === 'favorite') {
-                modalIcon.textContent = '🔖';
-                modalTitle.textContent = 'Sign in to save favorites';
-                modalSubtitle.textContent = 'Create an account or sign in to save properties';
-            } else {
-                modalIcon.textContent = '❤️';
-                modalTitle.textContent = 'Sign in to like properties';
-                modalSubtitle.textContent = 'Create an account or sign in to like properties';
+            modalTitle.textContent = 'Register / Login to continue';
+
+            switch (action) {
+                case 'booking':
+                    modalIcon.textContent = '📅';
+                    modalSubtitle.textContent = 'Reserve short stays and off-plan units by registering an account.';
+                    break;
+                case 'messaging':
+                case 'inquiry':
+                    modalIcon.textContent = '💬';
+                    modalSubtitle.textContent = 'Direct messaging and seller inquiries require an active account.';
+                    break;
+                case 'offer':
+                    modalIcon.textContent = '🤝';
+                    modalSubtitle.textContent = 'Formal offers and negotiations require an authenticated buyer account.';
+                    break;
+                case 'viewing':
+                    modalIcon.textContent = '👁️';
+                    modalSubtitle.textContent = 'Schedule in-person property inspections by signing in.';
+                    break;
+                case 'collection':
+                case 'favorite':
+                    modalIcon.textContent = '🔖';
+                    modalSubtitle.textContent = 'Organize custom property collections and favorites by signing in.';
+                    break;
+                default:
+                    modalIcon.textContent = '❤️';
+                    modalSubtitle.textContent = 'Booking, messaging, saving, inquiries, and offers require registration.';
+                    break;
             }
 
             if (redirectUrl) {
@@ -87,6 +108,18 @@
             modal.classList.add('flex');
             document.body.style.overflow = 'hidden';
         };
+
+        // Global delegate for any element marked with data-auth-gate or data-require-auth
+        document.addEventListener('click', function (e) {
+            const gateEl = e.target.closest('[data-auth-gate], [data-require-auth]');
+            if (gateEl && window.GTM_IS_GUEST) {
+                e.preventDefault();
+                e.stopPropagation();
+                const action = gateEl.getAttribute('data-auth-gate') || gateEl.getAttribute('data-require-auth') || 'action';
+                const redirect = gateEl.getAttribute('data-redirect') || window.location.href;
+                window.openAuthModal(redirect, action);
+            }
+        }, true);
 
         function closeModal() {
             modal.classList.add('hidden');

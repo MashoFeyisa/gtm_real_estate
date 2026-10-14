@@ -57,7 +57,15 @@ class WorkerManagementController extends Controller
             ]);
         }
 
-        return redirect()->to(route('dashboard').'#'.$section)->with('success', $message);
+        $target = match ($section) {
+            'users' => ! request()->isMethod('delete') ? route('dashboard', ['section' => 'users']) : route('dashboard'),
+            'testimonials' => route('dashboard', ['section' => 'testimonials']),
+            'settings' => route('dashboard', ['section' => 'settings']),
+            'branches' => route('dashboard', ['section' => 'branches']),
+            default => route('dashboard'),
+        };
+
+        return redirect()->to($target)->with('success', $message);
     }
 
     public function dashboard(Request $request)

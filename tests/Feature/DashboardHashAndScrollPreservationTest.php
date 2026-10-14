@@ -53,7 +53,7 @@ test('site settings update redirects to dashboard#settings or returns JSON on AJ
     ];
 
     $response = $this->actingAs($this->admin)->post(route('dashboard.settings.update'), $postData);
-    $response->assertRedirect(route('dashboard').'#settings');
+    $response->assertRedirect(route('dashboard', ['section' => 'settings']));
 
     // AJAX form submit returns JSON with section settings
     $ajaxResponse = $this->actingAs($this->admin)->postJson(route('dashboard.settings.update'), $postData);
@@ -76,7 +76,7 @@ test('user management store and update redirect to dashboard#users or return JSO
 
     // Create user via standard form submission
     $response = $this->actingAs($this->admin)->post(route('dashboard.users.store'), $userData);
-    $response->assertRedirect(route('dashboard').'#users');
+    $response->assertRedirect(route('dashboard', ['section' => 'users']));
 
     $createdUser = User::where('email', 'abebe.test@example.com')->firstOrFail();
 
@@ -111,9 +111,9 @@ test('property save redirects to dashboard#properties or returns JSON on AJAX', 
         'description' => 'Beautiful luxury property in Bole.',
     ];
 
-    // Standard store redirects to #properties
+    // Standard store redirects to dashboard
     $response = $this->actingAs($this->admin)->post(route('dashboard.properties.store'), $propertyData);
-    $response->assertRedirect(route('dashboard').'#properties');
+    $response->assertRedirect(route('dashboard'));
 
     $property = Property::where('title', 'Test Modern Villa Bole')->firstOrFail();
 

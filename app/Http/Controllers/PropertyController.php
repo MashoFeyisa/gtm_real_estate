@@ -432,7 +432,7 @@ class PropertyController extends Controller
         }
 
         $user = auth()->user();
-        $target = route('dashboard').'#'.$section;
+        $target = route('dashboard');
 
         if ($user) {
             if ($user->isCompany()) {
@@ -446,8 +446,7 @@ class PropertyController extends Controller
             } elseif ($user->role === 'developer') {
                 $target = route('developer.portal');
             } else {
-                $dashboardUrl = $user->dashboard_url;
-                $target = $dashboardUrl === route('dashboard') ? route('dashboard').'#'.$section : $dashboardUrl;
+                $target = $user->dashboard_url;
             }
         }
 

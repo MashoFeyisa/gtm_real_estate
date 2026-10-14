@@ -102,7 +102,7 @@ class UserManagementController extends Controller
             ]);
         }
 
-        return redirect()->to(route('dashboard').'#users')->with('success', $message);
+        return redirect()->to(route('dashboard', ['section' => 'users']))->with('success', $message);
     }
 
     /**
@@ -220,7 +220,7 @@ class UserManagementController extends Controller
             ]);
         }
 
-        return redirect()->to(route('dashboard').'#users')->with('success', $message);
+        return redirect()->to(route('dashboard', ['section' => 'users']))->with('success', $message);
     }
 
     /**

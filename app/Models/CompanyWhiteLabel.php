@@ -22,12 +22,15 @@ class CompanyWhiteLabel extends Model
         'support_phone',
         'support_email',
         'is_active',
+        'subscription_tier',
+        'subscription_expires_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'subscription_expires_at' => 'datetime',
         ];
     }
 

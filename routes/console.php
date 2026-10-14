@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('rents:process-schedules --notify')->daily();
+Schedule::command('reservations:expire-holds')->hourly();

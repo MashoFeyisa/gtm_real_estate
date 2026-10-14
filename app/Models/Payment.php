@@ -39,6 +39,8 @@ class Payment extends Model
         'verified_at',
         'verified_by',
         'payment_metadata',
+        'refunded_amount',
+        'refund_reason',
     ];
 
     protected $casts = [
@@ -46,6 +48,7 @@ class Payment extends Model
         'platform_fee' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'net_amount' => 'decimal:2',
+        'refunded_amount' => 'decimal:2',
         'verified_at' => 'datetime',
         'payment_metadata' => 'array',
     ];

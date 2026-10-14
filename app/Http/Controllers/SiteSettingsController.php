@@ -276,6 +276,6 @@ class SiteSettingsController extends Controller
             ]);
         }
 
-        return redirect()->to(route('dashboard').'#settings')->with('success', $message);
+        return redirect()->to(route('dashboard', ['section' => 'settings']))->with('success', $message);
     }
 }

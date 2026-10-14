@@ -124,7 +124,7 @@ test('admins can assign persona roles through user management', function () {
         'email' => $member->email,
         'role' => 'developer',
         'assigned_property_id' => '',
-    ])->assertRedirect(route('dashboard').'#users');
+    ])->assertRedirect(route('dashboard', ['section' => 'users']));
 
     expect($member->fresh()->role)->toBe('developer');
 });
@@ -147,7 +147,7 @@ test('admins can set per-user permission overrides through user management', fun
             (string) $offersPermissionId => 'deny',
             (string) $rolesPermissionId => 'allow',
         ],
-    ])->assertRedirect(route('dashboard').'#users');
+    ])->assertRedirect(route('dashboard', ['section' => 'users']));
 
     $freshBuyer = $buyer->fresh();
 

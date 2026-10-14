@@ -35,6 +35,14 @@ class FinancialLedger extends Model
                 $ledger->ledger_code = "LED-{$year}-{$random}";
             }
         });
+
+        static::updating(function () {
+            throw new \RuntimeException('Financial records are immutable and cannot be overwritten. Record a financial adjustment entry instead.');
+        });
+
+        static::deleting(function () {
+            throw new \RuntimeException('Financial records are immutable and cannot be deleted.');
+        });
     }
 
     public function payment(): BelongsTo

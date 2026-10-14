@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\URL;
 
 class PropertyDocument extends Model
 {
@@ -21,8 +22,10 @@ class PropertyDocument extends Model
         'file_size',
         'mime_type',
         'access_level',
+        'version',
         'status',
         'verification_notes',
+        'notes',
         'verified_at',
         'verified_by',
     ];
@@ -30,6 +33,7 @@ class PropertyDocument extends Model
     protected $casts = [
         'verified_at' => 'datetime',
         'file_size' => 'integer',
+        'version' => 'integer',
     ];
 
     public function property(): BelongsTo
@@ -142,5 +146,17 @@ class PropertyDocument extends Model
 
         // private / confidential default: uploader, agent, admin only
         return false;
+    }
+
+    /**
+     * Generate a time-limited signed URL for private/confidential documents (SRS §28).
+     */
+    public function getSignedUrl(int $expirationMinutes = 15): string
+    {
+        return URL::temporarySignedRoute(
+            'media.document',
+            now()->addMinutes($expirationMinutes),
+            ['document' => $this->id]
+        );
     }
 }

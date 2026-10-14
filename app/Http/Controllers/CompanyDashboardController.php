@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Commission;
+use App\Models\CompanyWhiteLabel;
+use App\Models\Inquiry;
 use App\Models\Lease;
 use App\Models\Listing;
 use App\Models\Order;
@@ -12,6 +15,7 @@ use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Property;
 use App\Models\PropertyCategory;
+use App\Models\PropertyOffer;
 use App\Models\PropertyReport;
 use App\Models\RentSchedule;
 use App\Models\SiteSetting;
@@ -20,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
@@ -32,7 +37,7 @@ class CompanyDashboardController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! $user->canAccessCompanyDashboard()) {
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
             abort(403, 'Unauthorized access to GTM Real Estate Company Dashboard.');
         }
 
@@ -137,8 +142,9 @@ class CompanyDashboardController extends Controller
         $companyPropertyToEdit = $request->query('edit_property')
             ? Property::query()->whereKey($request->query('edit_property'))->first()
             : null;
+        $companyWhiteLabel = CompanyWhiteLabel::where('user_id', $user->id)->first();
 
-        return view('company.dashboard', compact(
+        return view('dashboards.company', compact(
             'user',
             'branches',
             'agents',
@@ -155,7 +161,8 @@ class CompanyDashboardController extends Controller
             'payments',
             'reports',
             'companyKpis',
-            'siteBrand'
+            'siteBrand',
+            'companyWhiteLabel'
         ));
     }
 
@@ -322,5 +329,224 @@ class CompanyDashboardController extends Controller
         $client->delete();
 
         return redirect()->route('company.dashboard', ['section' => 'clients'])->with('success', 'Client removed successfully from CRM.');
+    }
+
+    /**
+     * Store a new corporate agent.
+     */
+    public function storeAgent(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('agents.create')) {
+            abort(403, 'Permission denied: agents.create');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
+            'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'license_number' => ['nullable', 'string', 'max:100'],
+            'password' => ['nullable', 'string', 'min:8'],
+        ]);
+
+        $agentUser = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'password' => Hash::make($validated['password'] ?? 'AgentPass123!'),
+            'role' => 'agent',
+        ]);
+
+        $agent = Agent::create([
+            'user_id' => $agentUser->id,
+            'branch_id' => $validated['branch_id'] ?? null,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'commission_rate' => $validated['commission_rate'] ?? 70.0,
+            'license_number' => $validated['license_number'] ?? null,
+            'is_active' => true,
+            'license_verified' => true,
+        ]);
+
+        AuditLog::log(action: 'agent.created', entity: $agent, reason: "Company created agent {$agent->name} (#{$agent->id})", user: $user);
+
+        return redirect()->route('company.dashboard', ['section' => 'agents'])->with('success', "Agent {$agent->name} added successfully.");
+    }
+
+    /**
+     * Update an existing corporate agent.
+     */
+    public function updateAgent(Request $request, Agent $agent): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('agents.update')) {
+            abort(403, 'Permission denied: agents.update');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$agent->user_id],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
+            'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'license_number' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $agent->update($validated);
+        if ($agent->user) {
+            $agent->user->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+            ]);
+        }
+
+        AuditLog::log(action: 'agent.updated', entity: $agent, reason: "Company updated agent {$agent->name} (#{$agent->id})", user: $user);
+
+        return redirect()->route('company.dashboard', ['section' => 'agents'])->with('success', "Agent {$agent->name} updated successfully.");
+    }
+
+    /**
+     * Toggle agent active status.
+     */
+    public function toggleAgentActive(Request $request, Agent $agent): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('agents.update')) {
+            abort(403, 'Permission denied: agents.update');
+        }
+
+        $agent->update(['is_active' => ! $agent->is_active]);
+
+        AuditLog::log(action: 'agent.toggled', entity: $agent, reason: "Company toggled active status for agent {$agent->name} (#{$agent->id})", user: $user);
+
+        return redirect()->route('company.dashboard', ['section' => 'agents'])->with('success', "Agent {$agent->name} status changed.");
+    }
+
+    /**
+     * Delete an agent.
+     */
+    public function deleteAgent(Request $request, Agent $agent): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('agents.delete')) {
+            abort(403, 'Permission denied: agents.delete');
+        }
+
+        AuditLog::log(action: 'agent.deleted', entity: $agent, reason: "Company removed agent {$agent->name} (#{$agent->id})", user: $user);
+        $agent->delete();
+
+        return redirect()->route('company.dashboard', ['section' => 'agents'])->with('success', 'Agent removed successfully.');
+    }
+
+    /**
+     * Reassign a client to another agent or branch.
+     */
+    public function reassignClient(Request $request, User $client): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('clients.update')) {
+            abort(403, 'Permission denied: clients.update');
+        }
+
+        $validated = $request->validate([
+            'agent_id' => ['nullable', 'exists:agents,id'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
+        ]);
+
+        if (! empty($validated['agent_id'])) {
+            Inquiry::where('email', $client->email)->orWhere('user_id', $client->id)->update(['agent_id' => $validated['agent_id']]);
+            Order::where('email', $client->email)->orWhere('user_id', $client->id)->update(['agent_id' => $validated['agent_id']]);
+        }
+
+        AuditLog::log(action: 'client.reassigned', entity: $client, reason: "Reassigned client {$client->name} (#{$client->id}) to agent {$validated['agent_id']}", user: $user);
+
+        return redirect()->route('company.dashboard', ['section' => 'clients'])->with('success', "Client {$client->name} reassigned successfully.");
+    }
+
+    /**
+     * Merge duplicate property listings.
+     */
+    public function mergeListings(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+        if (! $user->hasPermission('properties.merge')) {
+            abort(403, 'Permission denied: properties.merge');
+        }
+
+        $validated = $request->validate([
+            'primary_property_id' => ['required', 'exists:properties,id'],
+            'duplicate_property_id' => ['required', 'exists:properties,id', 'different:primary_property_id'],
+        ]);
+
+        $primary = Property::findOrFail($validated['primary_property_id']);
+        $duplicate = Property::findOrFail($validated['duplicate_property_id']);
+
+        DB::transaction(function () use ($primary, $duplicate, $user) {
+            Inquiry::where('property_id', $duplicate->id)->update(['property_id' => $primary->id]);
+            PropertyOffer::where('property_id', $duplicate->id)->update(['property_id' => $primary->id]);
+            Order::where('property_id', $duplicate->id)->update(['property_id' => $primary->id]);
+
+            $duplicate->update([
+                'status' => 'archived',
+                'is_active' => false,
+                'title' => $duplicate->title.' [Merged into #'.$primary->id.']',
+            ]);
+
+            AuditLog::log(action: 'property.merged', entity: $primary, reason: "Merged duplicate property #{$duplicate->id} into primary #{$primary->id}", user: $user);
+        });
+
+        return redirect()->route('company.dashboard', ['section' => 'listings'])->with('success', "Property #{$duplicate->id} successfully merged into #{$primary->id}.");
+    }
+
+    /**
+     * Update company white label subscription tier.
+     */
+    public function updateSubscription(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessCompanyDashboard() || $user->isAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'subscription_tier' => ['required', 'in:standard,premium,enterprise'],
+        ]);
+
+        $whiteLabel = CompanyWhiteLabel::firstOrNew(['user_id' => $user->id]);
+        if (! $whiteLabel->exists) {
+            $slug = Str::slug($user->name ?: 'company').'-'.$user->id;
+            $whiteLabel->company_name = $user->name ?: 'Corporate Real Estate';
+            $whiteLabel->brand_name = $user->name ?: 'Corporate Real Estate';
+            $whiteLabel->subdomain = $slug;
+        }
+        $whiteLabel->subscription_tier = $validated['subscription_tier'];
+        $whiteLabel->subscription_expires_at = now()->addYear();
+        $whiteLabel->save();
+
+        AuditLog::log(action: 'company.subscription_updated', entity: $whiteLabel, reason: "Company updated subscription tier to {$validated['subscription_tier']}", user: $user);
+
+        return redirect()->route('company.dashboard', ['section' => 'subscription'])->with('success', 'Company subscription updated to '.ucfirst($validated['subscription_tier']).'.');
     }
 }

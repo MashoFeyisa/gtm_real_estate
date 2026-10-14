@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\AuditLog;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\PaymentStatusNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -125,6 +128,10 @@ class PaymentController extends Controller
             'bank_transaction_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
+        if ($payment->status === 'completed') {
+            return back()->with('info', "Transaction {$payment->transaction_number} was already verified.");
+        }
+
         $payment->update([
             'status' => 'completed',
             'admin_notes' => $validated['admin_notes'] ?? $payment->admin_notes,
@@ -209,5 +216,96 @@ class PaymentController extends Controller
         }
 
         return Storage::disk('public')->download($payment->deposit_slip_path);
+    }
+
+    /**
+     * Process idempotent payment gateway webhook / callback (Telebirr, CBE Birr, Chapa).
+     */
+    public function handleGatewayCallback(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'transaction_number' => ['nullable', 'string', 'max:100'],
+            'gateway_reference' => ['required', 'string', 'max:150'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'string', 'in:completed,success,failed'],
+            'provider' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $gatewayRef = $validated['gateway_reference'];
+        $txnNumber = $validated['transaction_number'] ?? null;
+        $isSuccess = in_array(strtolower($validated['status']), ['completed', 'success'], true);
+
+        return DB::transaction(function () use ($gatewayRef, $txnNumber, $isSuccess, $validated, $request) {
+            // Locate payment by transaction number or existing gateway reference
+            $paymentQuery = Payment::query()->lockForUpdate();
+            if ($txnNumber) {
+                $paymentQuery->where('transaction_number', $txnNumber);
+            } else {
+                $paymentQuery->where('bank_transaction_reference', $gatewayRef);
+            }
+
+            $payment = $paymentQuery->first();
+
+            if (! $payment) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Payment record not found for the provided transaction references.',
+                ], 404);
+            }
+
+            // IDEMPOTENCY CHECK: If already completed, return idempotent response immediately without re-settling
+            if ($payment->status === 'completed') {
+                return response()->json([
+                    'success' => true,
+                    'status' => 'already_processed',
+                    'idempotent' => true,
+                    'message' => "Transaction {$payment->transaction_number} was already settled. No duplicate action taken.",
+                    'transaction_number' => $payment->transaction_number,
+                    'settled_at' => $payment->verified_at?->toIso8601String(),
+                ], 200);
+            }
+
+            if (! $isSuccess) {
+                $payment->update([
+                    'status' => 'failed',
+                    'bank_transaction_reference' => $gatewayRef,
+                    'admin_notes' => "Gateway ({$validated['provider']}) reported failed payment",
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'status' => 'failed',
+                    'idempotent' => false,
+                    'message' => 'Payment marked as failed per gateway status.',
+                    'transaction_number' => $payment->transaction_number,
+                ], 200);
+            }
+
+            // Process settlement atomically
+            $payment->update([
+                'status' => 'completed',
+                'bank_transaction_reference' => $gatewayRef,
+                'verified_at' => now(),
+            ]);
+
+            $payment->settle();
+
+            AuditLog::log(
+                action: 'payment.webhook_settled',
+                entity: $payment,
+                oldValue: ['status' => 'pending'],
+                newValue: ['status' => 'completed', 'gateway_reference' => $gatewayRef],
+                reason: "Gateway {$validated['provider']} callback verified and settled",
+                request: $request
+            );
+
+            return response()->json([
+                'success' => true,
+                'status' => 'completed',
+                'idempotent' => false,
+                'message' => "Payment {$payment->transaction_number} successfully verified and settled.",
+                'transaction_number' => $payment->transaction_number,
+            ], 200);
+        });
     }
 }

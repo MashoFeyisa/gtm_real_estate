@@ -109,6 +109,11 @@ class Agent extends Model
         return $this->hasMany(Inquiry::class);
     }
 
+    public function clients(): HasMany
+    {
+        return $this->hasMany(AgentClient::class)->latest();
+    }
+
     public function feedbacks(): HasMany
     {
         return $this->hasMany(AgentFeedback::class);

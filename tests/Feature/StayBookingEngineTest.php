@@ -132,10 +132,10 @@ test('guests are prompted to create an account before submitting a property orde
     ]);
 
     $response->assertRedirect(route('register'))
-        ->assertSessionHas('signup_prompt', 'Create a client account or sign in before submitting a request for this property.');
+        ->assertSessionHas('signup_prompt', 'Register / Login to continue: Create a client account or sign in before submitting a request for this property.');
 
     $registerPage = $this->get(route('register'));
-    $registerPage->assertSee('Create a client account or sign in before submitting a request for this property.')
+    $registerPage->assertSee('Register / Login to continue: Create a client account or sign in before submitting a request for this property.')
         ->assertSee(route('login'));
 
     $registration = $this->post(route('register.store'), [
@@ -152,7 +152,7 @@ test('guests are prompted to create an account before reserving a stay', functio
     $response = $this->post(route('stays.book', $this->property));
 
     $response->assertRedirect(route('register'))
-        ->assertSessionHas('signup_prompt', 'Create a client account or sign in before reserving this stay.');
+        ->assertSessionHas('signup_prompt', 'Register / Login to continue: Create a client account or sign in before reserving this stay.');
 
     expect(Booking::count())->toBe(0);
 });

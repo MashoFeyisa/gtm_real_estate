@@ -202,7 +202,7 @@ test('admin can edit and delete a user from the user manager board', function ()
             'email' => 'updated-user@example.com',
             'role' => 'admin',
         ])
-        ->assertRedirect(route('dashboard').'#users');
+        ->assertRedirect(route('dashboard', ['section' => 'users']));
 
     $user->refresh();
     expect($user->name)->toBe('Updated User');
@@ -213,7 +213,9 @@ test('admin can edit and delete a user from the user manager board', function ()
         ->delete('/dashboard/users/'.$user->id)
         ->assertRedirect(route('dashboard').'#users');
 
-    $this->assertDatabaseMissing('users', ['id' => $user->id]);
+    // Users are soft-deleted so financial records and audit logs keep a valid reference.
+    $this->assertSoftDeleted('users', ['id' => $user->id]);
+    expect(User::find($user->id))->toBeNull();
 });
 
 test('workers attendance is removed completely from the application', function () {

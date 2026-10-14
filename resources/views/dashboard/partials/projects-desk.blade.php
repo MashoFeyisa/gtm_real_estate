@@ -4,7 +4,7 @@
         <div>
             <span class="rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">New Projects Mode</span>
             <h2 class="mt-2 text-2xl font-black text-[#1d3c34]">Developments &amp; Projects</h2>
-            <p class="mt-1 text-sm text-slate-600">Manage developer projects, inventory units, construction milestones, and track all CRUD lifecycle actions.</p>
+            <p class="mt-1 text-sm text-slate-600">Developer projects with buildings, inventory units, construction phases, milestones, and CRUD lifecycle actions.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-[#f9ecd0] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#9b6c17]">
@@ -609,9 +609,6 @@
         const panel = document.getElementById('projects-create-panel');
         if (!panel) return;
         panel.classList.toggle('hidden');
-        if (!panel.classList.contains('hidden')) {
-            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
     }
 
     function openEditProjectModal(project) {

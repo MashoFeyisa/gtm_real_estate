@@ -19,16 +19,21 @@ class MaintenanceTicket extends Model
         'priority',
         'status',
         'description',
+        'photo_path',
         'location_notes',
         'scheduled_at',
         'resolved_at',
         'assigned_to',
         'resolution_notes',
+        'estimated_cost',
+        'actual_cost',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'resolved_at' => 'datetime',
+        'estimated_cost' => 'float',
+        'actual_cost' => 'float',
     ];
 
     protected static function booted(): void

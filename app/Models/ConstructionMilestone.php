@@ -16,6 +16,7 @@ class ConstructionMilestone extends Model
         'percentage',
         'target_date',
         'status',
+        'photo_path',
         'order_index',
     ];
 

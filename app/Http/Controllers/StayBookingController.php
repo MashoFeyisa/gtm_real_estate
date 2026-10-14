@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class StayBookingController extends Controller
@@ -130,44 +131,58 @@ class StayBookingController extends Controller
         $checkOut = Carbon::parse($validated['check_out_date'])->startOfDay();
         $nights = max(1, $checkIn->diffInDays($checkOut));
 
-        // Concurrency / Overlap Guard
-        if (! $property->isAvailableForDates($checkIn->format('Y-m-d'), $checkOut->format('Y-m-d'))) {
+        try {
+            $booking = DB::transaction(function () use ($property, $validated, $checkIn, $checkOut, $nights) {
+                // Lock the property record to prevent concurrent double-booking of overlapping dates
+                $lockedProperty = Property::where('id', $property->id)->lockForUpdate()->firstOrFail();
+
+                // Concurrency / Overlap Guard: lock active overlapping bookings
+                $overlappingCount = $lockedProperty->bookings()
+                    ->overlapping($checkIn->format('Y-m-d'), $checkOut->format('Y-m-d'))
+                    ->lockForUpdate()
+                    ->count();
+
+                if ($overlappingCount > 0 || ! $lockedProperty->isAvailableForDates($checkIn->format('Y-m-d'), $checkOut->format('Y-m-d'))) {
+                    throw new \RuntimeException('Selected dates are no longer available. Another guest has completed reservation for these dates.');
+                }
+
+                $stayListing = $lockedProperty->stayListing();
+                $nightlyPrice = $lockedProperty->getNightlyRate();
+                $cleaningFee = $lockedProperty->getCleaningFee();
+                $accommodationTotal = round($nights * $nightlyPrice, 2);
+                $customServiceFee = $lockedProperty->getCustomServiceFee();
+                $serviceFee = ! is_null($customServiceFee) ? round($customServiceFee, 2) : round($accommodationTotal * 0.05, 2);
+                $totalAmount = round($accommodationTotal + $cleaningFee + $serviceFee, 2);
+
+                return Booking::create([
+                    'property_id' => $lockedProperty->id,
+                    'listing_id' => $stayListing?->id,
+                    'user_id' => auth()->id(),
+                    'guest_name' => $validated['guest_name'],
+                    'guest_email' => $validated['guest_email'],
+                    'guest_phone' => $validated['guest_phone'],
+                    'check_in_date' => $checkIn->format('Y-m-d'),
+                    'check_out_date' => $checkOut->format('Y-m-d'),
+                    'total_nights' => $nights,
+                    'guests_count' => (int) ($validated['guests_count'] ?? 1),
+                    'nightly_price' => $nightlyPrice,
+                    'accommodation_total' => $accommodationTotal,
+                    'cleaning_fee' => $cleaningFee,
+                    'service_fee' => $serviceFee,
+                    'security_deposit' => $stayListing ? (float) $stayListing->deposit_amount : 0,
+                    'total_amount' => $totalAmount,
+                    'currency' => 'ETB',
+                    // The reservation is only confirmed once the finance desk clears payment.
+                    'status' => 'pending',
+                    'payment_status' => 'unpaid',
+                    'special_requests' => $validated['special_requests'] ?? null,
+                ]);
+            });
+        } catch (\RuntimeException $e) {
             return back()
                 ->withInput()
-                ->withErrors(['check_in_date' => 'Selected dates are no longer available. Please choose another date range.']);
+                ->withErrors(['check_in_date' => $e->getMessage()]);
         }
-
-        $stayListing = $property->stayListing();
-        $nightlyPrice = $property->getNightlyRate();
-        $cleaningFee = $property->getCleaningFee();
-        $accommodationTotal = round($nights * $nightlyPrice, 2);
-        $customServiceFee = $property->getCustomServiceFee();
-        $serviceFee = ! is_null($customServiceFee) ? round($customServiceFee, 2) : round($accommodationTotal * 0.05, 2);
-        $totalAmount = round($accommodationTotal + $cleaningFee + $serviceFee, 2);
-
-        $booking = Booking::create([
-            'property_id' => $property->id,
-            'listing_id' => $stayListing?->id,
-            'user_id' => auth()->id(),
-            'guest_name' => $validated['guest_name'],
-            'guest_email' => $validated['guest_email'],
-            'guest_phone' => $validated['guest_phone'],
-            'check_in_date' => $checkIn->format('Y-m-d'),
-            'check_out_date' => $checkOut->format('Y-m-d'),
-            'total_nights' => $nights,
-            'guests_count' => (int) ($validated['guests_count'] ?? 1),
-            'nightly_price' => $nightlyPrice,
-            'accommodation_total' => $accommodationTotal,
-            'cleaning_fee' => $cleaningFee,
-            'service_fee' => $serviceFee,
-            'security_deposit' => $stayListing ? (float) $stayListing->deposit_amount : 0,
-            'total_amount' => $totalAmount,
-            'currency' => 'ETB',
-            // The reservation is only confirmed once the finance desk clears payment.
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'special_requests' => $validated['special_requests'] ?? null,
-        ]);
 
         ActivityLog::record(
             'stay_reservation_created',

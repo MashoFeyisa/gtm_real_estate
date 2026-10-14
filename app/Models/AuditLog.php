@@ -23,6 +23,17 @@ class AuditLog extends Model
         return $this->belongsTo(User::class);
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function () {
+            throw new \RuntimeException('Audit logs are immutable and cannot be updated.');
+        });
+
+        static::deleting(function () {
+            throw new \RuntimeException('Audit logs are immutable and cannot be deleted.');
+        });
+    }
+
     /**
      * Helper to log an audit event. Supports either passing $entity directly or ($entityType, $entityId).
      */

@@ -126,7 +126,7 @@ test('guest must sign in before submitting a payment', function () {
     $response = $this->post(route('payments.store'));
 
     $response->assertRedirect(route('register'))
-        ->assertSessionHas('signup_prompt', 'Create a client account or sign in before submitting a payment.');
+        ->assertSessionHas('signup_prompt', 'Register / Login to continue: Create a client account or sign in before submitting a payment.');
 
     expect(Payment::count())->toBe(0);
 });

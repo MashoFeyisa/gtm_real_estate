@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AuditLog;
 use App\Models\Property;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -57,6 +58,16 @@ class AuthController extends Controller
 
             $user = Auth::user();
 
+            if ($user->deactivated_at || $user->status === 'suspended') {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return back()->withErrors([
+                    'email' => 'This account has been deactivated or suspended. Please contact support.',
+                ])->onlyInput('email');
+            }
+
             if ($user->agentProfile && ! $user->agentProfile->is_active) {
                 Auth::logout();
                 $request->session()->invalidate();
@@ -66,6 +77,14 @@ class AuthController extends Controller
                     'email' => 'Your agent account has been deactivated. Please contact an administrator.',
                 ])->onlyInput('email');
             }
+
+            AuditLog::log(
+                action: 'auth.login',
+                entity: $user,
+                reason: 'User logged in successfully',
+                user: $user,
+                request: $request
+            );
 
             // Each role lands on its own portal: admin dashboard, company, finance,
             // receptionist, agent portal, shared persona portal, or client portal.

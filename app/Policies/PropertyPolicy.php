@@ -122,4 +122,16 @@ class PropertyPolicy
 
         return $isOwner;
     }
+
+    /**
+     * Determine whether the user can merge properties (e.g. Moderator duplicate handling).
+     */
+    public function merge(User $user, Property $property): bool
+    {
+        if ($user->isCompany()) {
+            return true;
+        }
+
+        return $user->hasPermission('properties.merge') || $user->hasPermission('properties.update');
+    }
 }

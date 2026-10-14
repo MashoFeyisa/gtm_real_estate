@@ -92,7 +92,7 @@ test('user granted users.update permission can edit user without 403', function 
         'email' => $this->targetUser->email,
         'role' => 'buyer',
     ]);
-    $updateResponse->assertRedirect(route('dashboard').'#users');
+    $updateResponse->assertRedirect(route('dashboard', ['section' => 'users']));
 
     expect($this->targetUser->fresh()->name)->toBe('Target Updated Name');
 });

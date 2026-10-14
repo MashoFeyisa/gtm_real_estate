@@ -477,6 +477,10 @@ class ViewingOfferController extends Controller
             return;
         }
 
+        if ($viewing->property && (int) $viewing->property->user_id === (int) $user->id) {
+            return;
+        }
+
         abort(403, 'Unauthorized access to this viewing appointment.');
     }
 
@@ -492,6 +496,10 @@ class ViewingOfferController extends Controller
         }
 
         if ($user->agentProfile && $offer->agent_id === $user->agentProfile->id) {
+            return;
+        }
+
+        if ($offer->property && (int) $offer->property->user_id === (int) $user->id) {
             return;
         }
 
