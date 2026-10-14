@@ -45,7 +45,7 @@ return [
             'description' => 'Searches, saves and compares properties, contacts sellers, requests viewings, makes and negotiates offers, reserves, uploads documents, and tracks transactions.',
             'role' => 'buyer',
             'legacy_roles' => ['client', 'user'],
-            'portal' => 'client.portal',
+            'portal' => 'buyer.dashboard',
             'permissions' => [
                 // Property browsing
                 'properties.search' => 'Search properties',
@@ -103,7 +103,7 @@ return [
             'description' => 'Finds rentals, requests viewings, communicates with landlords, submits applications, signs agreements, tracks rent, and submits maintenance requests.',
             'role' => 'tenant',
             'legacy_roles' => ['client', 'renter'],
-            'portal' => 'client.portal',
+            'portal' => 'tenant.dashboard',
             'permissions' => [
                 // Rental search
                 'rentals.search' => 'Find rental properties',
@@ -125,9 +125,13 @@ return [
 
                 // Applications & agreements
                 'applications.create' => 'Submit rental applications',
+                'applications.update' => 'Edit rental applications',
+                'applications.withdraw' => 'Withdraw rental applications',
                 'applications.view' => 'View own applications',
                 'agreements.view' => 'View lease agreements',
                 'agreements.sign' => 'Sign & receive supported agreements',
+                'leases.view' => 'View lease agreements',
+                'leases.sign' => 'Digitally accept & sign leases',
 
                 // Rent tracking
                 'rent.view' => 'View rent schedule & history',
@@ -137,10 +141,12 @@ return [
                 'maintenance.create' => 'Submit maintenance requests',
                 'maintenance.view' => 'View own maintenance tickets',
                 'maintenance.update' => 'Add info to own tickets',
+                'maintenance.close' => 'Close resolved maintenance tickets',
 
                 // Documents
                 'documents.create' => 'Upload documents',
                 'documents.view' => 'View own documents',
+                'documents.delete' => 'Delete own documents',
 
                 // Reviews
                 'reviews.create' => 'Write reviews',
@@ -148,14 +154,14 @@ return [
             ],
         ],
 
-        // ── 4. Guest / Traveler (short-stay) ────────────────────────────
+        // ── 4b. Guest / Traveler (short-stay) ────────────────────────────
         [
             'key' => 'traveler',
             'label' => 'Guest / Traveler',
             'description' => 'Short-stay traveler: searches stays, chooses dates and guest counts, reserves, pays, checks in and out, and reviews hosts.',
             'role' => 'traveler',
-            'legacy_roles' => ['client', 'user'],
-            'portal' => 'client.portal',
+            'legacy_roles' => ['client', 'user', 'guest'],
+            'portal' => 'guest.dashboard',
             'permissions' => [
                 // Stay search & browse
                 'stays.search' => 'Search short stays',
@@ -168,6 +174,7 @@ return [
                 'stays.reserve' => 'Reserve stays',
                 'bookings.create' => 'Create bookings',
                 'bookings.view' => 'View own bookings',
+                'bookings.update' => 'Modify booking dates',
                 'bookings.cancel' => 'Cancel bookings',
 
                 // Payment
@@ -187,6 +194,56 @@ return [
                 'stays.review_host' => 'Review hosts',
                 'reviews.create' => 'Write reviews',
                 'reviews.view' => 'View reviews',
+                'reviews.update' => 'Edit reviews',
+                'reviews.delete' => 'Delete reviews',
+
+                // Disputes
+                'disputes.create' => 'Open disputes',
+                'disputes.view' => 'View own disputes',
+            ],
+        ],
+
+        // ── 4a. Guest (registered, self-service desk) ────────────────────
+        [
+            'key' => 'guest_account',
+            'label' => 'Guest',
+            'description' => 'Registered guest on the self-service desk: manages reservations, check-in/check-out, saved stays, reviews and disputes.',
+            'role' => 'guest',
+            'portal' => 'guest.dashboard',
+            'permissions' => [
+                // Stay search & browse
+                'stays.search' => 'Search short stays',
+                'stays.view' => 'View stay details',
+                'properties.save' => 'Save properties to favorites',
+
+                // Booking
+                'stays.dates_select' => 'Choose stay dates',
+                'stays.guests_select' => 'Select number of guests',
+                'stays.reserve' => 'Reserve stays',
+                'bookings.create' => 'Create bookings',
+                'bookings.view' => 'View own bookings',
+                'bookings.update' => 'Modify booking dates',
+                'bookings.cancel' => 'Cancel bookings',
+
+                // Payment
+                'stays.pay' => 'Pay for stays',
+                'payments.view' => 'View own payments',
+
+                // Check-in & check-out
+                'stays.check_in' => 'Check in',
+                'stays.check_out' => 'Check out',
+
+                // Communication
+                'messages.create' => 'Send messages to hosts',
+                'messages.view' => 'View messages',
+                'inquiries.create' => 'Send inquiries',
+
+                // Reviews
+                'stays.review_host' => 'Review hosts',
+                'reviews.create' => 'Write reviews',
+                'reviews.view' => 'View reviews',
+                'reviews.update' => 'Edit reviews',
+                'reviews.delete' => 'Delete reviews',
 
                 // Disputes
                 'disputes.create' => 'Open disputes',
@@ -269,7 +326,7 @@ return [
             'description' => 'Creates short-stay listings, defines availability, pricing and house rules, accepts bookings, communicates with guests, manages check-in and cleaning, and receives reviews.',
             'role' => 'host',
             'legacy_roles' => [],
-            'portal' => 'client.portal',
+            'portal' => 'host.dashboard',
             'permissions' => [
                 // Stay listings CRUD
                 'stays.listing_create' => 'Create short-stay listings',
@@ -513,6 +570,7 @@ return [
                 'properties.view' => 'View properties',
                 'properties.update' => 'Update properties',
                 'properties.delete' => 'Delete properties',
+                'properties.merge' => 'Merge duplicate properties',
 
                 // Clients CRUD
                 'clients.create' => 'Add clients',
@@ -710,7 +768,7 @@ return [
             'label' => 'Professional Service Provider',
             'description' => 'Lawyers, surveyors, architects, valuers, contractors, and inspectors: keeps a professional profile, receives job invitations, submits documents, and receives payments.',
             'role' => 'service_provider',
-            'legacy_roles' => [],
+            'legacy_roles' => ['professional'],
             'portal' => 'role.portal',
             'permissions' => [
                 // Profile CRUD
@@ -795,12 +853,14 @@ return [
                 // Properties
                 'properties.view' => 'View properties',
                 'properties.suspend' => 'Suspend properties',
+                'properties.merge' => 'Merge duplicate properties',
             ],
             'sections' => [
                 ['key' => 'listings_review', 'label' => 'Listing Reviews', 'icon' => '📋', 'permissions' => ['listings.review']],
                 ['key' => 'reports', 'label' => 'Reported Listings', 'icon' => '🚨', 'permissions' => ['reports.handle']],
                 ['key' => 'content', 'label' => 'Content Moderation', 'icon' => '🧹', 'permissions' => ['content.moderate']],
                 ['key' => 'suspicious_ads', 'label' => 'Suspicious Ads', 'icon' => '🚩', 'permissions' => ['ads.suspicious_review']],
+                ['key' => 'duplicates', 'label' => 'Duplicate Detection & Merge', 'icon' => '👥', 'permissions' => ['properties.merge']],
             ],
         ],
 
@@ -838,12 +898,16 @@ return [
                 'documents.reject' => 'Reject documents',
                 'documents.review_property' => 'Review property documents',
 
+                // Verification levels & badges
+                'verifications.manage' => 'Manage verification badges and levels',
+
                 // Users
                 'users.view' => 'View user profiles',
             ],
             'sections' => [
                 ['key' => 'property_documents', 'label' => 'Property Documents', 'icon' => '📎', 'permissions' => ['documents.review_property']],
                 ['key' => 'identity_verifications', 'label' => 'Identity Verifications', 'icon' => '🪪', 'permissions' => ['verifications.identity']],
+                ['key' => 'trust_levels', 'label' => 'Trust Levels & Badges', 'icon' => '🛡️', 'permissions' => ['verifications.manage']],
                 ['key' => 'company_verifications', 'label' => 'Company Verifications', 'icon' => '🏢', 'permissions' => ['verifications.company']],
                 ['key' => 'developer_verifications', 'label' => 'Developer Verifications', 'icon' => '🏗️', 'permissions' => ['verifications.developer']],
             ],
@@ -961,6 +1025,15 @@ return [
                 // Tax
                 'tax.view' => 'View tax records',
                 'tax.manage' => 'Manage tax configuration',
+            ],
+            'sections' => [
+                ['key' => 'ledger', 'label' => 'Financial Ledger', 'icon' => '📒', 'permissions' => ['ledger.view']],
+                ['key' => 'refunds', 'label' => 'Refunds & Adjustments', 'icon' => '↩️', 'permissions' => ['refunds.manage']],
+                ['key' => 'invoices', 'label' => 'Invoices & Billing', 'icon' => '🧾', 'permissions' => ['invoices.manage']],
+                ['key' => 'subscriptions', 'label' => 'Subscriptions', 'icon' => '💳', 'permissions' => ['subscriptions.manage']],
+                ['key' => 'payouts', 'label' => 'Payouts & Transfers', 'icon' => '💸', 'permissions' => ['payouts.view']],
+                ['key' => 'commissions', 'label' => 'Commissions', 'icon' => '🤝', 'permissions' => ['commissions.view']],
+                ['key' => 'reconciliation', 'label' => 'Reconciliation & Shifts', 'icon' => '⚖️', 'permissions' => ['reconciliation.view']],
             ],
         ],
 
@@ -1138,6 +1211,23 @@ return [
             ],
         ],
 
+        /*
+         * Reserved role for demo-data counterparties (the faker users created by
+         * factories: a buyer who made an offer, a landlord on a lease, a guest
+         * who booked a stay). It is deliberately NOT an operator persona: no
+         * permissions, no portal, and exempt from the one-account-per-role
+         * rule in users:cleanup. Without it those rows default to a persona
+         * role and break the "exactly one account per role" invariant.
+         */
+        [
+            'key' => 'contact',
+            'label' => 'Contact (demo data)',
+            'description' => 'Non-persona counterparties used by seeders and factories. No permissions and no dashboard access.',
+            'role' => 'contact',
+            'portal' => null,
+            'permissions' => [],
+        ],
+
     ],
 
     /*
@@ -1148,14 +1238,10 @@ return [
     */
     'assignable_roles' => [
         'admin',
-        'user',
-        'client',
+        'guest',
         'agent',
         'company',
-        'company_admin',
-        'real_estate_company',
         'finance_officer',
-        'receptionist',
         'host',
         'buyer',
         'tenant',
@@ -1170,7 +1256,6 @@ return [
         'verification_company',
         'customer_support',
         'cleaner',
-        'housekeeping',
         'investor',
     ],
 

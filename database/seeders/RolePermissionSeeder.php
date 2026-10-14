@@ -55,6 +55,8 @@ class RolePermissionSeeder extends Seeder
             'reviews.view' => ['menu_label' => 'My Reviews', 'icon' => '⭐', 'route' => 'user.reviews'],
             'inquiries.view' => ['menu_label' => 'My Inquiries', 'icon' => '💬', 'route' => 'user.inquiries'],
             'inquiries.create' => ['menu_label' => 'My Inquiries', 'icon' => '💬', 'route' => 'user.inquiries'],
+            'inquiry.view' => ['menu_label' => 'My Inquiries', 'icon' => '💬', 'route' => 'user.inquiries'],
+            'inquiry.create' => ['menu_label' => 'My Inquiries', 'icon' => '💬', 'route' => 'user.inquiries'],
         ];
 
         foreach ($menuMapping as $permKey => $meta) {

@@ -33,3 +33,6 @@ dev_team.py
 *.swp
 *.pyc
 __pycache__/
+
+# Database backups are working artifacts, not versioned
+/storage/backups/

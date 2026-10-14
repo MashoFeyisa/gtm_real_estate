@@ -27,7 +27,9 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'role' => 'user',
+            // Reserved non-persona role: seeded/faker counterparties must not
+            // occupy one of the 21 operator personas. See config/personas.php.
+            'role' => 'contact',
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('secret123'),
             'remember_token' => Str::random(10),

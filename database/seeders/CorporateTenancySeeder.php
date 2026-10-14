@@ -20,12 +20,15 @@ class CorporateTenancySeeder extends Seeder
      */
     public function run(): void
     {
-        $corpUser = User::firstOrCreate(
+        // Reserved `contact` role: this is a demo customer-company account,
+        // not an operator persona — the `company` persona must stay one
+        // account per role (docs/USER_CLEANUP_PLAN.md).
+        $corpUser = User::updateOrCreate(
             ['email' => 'housing.manager@ethiopianairlines.com'],
             [
                 'name' => 'Ethiopian Airlines Housing Division',
                 'password' => Hash::make('password123'),
-                'role' => 'company',
+                'role' => 'contact',
             ]
         );
 
@@ -44,6 +47,10 @@ class CorporateTenancySeeder extends Seeder
                 'status' => 'active',
             ]
         );
+
+        if ((int) $tenant->user_id !== (int) $corpUser->id) {
+            $tenant->update(['user_id' => $corpUser->id]);
+        }
 
         $emp1 = CorporateEmployee::firstOrCreate(
             ['employee_id_number' => 'ET-CREW-1049'],

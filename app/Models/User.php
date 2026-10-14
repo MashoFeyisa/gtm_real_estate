@@ -11,16 +11,46 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'password', 'role', 'status', 'dashboard_access_enabled', 'media_access_enabled', 'photo_path', 'portal_bg_path', 'assigned_property_id'])]
+#[Fillable([
+    'name',
+    'email',
+    'phone',
+    'password',
+    'role',
+    'status',
+    'two_factor_enabled',
+    'notification_preferences',
+    'language',
+    'deactivated_at',
+    'deactivation_reason',
+    'dashboard_access_enabled',
+    'media_access_enabled',
+    'photo_path',
+    'portal_bg_path',
+    'assigned_property_id',
+    'profession',
+    'hourly_rate',
+    'license_number',
+    'bio',
+    'portfolio_summary',
+    'id_card_path',
+    'id_card_type',
+    'id_verification_status',
+    'id_rejection_reason',
+    'id_verified_at',
+    'is_warned',
+    'warning_notes',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The model's default values for attributes.
@@ -31,6 +61,8 @@ class User extends Authenticatable
         'status' => 'active',
         'dashboard_access_enabled' => true,
         'media_access_enabled' => true,
+        'two_factor_enabled' => false,
+        'language' => 'en',
     ];
 
     /**
@@ -44,8 +76,14 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => 'string',
+            'two_factor_enabled' => 'boolean',
+            'notification_preferences' => 'array',
+            'deactivated_at' => 'datetime',
             'dashboard_access_enabled' => 'boolean',
             'media_access_enabled' => 'boolean',
+            'hourly_rate' => 'decimal:2',
+            'id_verified_at' => 'datetime',
+            'is_warned' => 'boolean',
         ];
     }
 
@@ -475,6 +513,8 @@ class User extends Authenticatable
             'viewing.create' => 'viewings.create',
             'viewing.request' => 'viewings.request',
             'viewing.schedule' => 'viewings.schedule',
+            'viewing.book' => 'viewings.create',
+            'viewings.book' => 'viewings.create',
             'viewing.cancel' => 'viewings.cancel',
             'inquiry.view' => 'inquiries.view',
             'inquiry.create' => 'inquiries.create',

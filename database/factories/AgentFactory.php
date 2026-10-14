@@ -22,7 +22,7 @@ class AgentFactory extends Factory
         $name = fake()->name();
 
         return [
-            'user_id' => User::factory()->state(['role' => 'agent']),
+            'user_id' => User::factory()->state(['role' => 'contact']),
             'branch_id' => fake()->boolean(40) ? Branch::factory() : null,
             'name' => $name,
             'email' => fake()->unique()->safeEmail(),

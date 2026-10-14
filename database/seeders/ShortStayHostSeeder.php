@@ -18,8 +18,12 @@ class ShortStayHostSeeder extends Seeder
     public function run(): void
     {
         $today = Carbon::today();
-        $receptionist = User::where('role', 'receptionist')->first();
-        $guestUser = User::where('role', 'user')->first() ?? $receptionist;
+        // `receptionist` and `user` roles merged into `customer_support` / `buyer`
+        // — resolve the surviving personas instead (docs/USER_CLEANUP_PLAN.md).
+        $receptionist = User::where('role', 'customer_support')->first();
+        $guestUser = User::where('role', 'traveler')->first()
+            ?? User::where('role', 'guest')->first()
+            ?? $receptionist;
 
         // 1. Create short-stay properties
         $bolePenthouse = Property::updateOrCreate(

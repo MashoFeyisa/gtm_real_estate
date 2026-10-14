@@ -36,7 +36,17 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // ── 2. Buyer ────────────────────────────────────────────────
+        // ── 2. Guest ──────────────────────────────────────────────
+        User::query()->updateOrCreate(
+            ['email' => 'guest@realestate.com'],
+            [
+                'name' => 'Guest Visitor (Guest)',
+                'role' => 'guest',
+                'password' => $sharedPassword,
+            ]
+        );
+
+        // ── 3. Buyer ────────────────────────────────────────────────
         User::query()->updateOrCreate(
             ['email' => 'buyer@realestate.com'],
             [
@@ -114,6 +124,9 @@ class DatabaseSeeder extends Seeder
                 'bio' => 'Senior property consultant with 10+ years in Addis Ababa real estate.',
                 'password' => 'secret123',
                 'user_id' => $agentUser->id,
+                // The demo agent must be able to sign in: AuthController blocks
+                // logins when the linked agent profile is inactive.
+                'is_active' => true,
             ]
         );
 
@@ -227,29 +240,13 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // ── Bonus roles ─────────────────────────────────────────────
+        // NOTE: the former "bonus" personas (user@realestate.com as role `user`
+        // and receptionist@realestate.com as role `receptionist`) were removed:
+        // those roles merged into `buyer` and `customer_support`, which already
+        // have their own persona account. Exactly one account per surviving
+        // role is seeded. See docs/USER_CLEANUP_PLAN.md.
 
-        // Regular Client / User (fallback role)
-        User::query()->updateOrCreate(
-            ['email' => 'user@realestate.com'],
-            [
-                'name' => 'Regular User',
-                'role' => 'user',
-                'password' => $sharedPassword,
-            ]
-        );
-
-        // Receptionist (legacy → customer_support)
-        User::query()->updateOrCreate(
-            ['email' => 'receptionist@realestate.com'],
-            [
-                'name' => 'Hiwot Alemayehu (Front Desk Receptionist)',
-                'role' => 'receptionist',
-                'password' => $sharedPassword,
-            ]
-        );
-
-        // Campaign Officer (Promotions & Marketing Review Desk)
+        // ── Campaign Officer (Promotions & Marketing Review Desk) ────────
         User::query()->updateOrCreate(
             ['email' => 'campaign@realestate.com'],
             [
@@ -259,34 +256,11 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Additional sample agents for realistic CRM / pipeline testing
-        $sampleAgents = [
-            ['name' => 'Mekdes Ali', 'email' => 'mekdes.agent@example.com', 'phone' => '+251922000002', 'bio' => 'Investment advisor'],
-            ['name' => 'Yohannes Gebre', 'email' => 'yohannes.agent@example.com', 'phone' => '+251933000003', 'bio' => 'Sales manager'],
-        ];
-
-        foreach ($sampleAgents as $agentData) {
-            $agent = Agent::query()->updateOrCreate(
-                ['email' => $agentData['email']],
-                [
-                    'name' => $agentData['name'],
-                    'phone' => $agentData['phone'],
-                    'bio' => $agentData['bio'],
-                    'password' => 'secret123',
-                ]
-            );
-
-            $account = User::query()->updateOrCreate(
-                ['email' => $agentData['email']],
-                [
-                    'name' => $agentData['name'],
-                    'role' => 'agent',
-                    'password' => $sharedPassword,
-                ]
-            );
-
-            $agent->forceFill(['user_id' => $account->id])->save();
-        }
+        // NOTE: exactly one account per role is seeded on purpose. The extra
+        // "sample agents" block that used to live here created second agent
+        // accounts (mekdes.agent@example.com, yohannes.agent@example.com) on
+        // every seed and broke the one-account-per-role rule.
+        // See docs/USER_CLEANUP_PLAN.md.
 
         // Persona-specific demo data for all 17 actor desks/portals
         $this->call(ActorSeedDataSeeder::class);

@@ -64,25 +64,42 @@ This application implements 17 permission-driven dashboards for each target acto
 
 ### Demo Accounts & Credentials (Password: `secret123`)
 
+Every role below has **exactly one seeded account** (`@realestate.com`), created by `DatabaseSeeder` and re-safe on every seed. Running `php artisan db:seed --class=DatabaseSeeder` twice creates no duplicates.
+
+#### The 17 SRS personas
+
 | # | User Type | Email | Dashboard Route | Core Workflow Focus |
 |---|-----------|-------|-----------------|---------------------|
 | 1 | **Buyer** | `buyer@realestate.com` | `/dashboard/buyer` | Saved properties, saved search alerts, inquiries, viewings, formal offers |
 | 2 | **Tenant / Renter** | `tenant@realestate.com` | `/dashboard/tenant` | Active leases, rent payment schedule, maintenance tickets, tenancy documents |
-| 3 | **Guest (Short-Stay)** | `traveler@realestate.com` | `/dashboard/guest` | Bookings (pending/confirmed/completed), check-in details, reviews, saved stays |
-| 4 | **Investor** | `investor@realestate.com` | `/dashboard/investor` | Portfolio assets, yield estimates (gross/net), rental cash flow, market indicators |
-| 5 | **Seller / Landlord** | `owner@realestate.com` | `/dashboard/seller` | Properties, published listings, lead inquiries, quality scores |
-| 6 | **Host (Short-Stay)** | `host@realestate.com` | `/dashboard/host` | Short-stay properties, upcoming check-ins/outs, occupancy %, payouts |
-| 7 | **Agent / Broker** | `agent@realestate.com` | `/agent-portal` | CRM pipeline (New Lead → Closed), viewings, offers, commission splits |
-| 8 | **Company / Branch Manager** | `company@realestate.com` | `/company` | Branches, team agents, verified listings, company performance & revenue |
-| 9 | **Developer** | `developer@realestate.com` | `/developer-portal` | Construction projects, buildings, units (Available/Reserved/Sold), payment plans |
-| 10 | **Property Manager** | `propertymanager@realestate.com` | `/dashboard/property-manager` | Managed properties, tenant/guest queues, rent tracking, cleaning dispatch |
-| 11 | **Professional** (Valuer/Lawyer) | `service@realestate.com` | `/dashboard/professional` | Service requests, appointment calendar, report submissions, earnings |
-| 12 | **Cleaner / Housekeeping** | `cleaner@realestate.com` | `/dashboard/cleaner` | Assigned tasks, turnaround checklist (Assigned → In Progress → Inspection → Ready) |
-| 13 | **Super Admin** | `admin@realestate.com` | `/dashboard` | Users, roles & permission matrix, platform metrics, security audit log |
-| 14 | **Verification Officer** | `verification@realestate.com` | `/dashboard/verification-officer` | Title deed cartas, site plan mapas, company licenses, developer credentials |
-| 15 | **Moderator** | `moderator@realestate.com` | `/dashboard/moderator` | Listing review queue, report triage (fraud/duplicates), review moderation |
-| 16 | **Finance Officer** | `finance@realestate.com` | `/finance` | Payments, financial ledger, refunds, agent commission settlements, vouchers |
-| 17 | **Customer Support** | `support@realestate.com` | `/dashboard/customer-support` | Inbound support tickets, non-sensitive customer lookup, dispute resolution |
+| 3 | **Guest / Traveler** | `traveler@realestate.com` | `/dashboard/guest` | Bookings (pending/confirmed/completed), check-in details, reviews, saved stays |
+| 4 | **Guest** | `guest@realestate.com` | `/dashboard/guest` | Guest self-service desk: bookings, check-in/out, saved stays |
+| 5 | **Investor** | `investor@realestate.com` | `/dashboard/investor` | Portfolio assets, yield estimates (gross/net), rental cash flow, market indicators |
+| 6 | **Seller / Property Owner** | `owner@realestate.com` | `/dashboard/seller` | Properties, published listings, lead inquiries, quality scores |
+| 7 | **Landlord** | `landlord@realestate.com` | `/dashboard/seller` | Leases, rent schedules, tenants, maintenance dispatch |
+| 8 | **Host (Short-Stay)** | `host@realestate.com` | `/dashboard/host` | Short-stay properties, upcoming check-ins/outs, occupancy %, payouts |
+| 9 | **Agent / Broker** | `agent@realestate.com` | `/agent-portal` | CRM pipeline (New Lead → Closed), viewings, offers, commission splits |
+| 10 | **Company / Branch Manager** | `company@realestate.com` | `/company` | Branches, team agents, verified listings, company performance & revenue |
+| 11 | **Developer** | `developer@realestate.com` | `/developer-portal` | Construction projects, buildings, units (Available/Reserved/Sold), payment plans |
+| 12 | **Property Manager** | `propertymanager@realestate.com` | `/dashboard/property-manager` | Managed properties, tenant/guest queues, rent tracking, cleaning dispatch |
+| 13 | **Professional** (Valuer/Lawyer) | `service@realestate.com` | `/dashboard/professional` | Service requests, appointment calendar, report submissions, earnings |
+| 14 | **Super Admin** | `admin@realestate.com` | `/dashboard` | Users, roles & permission matrix, platform metrics, security audit log |
+| 15 | **Verification Officer** | `verification@realestate.com` | `/dashboard/verification-officer` | Title deed cartas, site plan mapas, company licenses, developer credentials |
+| 16 | **Moderator** | `moderator@realestate.com` | `/dashboard/moderator` | Listing review queue, report triage (fraud/duplicates), review moderation |
+| 17 | **Finance Officer** | `finance@realestate.com` | `/finance` | Payments, financial ledger, refunds, agent commission settlements, vouchers |
+| 18 | **Customer Support** | `support@realestate.com` | `/dashboard/customer-support` | Inbound support tickets, non-sensitive customer lookup, dispute resolution |
+
+> The `receptionist` role was merged into `customer_support` (identical permission set) and `receptionist@realestate.com` no longer exists — use `support@realestate.com`.
+
+#### Internal admin presets (outside the 17 SRS personas)
+
+| # | User Type | Email | Dashboard Route | Why it exists |
+|---|-----------|-------|-----------------|----------------|
+| 19 | **Cleaner / Housekeeping** | `cleaner@realestate.com` | `/dashboard/cleaner` | Assigned tasks, turnaround checklist (Assigned → In Progress → Inspection → Ready) |
+| 20 | **Campaign Officer** | `campaign@realestate.com` | `/dashboard/campaign` | Promotions & marketing campaign review desk (`campaigns.*` permissions) |
+| 21 | **Verification Company** | `verifycompany@realestate.com` | `/verification-company` | Business account for outsourced verification jobs, reports and verification payments |
+
+Roles merged away during the one-account-per-role cleanup: `client` + `user` → `buyer`, `seller` → `property_owner`, `company_admin` + `real_estate_company` → `company`, `receptionist` → `customer_support`, `housekeeping` → `cleaner`. See `docs/USER_CLEANUP_PLAN.md`.
 
 ---
 

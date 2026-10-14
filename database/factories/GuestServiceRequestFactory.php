@@ -36,7 +36,7 @@ class GuestServiceRequestFactory extends Factory
             'priority' => fake()->randomElement(['normal', 'normal', 'high']),
             'description' => fake()->sentence(10),
             'status' => fake()->randomElement(['pending', 'pending', 'in_progress']),
-            'handled_by' => fake()->boolean(40) ? User::factory()->state(['role' => 'property_manager']) : null,
+            'handled_by' => fake()->boolean(40) ? User::factory()->state(['role' => 'contact']) : null,
             'response_notes' => null,
         ];
     }
