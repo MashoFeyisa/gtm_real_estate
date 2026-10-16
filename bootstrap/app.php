@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureUserHasPermission;
 use App\Http\Middleware\EnsureUserIsAgent;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\VerifyPaymentGatewaySignature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'agent' => EnsureUserIsAgent::class,
             'permission' => EnsureUserHasPermission::class,
+            'provider.signature' => VerifyPaymentGatewaySignature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

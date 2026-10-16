@@ -61,9 +61,12 @@ class CommissionSplitService
         Agent $listingAgent,
         ?Agent $sellingAgent = null,
         ?Agent $referralAgent = null,
-        float $commissionRate = 2.00,
+        ?float $commissionRate = null,
         float $referralPercent = 10.00
     ): array {
+        $settings = app(FinanceSettings::class);
+        $commissionRate ??= $settings->defaultCommissionRate();
+
         $totalCommissionPool = round($dealPrice * ($commissionRate / 100), 2);
 
         // 1. Referral Bonus Deduction
@@ -102,8 +105,8 @@ class CommissionSplitService
             $companyRetained = round($remainingPool - $listingAgentAmount, 2);
         }
 
-        // 3. Ethiopian 2% Withholding Tax (WHT) calculations
-        $whtRate = 2.00;
+        // 3. Ethiopian withholding tax (WHT) calculations
+        $whtRate = $settings->withholdingTaxRate();
         $listingWht = round($listingAgentAmount * ($whtRate / 100), 2);
         $listingNet = round($listingAgentAmount - $listingWht, 2);
 
@@ -164,8 +167,11 @@ class CommissionSplitService
         ?Agent $referralAgent = null,
         ?Order $order = null,
         ?Lease $lease = null,
-        float $commissionRate = 2.00
+        ?float $commissionRate = null
     ): Commission {
+        $settings = app(FinanceSettings::class);
+        $commissionRate ??= $settings->defaultCommissionRate();
+
         $splits = $this->calculateSplits(
             $dealPrice,
             $listingAgent,
@@ -184,7 +190,7 @@ class CommissionSplitService
             'property_price' => $dealPrice,
             'commission_rate' => $commissionRate,
             'commission_amount' => $listingData['gross_commission'],
-            'withholding_tax_rate' => 2.00,
+            'withholding_tax_rate' => $settings->withholdingTaxRate(),
             'withholding_tax_amount' => $listingData['withholding_tax'],
             'net_payout_amount' => $listingData['net_payout'],
             'status' => 'pending',

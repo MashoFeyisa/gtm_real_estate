@@ -15,6 +15,7 @@ use App\Models\Property;
 use App\Models\PropertyImage;
 use App\Services\AgreementPdfService;
 use App\Services\AnalyticsService;
+use App\Services\FinanceSettings;
 use App\Services\WorkflowIntegrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -665,8 +666,9 @@ class AgentPortalController extends Controller
         }
 
         $price = $order->offer_amount ?? optional($order->property)->price ?? 0;
-        $rate = (float) ($agent->commission_rate ?? 5.00);
-        $amount = round($price * $rate / 100, 2);
+        $settings = app(FinanceSettings::class);
+        $rate = $settings->commissionRateFor($agent->id, $order->property?->property_category, null, $agent->commission_rate);
+        $amount = $settings->commissionFor((float) $price, $rate);
 
         Commission::create([
             'agent_id' => $agent->id,

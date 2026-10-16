@@ -6,15 +6,24 @@ use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Commission;
 use App\Models\CompanyWhiteLabel;
+use App\Models\FinanceRate;
+use App\Models\FinanceReviewFlag;
 use App\Models\FinancialLedger;
 use App\Models\FrontDeskShift;
 use App\Models\Invoice;
 use App\Models\Lease;
 use App\Models\Payment;
 use App\Models\PayoutRequest;
+use App\Models\Refund;
 use App\Models\RentSchedule;
+use App\Models\VatRemittance;
 use App\Notifications\CommissionGeneratedNotification;
+use App\Services\AgentBalanceService;
 use App\Services\AnalyticsService;
+use App\Services\FinanceSettings;
+use App\Services\LedgerService;
+use App\Services\PayoutService;
+use App\Services\RefundService;
 use App\Services\WorkflowIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -89,20 +98,43 @@ class FinancialReportingController extends Controller
 
         $ledgers = (clone $query)->with(['payment.property', 'user'])->latest()->paginate(12)->withQueryString();
 
-        // Revenue Breakdown by category
-        $grossInflow = (float) (clone $query)->where('entry_type', 'credit')->sum('amount');
-        $grossOutflow = (float) (clone $query)->where('entry_type', 'debit')->sum('amount');
+        // Revenue Breakdown by category (the `cash` leg is a balance-sheet
+        // account, so it is excluded from the profit-and-loss inflow/outflow).
+        //
+        // Legacy single-sided rows are never folded into net revenue or the P&L:
+        // they were written before double entry, so they are shown as their own
+        // totals. Only the balanced current journals drive the profit and loss.
+        $current = fn () => (clone $query)->where('is_legacy', false);
+        $legacy = fn () => (clone $query)->where('is_legacy', true);
+
+        $grossInflow = (float) $current()->where('entry_type', 'credit')->where('category', '!=', 'cash')->sum('amount');
+        $grossOutflow = (float) $current()->where('entry_type', 'debit')->where('category', '!=', 'cash')->sum('amount');
         $netRetained = round($grossInflow - $grossOutflow, 2);
 
-        $rentalRevenue = (float) (clone $query)->where('entry_type', 'credit')->where('category', 'rental_revenue')->sum('amount');
-        $earnestDeposits = (float) (clone $query)->where('entry_type', 'credit')->where('category', 'earnest_deposit')->sum('amount');
-        $bookingRevenue = (float) (clone $query)->where('entry_type', 'credit')->where('category', 'booking_revenue')->sum('amount');
-        $developerDeposits = (float) (clone $query)->where('entry_type', 'credit')->where('category', 'developer_deposit')->sum('amount');
-        $platformFees = (float) (clone $query)->where('entry_type', 'credit')->where('category', 'platform_fee')->sum('amount');
-        $disbursedCommissions = (float) (clone $query)->where('entry_type', 'debit')->where('category', 'agent_commission')->sum('amount');
+        $rentalRevenue = (float) $current()->where('entry_type', 'credit')->where('category', 'rental_revenue')->sum('amount');
+        $earnestDeposits = (float) $current()->where('entry_type', 'credit')->where('category', 'earnest_deposit')->sum('amount');
+        $bookingRevenue = (float) $current()->where('entry_type', 'credit')->where('category', 'booking_revenue')->sum('amount');
+        $developerDeposits = (float) $current()->where('entry_type', 'credit')->where('category', 'developer_deposit')->sum('amount');
+        $platformFees = (float) $current()->where('entry_type', 'credit')->where('category', 'platform_fee')->sum('amount');
+        $disbursedCommissions = (float) $current()->where('entry_type', 'debit')->where('category', 'agent_commission')->sum('amount');
 
-        // Ethiopian Tax Breakdown (15% VAT on platform revenue + 2% Withholding Tax on agent payouts)
-        $vatAccrued = round($platformFees * 0.15, 2);
+        // Ethiopian Tax Breakdown. VAT is read from its own payable account
+        // (not re-derived from today's rate, which would rewrite history), and
+        // withholding tax from the settled commission records.
+        $vatAccrued = (float) $current()->where('entry_type', 'credit')->where('category', 'vat_payable')->sum('amount');
+        $vatReversed = (float) $current()->where('entry_type', 'debit')->where('category', 'vat_payable')
+            ->where(fn ($q) => $q->where('transaction_group', 'like', 'refund:%')->orWhere('transaction_group', 'like', 'LED-ADJ-REF-%'))
+            ->sum('amount');
+        $vatRemitted = (float) $current()->where('entry_type', 'debit')->where('category', 'vat_payable')
+            ->where('transaction_group', 'like', 'vat-remittance:%')
+            ->sum('amount');
+        $vatBalance = round($vatAccrued - $vatReversed - $vatRemitted, 2);
+
+        // Pre-change rows are single-sided; they are surfaced separately so a
+        // report can tell a legacy entry from a balanced journal leg.
+        $legacyEntries = (int) $legacy()->count();
+        $legacyInflow = (float) $legacy()->where('entry_type', 'credit')->sum('amount');
+        $legacyOutflow = (float) $legacy()->where('entry_type', 'debit')->sum('amount');
 
         // Commissions Table
         $commissionsQuery = Commission::with(['agent.user', 'listingAgent', 'sellingAgent', 'referralAgent', 'property', 'order', 'lease', 'disbursedBy']);
@@ -136,6 +168,12 @@ class FinancialReportingController extends Controller
             'platform_fees' => $platformFees,
             'disbursed_commissions' => $disbursedCommissions,
             'vat_accrued' => $vatAccrued,
+            'vat_reversed' => $vatReversed,
+            'vat_remitted' => $vatRemitted,
+            'vat_balance' => $vatBalance,
+            'legacy_ledger_entries' => $legacyEntries,
+            'legacy_inflow' => $legacyInflow,
+            'legacy_outflow' => $legacyOutflow,
             'total_withholding_tax' => $totalWithholdingTax,
             'pending_commissions_count' => $pendingCommissionsCount,
             'total_pending_commissions' => $totalPendingCommissions,
@@ -194,6 +232,26 @@ class FinancialReportingController extends Controller
         $actionableTasks = app(WorkflowIntegrationService::class)->getActorActionableTasks($user);
         $financeCharts = $scopedAgent ? null : app(AnalyticsService::class)->getFinanceChartData();
 
+        // Payout desk (SRS §194): the available balance is ledger-derived, and
+        // the threshold, schedule and holdback are the configured policy.
+        $settings = app(FinanceSettings::class);
+        $balanceService = app(AgentBalanceService::class);
+        $payoutBalance = $balanceService->payoutableFor($user);
+        $payoutHeld = $balanceService->heldFor($user);
+        $payoutMinimum = $settings->payoutMinimumThreshold();
+        $payoutSchedule = $settings->payoutSchedule();
+        $payoutHoldbackRate = $settings->payoutHoldbackRate();
+        $payoutScheduleOpen = app(PayoutService::class)->scheduleAllows($user);
+
+        // Rollback-safety flags for the finance desk to review.
+        $financeReviewFlags = FinanceReviewFlag::with(['payment', 'reviewable'])
+            ->whereNull('resolved_at')
+            ->latest()
+            ->take(20)
+            ->get();
+
+        $pendingRates = FinanceRate::where('status', FinanceRate::STATUS_PENDING)->latest()->take(5)->get();
+
         return view('dashboards.finance', compact(
             'ledgers',
             'commissions',
@@ -201,6 +259,7 @@ class FinancialReportingController extends Controller
             'dateFilter',
             'isAdmin',
             'isFinanceOfficer',
+            'scopedAgent',
             'leases',
             'rentSchedules',
             'pendingPayments',
@@ -210,13 +269,24 @@ class FinancialReportingController extends Controller
             'payouts',
             'subscriptions',
             'actionableTasks',
-            'financeCharts'
+            'financeCharts',
+            'payoutBalance',
+            'payoutHeld',
+            'payoutMinimum',
+            'payoutSchedule',
+            'payoutHoldbackRate',
+            'payoutScheduleOpen',
+            'financeReviewFlags',
+            'pendingRates'
         ));
     }
 
     /**
      * Process refund as a financial adjustment entry in the ledger (SRS §132).
      * Financial records are never overwritten, only adjusted.
+     *
+     * The refundable ceiling is the original amount minus what has already been
+     * refunded, so a payment can never be refunded twice over.
      */
     public function issueRefund(Request $request, Payment $payment): RedirectResponse
     {
@@ -225,48 +295,30 @@ class FinancialReportingController extends Controller
             abort(403, 'Permission denied: refunds.manage required to issue refunds.');
         }
 
+        $refunds = app(RefundService::class);
+
+        $refundable = $refunds->refundableAmount($payment);
+
+        abort_if($refundable <= 0, 422, 'This payment has already been refunded in full.');
+
         $validated = $request->validate([
-            'refund_amount' => ['required', 'numeric', 'min:1', 'max:'.$payment->amount],
+            'refund_amount' => ['required', 'numeric', 'min:0.01', 'max:'.$refundable],
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $refundAmount = (float) $validated['refund_amount'];
-        $reason = $validated['reason'];
+        // A retried refund must not refund twice (SRS §132). The caller supplies
+        // an idempotency key; the same key reuses the same ledger group, and a
+        // group that is already posted is a no-op.
+        $idempotencyKey = $request->header('Idempotency-Key') ?? $request->input('idempotency_key');
+        $idempotencyKey = is_string($idempotencyKey) && $idempotencyKey !== '' ? $idempotencyKey : null;
 
-        DB::transaction(function () use ($payment, $refundAmount, $reason, $user) {
-            $isFullRefund = $refundAmount >= (float) $payment->amount;
+        $refunded = $refunds->refund($payment, (float) $validated['refund_amount'], $validated['reason'], $user, $idempotencyKey);
 
-            $payment->update([
-                'status' => $isFullRefund ? 'refunded' : 'partially_refunded',
-                'refunded_amount' => (float) $payment->refunded_amount + $refundAmount,
-                'refund_reason' => $reason,
-            ]);
+        if ($refunded <= 0.0) {
+            return back()->with('info', 'This refund was already processed.');
+        }
 
-            // Add immutable financial adjustment entry to ledger
-            $ledgerCode = 'LED-ADJ-REF-'.strtoupper(substr(uniqid(), -8));
-            FinancialLedger::create([
-                'ledger_code' => $ledgerCode,
-                'payment_id' => $payment->id,
-                'entry_type' => 'debit',
-                'category' => 'refund_adjustment',
-                'amount' => $refundAmount,
-                'currency' => $payment->currency ?? 'ETB',
-                'description' => "Refund adjustment for Payment #{$payment->transaction_number}: {$reason}",
-                'reference' => $payment->transaction_number,
-                'user_id' => $user->id,
-            ]);
-
-            AuditLog::log(
-                user: $user,
-                action: 'payment.refund_issued',
-                entity: $payment,
-                oldValue: ['status' => $payment->getOriginal('status'), 'refunded_amount' => $payment->getOriginal('refunded_amount')],
-                newValue: ['status' => $payment->status, 'refunded_amount' => $payment->refunded_amount, 'adjustment_code' => $ledgerCode],
-                reason: "Refund adjustment: {$reason}",
-            );
-        });
-
-        return back()->with('success', "Refund adjustment of {$refundAmount} ETB recorded for Payment #{$payment->transaction_number}.");
+        return back()->with('success', "Refund adjustment of {$refunded} ETB recorded for Payment #{$payment->transaction_number}.");
     }
 
     /**
@@ -289,10 +341,11 @@ class FinancialReportingController extends Controller
         ]);
 
         $subtotal = (float) $validated['subtotal'];
-        $vatRate = 15.00;
-        $vatAmount = round($subtotal * 0.15, 2);
-        $whtRate = 2.00;
-        $whtAmount = round($subtotal * 0.02, 2);
+        $settings = app(FinanceSettings::class);
+        $vatRate = $settings->vatRate();
+        $vatAmount = round($subtotal * $vatRate / 100, 2);
+        $whtRate = $settings->withholdingTaxRate();
+        $whtAmount = round($subtotal * $whtRate / 100, 2);
         $totalAmount = round($subtotal + $vatAmount - $whtAmount, 2);
 
         $invoice = Invoice::create([
@@ -361,7 +414,9 @@ class FinancialReportingController extends Controller
     }
 
     /**
-     * Submit Payout request with 2% withholding tax.
+     * Submit a payout request against the ledger-derived available balance
+     * (SRS §194). The minimum threshold, the payout schedule and the holdback
+     * are all enforced by the one PayoutService.
      */
     public function storePayoutRequest(Request $request): RedirectResponse
     {
@@ -371,45 +426,31 @@ class FinancialReportingController extends Controller
         }
 
         $validated = $request->validate([
-            'gross_amount' => ['required', 'numeric', 'min:100'],
+            'gross_amount' => ['required', 'numeric', 'min:0.01'],
             'role' => ['nullable', 'string', 'in:host,seller,agent,professional'],
             'payment_method' => ['required', 'string', 'in:bank_transfer,telebirr,cbe_birr'],
             'bank_name' => ['nullable', 'string', 'max:100'],
             'account_number' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $gross = (float) $validated['gross_amount'];
-        $wht = round($gross * 0.02, 2); // 2% Ethiopian withholding tax
-        $net = round($gross - $wht, 2);
-
-        $payout = PayoutRequest::create([
-            'payout_code' => 'PAY-REQ-'.strtoupper(substr(uniqid(), -8)),
-            'user_id' => $user->id,
-            'role' => $validated['role'] ?? ($user->role ?: 'host'),
-            'gross_amount' => $gross,
-            'withholding_tax' => $wht,
-            'net_amount' => $net,
-            'payment_method' => $validated['payment_method'],
-            'bank_name' => $validated['bank_name'] ?? null,
-            'account_number' => $validated['account_number'] ?? null,
-            'status' => 'pending',
-        ]);
-
-        AuditLog::log(
-            user: $user,
-            action: 'payout.requested',
-            entity: $payout,
-            oldValue: null,
-            newValue: ['gross_amount' => $gross, 'net_amount' => $net],
-            reason: 'User submitted payout request',
-            request: $request
+        $payout = app(PayoutService::class)->request(
+            party: $user,
+            gross: (float) $validated['gross_amount'],
+            method: $validated['payment_method'],
+            bankName: $validated['bank_name'] ?? null,
+            accountNumber: $validated['account_number'] ?? null,
+            role: $validated['role'] ?? ($user->role ?: 'host'),
         );
 
-        return back()->with('success', "Payout request {$payout->payout_code} for {$net} ETB submitted (after 2% WHT: {$wht} ETB).");
+        return back()->with('success', "Payout request {$payout->payout_code} for {$payout->net_amount} ETB submitted (after {$payout->withholding_tax} ETB WHT).");
     }
 
     /**
-     * Approve, reject, or disburse payout request.
+     * Approve, reject, or disburse a payout request (SRS §194).
+     *
+     * Maker-checker: the requester can never approve or disburse their own
+     * payout. Disbursement applies the withholding tax, issues a voucher number
+     * and records the bank reference as a manual disbursement.
      */
     public function processPayout(Request $request, PayoutRequest $payout): RedirectResponse
     {
@@ -424,55 +465,20 @@ class FinancialReportingController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $oldStatus = $payout->status;
+        $service = app(PayoutService::class);
 
-        if ($validated['decision'] === 'disburse') {
-            DB::transaction(function () use ($payout, $validated, $user) {
-                $payout->update([
-                    'status' => 'disbursed',
-                    'transaction_reference' => $validated['transaction_reference'] ?? 'DISB-'.date('YmdHis'),
-                    'processed_by' => $user->id,
-                    'processed_at' => now(),
-                ]);
+        match ($validated['decision']) {
+            'approve' => $service->approve($user, $payout),
+            'reject' => $service->reject($user, $payout, $validated['rejection_reason'] ?? null),
+            'disburse' => $service->disburse(
+                $user,
+                $payout,
+                $validated['transaction_reference'] ?? null,
+                $request->header('Idempotency-Key'),
+            ),
+        };
 
-                // Create ledger debit entry for payout disbursement
-                FinancialLedger::create([
-                    'ledger_code' => 'LED-OUT-'.strtoupper(substr(uniqid(), -8)),
-                    'entry_type' => 'debit',
-                    'category' => 'payout',
-                    'amount' => $payout->net_amount,
-                    'currency' => 'ETB',
-                    'description' => "Payout disbursement #{$payout->payout_code} to user #{$payout->user_id}",
-                    'reference' => $payout->transaction_reference,
-                    'user_id' => $user->id,
-                ]);
-            });
-        } elseif ($validated['decision'] === 'approve') {
-            $payout->update([
-                'status' => 'approved',
-                'processed_by' => $user->id,
-            ]);
-        } else {
-            // reject
-            $payout->update([
-                'status' => 'rejected',
-                'rejection_reason' => $validated['rejection_reason'] ?? 'Rejected by finance audit.',
-                'processed_by' => $user->id,
-                'processed_at' => now(),
-            ]);
-        }
-
-        AuditLog::log(
-            user: $user,
-            action: 'payout.processed',
-            entity: $payout,
-            oldValue: ['status' => $oldStatus],
-            newValue: ['status' => $payout->status, 'ref' => $payout->transaction_reference],
-            reason: "Finance decision: {$validated['decision']}",
-            request: $request
-        );
-
-        return back()->with('success', "Payout #{$payout->payout_code} set to ".strtoupper($payout->status).'.');
+        return back()->with('success', "Payout #{$payout->payout_code} set to ".strtoupper($payout->fresh()->status).'.');
     }
 
     /**
@@ -554,7 +560,7 @@ class FinancialReportingController extends Controller
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:30'],
         ]);
 
-        $taxRate = (float) ($validated['tax_rate'] ?? 2.0);
+        $taxRate = (float) ($validated['tax_rate'] ?? app(FinanceSettings::class)->withholdingTaxRate());
         $commission->settlePayout(
             disbursedBy: $user,
             method: $validated['payout_method'],
@@ -576,6 +582,313 @@ class FinancialReportingController extends Controller
         );
 
         return back()->with('success', "Commission {$commission->voucher_number} of ".number_format($commission->net_payout_amount, 2)." ETB successfully disbursed to {$commission->agent?->name} (2% WHT: ".number_format($commission->withholding_tax_amount, 2).' ETB).');
+    }
+
+    /**
+     * Record a new dated finance rate (SRS §171).
+     *
+     * A rate change is a new fact, never an edit: it needs the
+     * `finance.settings.update` permission, a written reason, is audit-logged,
+     * and carries an effective date so it applies only from that day forward.
+     * Records already written keep the rate snapshotted on them, so history is
+     * never recalculated.
+     */
+    public function updateFinanceRate(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->hasPermission('finance.settings.update')) {
+            abort(403, 'Permission denied: finance.settings.update required to change finance rates.');
+        }
+
+        $validated = $request->validate([
+            'key' => ['required', 'string', 'in:'.implode(',', [
+                FinanceRate::PLATFORM_FEE,
+                FinanceRate::VAT,
+                FinanceRate::WITHHOLDING,
+                FinanceRate::COMMISSION,
+                FinanceRate::EXPERIENCE_FEE,
+            ])],
+            'rate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'effective_from' => ['required', 'date', 'after_or_equal:today'],
+            'location' => ['nullable', 'string', 'max:100'],
+            'service' => ['nullable', 'string', 'max:100'],
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $settings = app(FinanceSettings::class);
+        $oldRate = $settings->rateForRule($validated['key']);
+
+        // The optional second-approval setting holds a change in `pending` until
+        // a *different* finance user approves it (SRS §171 governance).
+        $needsApproval = $settings->requiresSecondRateApproval();
+
+        $rate = FinanceRate::create([
+            'key' => $validated['key'],
+            'rate' => $validated['rate'],
+            'effective_from' => $validated['effective_from'],
+            'location' => $validated['location'] ?? null,
+            'service' => $validated['service'] ?? null,
+            'created_by' => $user->id,
+            'reason' => $validated['reason'],
+            'status' => $needsApproval ? FinanceRate::STATUS_PENDING : FinanceRate::STATUS_APPROVED,
+            'approved_by' => $needsApproval ? null : $user->id,
+            'approved_at' => $needsApproval ? null : now(),
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'finance.rate_updated',
+            entity: $rate,
+            oldValue: ['key' => $validated['key'], 'rate' => $oldRate],
+            newValue: [
+                'key' => $rate->key,
+                'rate' => (float) $rate->rate,
+                'previous_rate' => $oldRate,
+                'effective_from' => $rate->effective_from?->toDateString(),
+                'status' => $rate->status,
+            ],
+            reason: $validated['reason'],
+            request: $request
+        );
+
+        if ($needsApproval) {
+            return back()->with('success', "Finance rate {$rate->key} change to {$rate->rate}% is pending a second approver.");
+        }
+
+        return back()->with('success', "Finance rate {$rate->key} set to {$rate->rate}% effective {$rate->effective_from?->toDateString()}.");
+    }
+
+    /**
+     * Approve a pending finance rate change (SRS §171 governance).
+     *
+     * Maker-checker: the user who requested the change can never approve it, and
+     * only an approved row is ever used to move money.
+     */
+    public function approveFinanceRate(Request $request, FinanceRate $rate): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->hasPermission('finance.settings.approve')) {
+            abort(403, 'Permission denied: finance.settings.approve required to approve a rate change.');
+        }
+
+        abort_if($rate->status === FinanceRate::STATUS_APPROVED, 422, 'This rate change is already approved.');
+        abort_if((int) $rate->created_by === (int) $user->id, 403, 'The requester of a rate change cannot approve it.');
+
+        $rate->update([
+            'status' => FinanceRate::STATUS_APPROVED,
+            'approved_by' => $user->id,
+            'approved_at' => now(),
+        ]);
+
+        AuditLog::log(
+            user: $user,
+            action: 'finance.rate_approved',
+            entity: $rate,
+            oldValue: ['status' => FinanceRate::STATUS_PENDING],
+            newValue: ['status' => $rate->status, 'key' => $rate->key, 'rate' => (float) $rate->rate],
+            reason: 'Second-person approval of a finance rate change',
+            request: $request
+        );
+
+        return back()->with('success', "Finance rate {$rate->key} ({$rate->rate}%) approved.");
+    }
+
+    /**
+     * Record a remittance of collected VAT to the tax authority (SRS §170).
+     *
+     * Posts the balanced journal "debit vat_payable, credit cash" with the
+     * authority's reference, so the VAT report shows what is still owed.
+     */
+    public function remitVat(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->hasPermission('tax.manage')) {
+            abort(403, 'Permission denied: tax.manage required to remit VAT.');
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'period_start' => ['required', 'date'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+            'reference' => ['required', 'string', 'max:100'],
+        ]);
+
+        $amount = round((float) $validated['amount'], 2);
+
+        DB::transaction(function () use ($validated, $amount, $user) {
+            $remittance = VatRemittance::create([
+                'amount' => $amount,
+                'period_start' => $validated['period_start'],
+                'period_end' => $validated['period_end'],
+                'reference' => $validated['reference'],
+                'created_by' => $user->id,
+            ]);
+
+            $group = 'vat-remittance:'.$remittance->id;
+            $remittance->update(['ledger_group' => $group]);
+
+            app(LedgerService::class)->post($group, [
+                [
+                    'entry_type' => 'debit',
+                    'category' => 'vat_payable',
+                    'amount' => $amount,
+                    'currency' => 'ETB',
+                    'description' => "VAT remitted to the tax authority ({$validated['reference']})",
+                    'reference' => $validated['reference'],
+                    'user_id' => $user->id,
+                ],
+                [
+                    'entry_type' => 'credit',
+                    'category' => 'cash',
+                    'amount' => $amount,
+                    'currency' => 'ETB',
+                    'description' => "Cash paid to the tax authority for VAT ({$validated['reference']})",
+                    'reference' => $validated['reference'],
+                    'user_id' => $user->id,
+                ],
+            ]);
+
+            AuditLog::log(
+                user: $user,
+                action: 'finance.vat_remitted',
+                entity: $remittance,
+                oldValue: null,
+                newValue: ['amount' => $amount, 'reference' => $validated['reference'], 'ledger_group' => $group],
+                reason: "VAT remittance for {$validated['period_start']} to {$validated['period_end']}",
+                request: request()
+            );
+        });
+
+        return back()->with('success', 'VAT remittance of '.number_format($amount, 2).' ETB recorded.');
+    }
+
+    /**
+     * Bank reference matching for reconciliation (SRS §133).
+     *
+     * Lists the references that still need matching and lets finance settle a
+     * pending payment by its bank reference.
+     */
+    public function reconciliation(Request $request): View
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('reconciliation.view') && ! $user->hasPermission('reconciliation.manage'))) {
+            abort(403, 'Unauthorized to view reconciliation.');
+        }
+
+        $pending = Payment::query()
+            ->where('status', 'pending')
+            ->whereNotNull('bank_transaction_reference')
+            ->latest()
+            ->take(50)
+            ->get();
+
+        $matched = Payment::query()
+            ->where('status', 'completed')
+            ->whereNotNull('bank_transaction_reference')
+            ->latest()
+            ->take(50)
+            ->get();
+
+        $payoutReferences = PayoutRequest::query()
+            ->whereNotNull('transaction_reference')
+            ->latest()
+            ->take(50)
+            ->get();
+
+        return view('finance.reconciliation', compact('pending', 'matched', 'payoutReferences'));
+    }
+
+    /**
+     * Match a bank reference to a payment and settle it (SRS §82, §133).
+     *
+     * The matcher can never be the payer who submitted the payment (SRS §83).
+     */
+    public function matchBankReference(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('reconciliation.manage') && ! $user->hasPermission('payments.manage'))) {
+            abort(403, 'Permission denied: reconciliation.manage required to match bank references.');
+        }
+
+        $validated = $request->validate([
+            'reference' => ['required', 'string', 'max:100'],
+        ]);
+
+        $payment = Payment::query()
+            ->where('bank_transaction_reference', $validated['reference'])
+            ->latest('id')
+            ->first();
+
+        abort_if($payment === null, 404, 'No payment found for that bank reference.');
+
+        // A payer can never verify their own payment (SRS §83).
+        abort_if((int) $payment->user_id === (int) $user->id, 403, 'You cannot match and settle your own payment.');
+
+        if ($payment->status === 'pending') {
+            $payment->settle();
+            $payment->update([
+                'status' => 'completed',
+                'verified_at' => now(),
+                'verified_by' => $user->id,
+            ]);
+        }
+
+        AuditLog::log(
+            user: $user,
+            action: 'finance.bank_reference_matched',
+            entity: $payment,
+            oldValue: ['status' => 'pending'],
+            newValue: ['status' => $payment->status, 'reference' => $validated['reference']],
+            reason: 'Bank reference matched to payment during reconciliation',
+            request: $request
+        );
+
+        return back()->with('success', "Bank reference {$validated['reference']} matched to Payment #{$payment->transaction_number}.");
+    }
+
+    /**
+     * VAT report: the `vat_payable` balance by period (SRS §170).
+     */
+    public function vatReport(Request $request): View
+    {
+        $user = $request->user();
+        if (! $user || (! $user->isFinanceStaff() && ! $user->hasPermission('tax.view') && ! $user->hasPermission('tax.manage'))) {
+            abort(403, 'Unauthorized to view the VAT report.');
+        }
+
+        $legs = FinancialLedger::query()
+            ->where('category', 'vat_payable')
+            ->where('is_legacy', false)
+            ->orderBy('created_at')
+            ->get();
+
+        $byPeriod = $legs->groupBy(fn ($leg) => $leg->created_at->format('Y-m'))
+            ->map(function ($rows, $period) {
+                $collected = round((float) $rows->where('entry_type', 'credit')->sum('amount'), 2);
+                $remitted = round((float) $rows->where('entry_type', 'debit')
+                    ->filter(fn ($leg) => str_starts_with((string) $leg->transaction_group, 'vat-remittance:'))
+                    ->sum('amount'), 2);
+                $reversed = round((float) $rows->where('entry_type', 'debit')->sum('amount') - $remitted, 2);
+
+                return [
+                    'period' => $period,
+                    'collected' => $collected,
+                    'reversed' => $reversed,
+                    'remitted' => $remitted,
+                    'net' => round($collected - $reversed - $remitted, 2),
+                ];
+            })
+            ->values();
+
+        $vatBalance = round(
+            (float) $legs->where('entry_type', 'credit')->sum('amount')
+            - (float) $legs->where('entry_type', 'debit')->sum('amount'),
+            2
+        );
+
+        $remittances = VatRemittance::with('creator')->latest()->take(20)->get();
+
+        return view('finance.vat-report', compact('byPeriod', 'vatBalance', 'remittances'));
     }
 
     /**
@@ -631,6 +944,7 @@ class FinancialReportingController extends Controller
                 'Reference / Txn #',
                 'Description',
                 'Recorded By',
+                'Books',
             ]);
 
             FinancialLedger::with(['user'])->orderBy('created_at')->chunk(200, function ($ledgers) use ($handle) {
@@ -645,6 +959,7 @@ class FinancialReportingController extends Controller
                         $ledger->reference ?: '-',
                         $ledger->description,
                         $ledger->user?->name ?? 'System',
+                        $ledger->is_legacy ? 'Legacy (single-sided)' : 'Current (balanced journal)',
                     ]);
                 }
             });

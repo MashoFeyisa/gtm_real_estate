@@ -78,7 +78,7 @@
                     <span class="font-medium text-slate-900">{{ number_format($subtotal, 2) }} ETB</span>
                 </div>
                 <div class="flex justify-between text-sm text-slate-600">
-                    <span>Ethiopian VAT (15%):</span>
+                    <span>Ethiopian VAT ({{ (float) $vatRate }}%):</span>
                     <span class="font-medium text-slate-900">{{ number_format($vat, 2) }} ETB</span>
                 </div>
                 <div class="border-t border-slate-200 pt-3 flex justify-between text-base font-bold text-slate-900">

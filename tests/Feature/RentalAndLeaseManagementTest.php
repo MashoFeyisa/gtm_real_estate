@@ -7,6 +7,7 @@ use App\Models\Property;
 use App\Models\RentSchedule;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
@@ -351,6 +352,31 @@ test('paying rent installment via Ethiopian payment engine marks schedule as pai
 
     $response->assertRedirect();
 
+    // SRS §83: a mobile-money transfer is not self-verifying. The submission is
+    // recorded pending and the schedule is untouched until finance confirms it.
+    $payment = Payment::where('payable_id', $schedule->id)->latest()->first();
+    expect($payment)->not->toBeNull()
+        ->and($payment->status)->toBe('pending');
+
+    $schedule->refresh();
+    expect($schedule->status)->not->toBe('paid')
+        ->and($schedule->payment_id)->toBeNull();
+
+    $this->seed(RolePermissionSeeder::class);
+
+    // Separation of duties: the admin who submitted the payment cannot verify
+    // it, so an independent finance officer confirms the installment.
+    $financeOfficer = User::create([
+        'name' => 'Finance Fikirte',
+        'email' => 'fikirte.rent@example.com',
+        'password' => Hash::make('password123'),
+        'role' => 'finance_officer',
+    ]);
+
+    $this->actingAs($financeOfficer)
+        ->put(route('payments.verify', $payment))
+        ->assertRedirect();
+
     $schedule->refresh();
     expect($schedule->status)->toBe('paid')
         ->and((float) $schedule->amount_paid)->toBe(25000.00)
@@ -358,7 +384,8 @@ test('paying rent installment via Ethiopian payment engine marks schedule as pai
 
     $this->assertDatabaseHas('financial_ledgers', [
         'category' => 'rental_revenue',
-        'amount' => 25000.00,
+        // 25,000 - 500 platform fee - 75 VAT on the fee.
+        'amount' => 24425.00,
     ]);
 });
 

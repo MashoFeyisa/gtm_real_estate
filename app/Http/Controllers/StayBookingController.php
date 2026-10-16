@@ -9,6 +9,7 @@ use App\Models\Property;
 use App\Models\User;
 use App\Notifications\GuestBookingNotification;
 use App\Notifications\PaymentStatusNotification;
+use App\Services\FinanceSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -250,6 +251,8 @@ class StayBookingController extends Controller
         $isInstant = in_array($validated['payment_method'], ['telebirr'], true);
         $amount = (float) $booking->total_amount;
         $platformFee = (float) $booking->service_fee;
+        $settings = app(FinanceSettings::class);
+        $vatOnFee = $settings->vatOnFee($platformFee);
 
         $payment = Payment::create([
             'payable_type' => Booking::class,
@@ -267,8 +270,8 @@ class StayBookingController extends Controller
             'currency' => $booking->currency ?? 'ETB',
             'amount' => $amount,
             'platform_fee' => $platformFee,
-            'tax_amount' => round($platformFee * 0.15, 2),
-            'net_amount' => round($amount - $platformFee, 2),
+            'tax_amount' => $vatOnFee,
+            'net_amount' => $settings->netAmount($amount, $platformFee, $vatOnFee),
             'status' => $isInstant ? 'completed' : 'pending',
             'notes' => $validated['notes'] ?? "Short-stay payment for {$booking->booking_reference}",
             'verified_at' => $isInstant ? now() : null,

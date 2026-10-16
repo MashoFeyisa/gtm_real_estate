@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Payment;
+use App\Models\PaymentGatewayLog;
 use App\Models\User;
 use App\Notifications\PaymentStatusNotification;
+use App\Services\FinanceSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,20 +55,57 @@ class PaymentController extends Controller
         }
 
         $amount = (float) $validated['amount'];
-        // Standard platform service fee estimate (e.g., 2% of amount)
-        $platformFee = round($amount * 0.02, 2);
-        $taxAmount = round($platformFee * 0.15, 2); // 15% VAT on service fee
-        $netAmount = round($amount - $platformFee, 2);
+        // Every fee, VAT and net amount comes from the one shared settings
+        // service - nothing in this path may hard-code a rate (SRS §171, §195).
+        $settings = app(FinanceSettings::class);
+        $platformFee = $settings->platformFee($amount);
+        $taxAmount = $settings->vatOnFee($platformFee);
+        $netAmount = $settings->netAmount($amount, $platformFee, $taxAmount);
 
-        // Immediate completion for instant mobile simulation; pending for bank deposit slips requiring audit
-        $isInstant = in_array($validated['payment_method'], ['telebirr']);
-        $initialStatus = $isInstant ? 'completed' : 'pending';
+        // A retried submission must not create a second payment (SRS §80). The
+        // caller supplies an idempotency key; the same key with the same payload
+        // returns the row that was already written, while the same key with a
+        // different payload is a conflict (HTTP 409).
+        $idempotencyKey = $request->header('Idempotency-Key') ?? $request->input('idempotency_key');
+        $idempotencyHash = null;
 
+        if (is_string($idempotencyKey) && $idempotencyKey !== '') {
+            $idempotencyHash = hash('sha256', json_encode([
+                'payment_type' => $validated['payment_type'],
+                'payment_method' => $validated['payment_method'],
+                'amount' => $amount,
+                'payer_name' => $validated['payer_name'],
+                'payer_email' => $validated['payer_email'],
+                'payer_phone' => $validated['payer_phone'] ?? null,
+                'property_id' => $validated['property_id'] ?? null,
+                'payable_type' => $validated['payable_type'] ?? null,
+                'payable_id' => $validated['payable_id'] ?? null,
+                'bank_transaction_reference' => $validated['bank_transaction_reference'] ?? null,
+            ]));
+
+            $existing = Payment::where('idempotency_key', $idempotencyKey)->first();
+
+            if ($existing) {
+                if (! hash_equals((string) $existing->idempotency_hash, $idempotencyHash)) {
+                    abort(409, 'This idempotency key was already used with a different payload.');
+                }
+
+                return redirect()->route('payments.receipt', $existing->transaction_number)
+                    ->with('info', "Payment {$existing->transaction_number} was already submitted for this request.");
+            }
+        }
+
+        // No payment method verifies itself. A method being "instant" only
+        // controls how fast the provider reports back - a mobile-money transfer
+        // still has to be confirmed by the payer's provider or by finance.
+        // A payer can never be the verifier of their own payment (SRS §83).
         $payment = Payment::create([
             'payable_type' => $validated['payable_type'] ?? null,
             'payable_id' => $validated['payable_id'] ?? null,
             'property_id' => $validated['property_id'] ?? null,
             'user_id' => auth()->id(),
+            'idempotency_key' => is_string($idempotencyKey) && $idempotencyKey !== '' ? $idempotencyKey : null,
+            'idempotency_hash' => $idempotencyHash,
             'payer_name' => $validated['payer_name'],
             'payer_email' => $validated['payer_email'],
             'payer_phone' => $validated['payer_phone'] ?? null,
@@ -81,18 +120,14 @@ class PaymentController extends Controller
             'platform_fee' => $platformFee,
             'tax_amount' => $taxAmount,
             'net_amount' => $netAmount,
-            'status' => $initialStatus,
+            'status' => 'pending',
             'notes' => $validated['notes'] ?? null,
-            'verified_at' => $isInstant ? now() : null,
-            'verified_by' => $isInstant ? auth()->id() : null,
+            'verified_at' => null,
+            'verified_by' => null,
         ]);
 
-        if ($payment->status === 'completed') {
-            $payment->settle();
-        }
-
         return redirect()->route('payments.receipt', $payment->transaction_number)
-            ->with('success', "Payment {$payment->transaction_number} processed successfully.");
+            ->with('success', "Payment {$payment->transaction_number} submitted. It will be confirmed once your {$payment->method_label} transfer is verified.");
     }
 
     /**
@@ -122,6 +157,8 @@ class PaymentController extends Controller
         if (! $user || ! $user->isFinanceStaff()) {
             abort(403, 'Unauthorized.');
         }
+
+        $this->abortIfPaymentOriginator($payment, $user);
 
         $validated = $request->validate([
             'admin_notes' => ['nullable', 'string', 'max:1000'],
@@ -172,6 +209,8 @@ class PaymentController extends Controller
             abort(403, 'Unauthorized.');
         }
 
+        $this->abortIfPaymentOriginator($payment, $user);
+
         $validated = $request->validate([
             'admin_notes' => ['required', 'string', 'max:1000'],
         ]);
@@ -219,7 +258,27 @@ class PaymentController extends Controller
     }
 
     /**
-     * Process idempotent payment gateway webhook / callback (Telebirr, CBE Birr, Chapa).
+     * Separation of duties (SRS §83): whoever made a payment can never verify
+     * or reject it, even when they also hold a finance role. A person cannot
+     * confirm their own money - the same rule the escrow desk enforces.
+     */
+    protected function abortIfPaymentOriginator(Payment $payment, User $user): void
+    {
+        $isSubmitter = $payment->user_id !== null && $payment->user_id === $user->id;
+        $isPayerEmail = $payment->payer_email !== null
+            && $user->email !== null
+            && strcasecmp((string) $payment->payer_email, (string) $user->email) === 0;
+
+        if ($isSubmitter || $isPayerEmail) {
+            abort(403, 'Separation of duties: the payer cannot verify or reject their own payment.');
+        }
+    }
+
+    /**
+     * Process an authenticated payment-gateway webhook (Telebirr, CBE Birr, Chapa).
+     *
+     * Idempotency is keyed on the provider's own transaction reference: the
+     * same reference twice creates one payment row and settles it once.
      */
     public function handleGatewayCallback(Request $request): JsonResponse
     {
@@ -229,31 +288,25 @@ class PaymentController extends Controller
             'amount' => ['required', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'in:completed,success,failed'],
             'provider' => ['nullable', 'string', 'max:50'],
+            'payer_name' => ['nullable', 'string', 'max:255'],
+            'payer_email' => ['nullable', 'email', 'max:255'],
+            'payer_phone' => ['nullable', 'string', 'max:50'],
+            'payment_type' => ['nullable', 'string', 'in:earnest_deposit,stay_booking,unit_reservation,rent_installment,service_fee'],
+            'payment_method' => ['nullable', 'string', 'in:telebirr,cbe_birr,bank_transfer,cash'],
+            'property_id' => ['nullable', 'exists:properties,id'],
         ]);
 
+        $provider = $validated['provider'] ?? (string) $request->header('X-Provider', 'gateway');
         $gatewayRef = $validated['gateway_reference'];
         $txnNumber = $validated['transaction_number'] ?? null;
         $isSuccess = in_array(strtolower($validated['status']), ['completed', 'success'], true);
 
-        return DB::transaction(function () use ($gatewayRef, $txnNumber, $isSuccess, $validated, $request) {
-            // Locate payment by transaction number or existing gateway reference
-            $paymentQuery = Payment::query()->lockForUpdate();
-            if ($txnNumber) {
-                $paymentQuery->where('transaction_number', $txnNumber);
-            } else {
-                $paymentQuery->where('bank_transaction_reference', $gatewayRef);
-            }
+        $response = DB::transaction(function () use ($validated, $provider, $gatewayRef, $txnNumber, $isSuccess, $request) {
+            // Locate or create the payment the provider is reporting on. The
+            // provider reference is the identity, so a replayed webhook can
+            // never open a second payment row.
+            $payment = $this->resolveCallbackPayment($validated, $gatewayRef, $txnNumber);
 
-            $payment = $paymentQuery->first();
-
-            if (! $payment) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Payment record not found for the provided transaction references.',
-                ], 404);
-            }
-
-            // IDEMPOTENCY CHECK: If already completed, return idempotent response immediately without re-settling
             if ($payment->status === 'completed') {
                 return response()->json([
                     'success' => true,
@@ -265,11 +318,21 @@ class PaymentController extends Controller
                 ], 200);
             }
 
+            if ($payment->status === 'refunded' || $payment->status === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'status' => $payment->status,
+                    'idempotent' => true,
+                    'message' => "Transaction {$payment->transaction_number} is already {$payment->status}; no change made.",
+                    'transaction_number' => $payment->transaction_number,
+                ], 200);
+            }
+
             if (! $isSuccess) {
                 $payment->update([
                     'status' => 'failed',
                     'bank_transaction_reference' => $gatewayRef,
-                    'admin_notes' => "Gateway ({$validated['provider']}) reported failed payment",
+                    'admin_notes' => "Gateway ({$provider}) reported failed payment",
                 ]);
 
                 return response()->json([
@@ -280,6 +343,8 @@ class PaymentController extends Controller
                     'transaction_number' => $payment->transaction_number,
                 ], 200);
             }
+
+            $previousStatus = $payment->status;
 
             // Process settlement atomically
             $payment->update([
@@ -293,9 +358,9 @@ class PaymentController extends Controller
             AuditLog::log(
                 action: 'payment.webhook_settled',
                 entity: $payment,
-                oldValue: ['status' => 'pending'],
+                oldValue: ['status' => $previousStatus],
                 newValue: ['status' => 'completed', 'gateway_reference' => $gatewayRef],
-                reason: "Gateway {$validated['provider']} callback verified and settled",
+                reason: "Gateway {$provider} callback verified and settled",
                 request: $request
             );
 
@@ -307,5 +372,95 @@ class PaymentController extends Controller
                 'transaction_number' => $payment->transaction_number,
             ], 200);
         });
+
+        $this->recordGatewayOutcome($request, $provider, $gatewayRef, $txnNumber, $response);
+
+        return $response;
+    }
+
+    /**
+     * Find the pending payment for a gateway callback, or create one.
+     *
+     * A provider reports a transaction the platform has never seen (a payer
+     * charged directly on the provider's checkout) as easily as one it raised
+     * itself, so the callback may be the first record of a payment. Matching is
+     * by transaction number first, then by the provider reference, so the same
+     * reference always resolves to the same payment.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function resolveCallbackPayment(array $validated, string $gatewayRef, ?string $txnNumber): Payment
+    {
+        $payment = Payment::query()
+            ->lockForUpdate()
+            ->where(function ($query) use ($gatewayRef, $txnNumber): void {
+                $query->where('bank_transaction_reference', $gatewayRef);
+
+                if ($txnNumber !== null) {
+                    $query->orWhere('transaction_number', $txnNumber);
+                }
+            })
+            ->orderBy('id')
+            ->first();
+
+        if ($payment) {
+            return $payment;
+        }
+
+        $amount = (float) $validated['amount'];
+        $settings = app(FinanceSettings::class);
+        $platformFee = $settings->platformFee($amount);
+        $taxAmount = $settings->vatOnFee($platformFee);
+
+        return Payment::create([
+            'payable_type' => null,
+            'payable_id' => null,
+            'property_id' => $validated['property_id'] ?? null,
+            'user_id' => isset($validated['payer_email']) ? User::where('email', $validated['payer_email'])->value('id') : null,
+            'payer_name' => $validated['payer_name'] ?? 'Gateway Payer',
+            'payer_email' => $validated['payer_email'] ?? $gatewayRef.'@gateway.invalid',
+            'payer_phone' => $validated['payer_phone'] ?? null,
+            'payment_type' => $validated['payment_type'] ?? 'service_fee',
+            'payment_method' => $validated['payment_method'] ?? 'telebirr',
+            'bank_name' => null,
+            'bank_account_number' => null,
+            'bank_transaction_reference' => $gatewayRef,
+            'currency' => 'ETB',
+            'amount' => $amount,
+            'platform_fee' => $platformFee,
+            'tax_amount' => $taxAmount,
+            'net_amount' => $settings->netAmount($amount, $platformFee, $taxAmount),
+            'status' => 'pending',
+            'notes' => 'Created from an authenticated gateway callback.',
+        ]);
+    }
+
+    /**
+     * Update the middleware's audit row with what the callback actually did.
+     */
+    protected function recordGatewayOutcome(
+        Request $request,
+        string $provider,
+        string $gatewayRef,
+        ?string $txnNumber,
+        JsonResponse $response
+    ): void {
+        $log = $request->attributes->get('provider_signature_log');
+
+        if (! $log instanceof PaymentGatewayLog) {
+            return;
+        }
+
+        $decoded = json_decode($response->getContent() ?: '{}', true);
+        $payment = Payment::where('bank_transaction_reference', $gatewayRef)->first();
+
+        $log->update([
+            'event' => 'callback.processed',
+            'outcome' => ($decoded['success'] ?? false) ? 'processed' : 'rejected',
+            'response_code' => $response->getStatusCode(),
+            'payment_id' => $payment?->id,
+            'transaction_number' => $decoded['transaction_number'] ?? $txnNumber,
+            'message' => $decoded['message'] ?? null,
+        ]);
     }
 }

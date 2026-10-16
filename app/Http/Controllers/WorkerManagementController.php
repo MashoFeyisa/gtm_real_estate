@@ -11,7 +11,6 @@ use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\Campaign;
 use App\Models\Commission;
-use App\Models\FinancialLedger;
 use App\Models\Inquiry;
 use App\Models\JobApplication;
 use App\Models\Lease;
@@ -35,6 +34,8 @@ use App\Models\User;
 use App\Services\AgreementPdfService;
 use App\Services\AnalyticsService;
 use App\Services\CommissionSplitService;
+use App\Services\FinanceSettings;
+use App\Services\LedgerService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -642,14 +643,25 @@ class WorkerManagementController extends Controller
             $commission = $lockedOrder->commission()->lockForUpdate()->firstOrFail();
             $ledgerReference = 'ORDER-WEBSITE-COMMISSION-'.$lockedOrder->id;
 
-            FinancialLedger::create([
-                'entry_type' => 'credit',
-                'category' => 'website_commission',
-                'amount' => $commission->commission_amount,
-                'currency' => 'ETB',
-                'description' => 'Website commission received for order '.$lockedOrder->id.' ('.$lockedOrder->name.'); receipt '.$validated['collection_reference'],
-                'reference' => $ledgerReference,
-                'user_id' => $user->id,
+            app(LedgerService::class)->post('order-commission:'.$lockedOrder->id, [
+                [
+                    'entry_type' => 'debit',
+                    'category' => 'cash',
+                    'amount' => $commission->commission_amount,
+                    'currency' => 'ETB',
+                    'description' => 'Website commission cash received for order '.$lockedOrder->id.' ('.$lockedOrder->name.'); receipt '.$validated['collection_reference'],
+                    'reference' => $ledgerReference,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'entry_type' => 'credit',
+                    'category' => 'website_commission',
+                    'amount' => $commission->commission_amount,
+                    'currency' => 'ETB',
+                    'description' => 'Website commission received for order '.$lockedOrder->id.' ('.$lockedOrder->name.'); receipt '.$validated['collection_reference'],
+                    'reference' => $ledgerReference,
+                    'user_id' => $user->id,
+                ],
             ]);
 
             $commission->update([
@@ -981,15 +993,45 @@ class WorkerManagementController extends Controller
         $commission->update($updates);
 
         if ($validated['status'] === 'paid') {
-            FinancialLedger::firstOrCreate([
-                'category' => 'agent_commission',
-                'reference' => 'COMM-'.$commission->id,
-            ], [
-                'entry_type' => 'debit',
-                'amount' => $commission->commission_amount,
-                'currency' => 'ETB',
-                'description' => "Commission payout for Agent {$commission->agent?->name} on property #{$commission->property_id}",
-                'user_id' => $user->id,
+            $settings = app(FinanceSettings::class);
+            $gross = (float) $commission->commission_amount;
+            $withholding = (float) ($commission->withholding_tax_amount ?: $settings->withholdingTax($gross));
+            $net = round($gross - $withholding, 2);
+
+            $commission->update([
+                'withholding_tax_rate' => $commission->withholding_tax_rate ?: $settings->withholdingTaxRate(),
+                'withholding_tax_amount' => $withholding,
+                'net_payout_amount' => $net,
+            ]);
+
+            app(LedgerService::class)->post('commission:'.$commission->id, [
+                [
+                    'entry_type' => 'debit',
+                    'category' => 'agent_commission',
+                    'amount' => $gross,
+                    'currency' => 'ETB',
+                    'description' => "Commission payout for Agent {$commission->agent?->name} on property #{$commission->property_id}",
+                    'reference' => 'COMM-'.$commission->id,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'entry_type' => 'credit',
+                    'category' => 'cash',
+                    'amount' => $net,
+                    'currency' => 'ETB',
+                    'description' => "Net commission paid to Agent {$commission->agent?->name} (COMM-{$commission->id})",
+                    'reference' => 'COMM-'.$commission->id,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'entry_type' => 'credit',
+                    'category' => 'tax_withholding',
+                    'amount' => $withholding,
+                    'currency' => 'ETB',
+                    'description' => "Withholding tax on commission COMM-{$commission->id}",
+                    'reference' => 'COMM-'.$commission->id,
+                    'user_id' => $user->id,
+                ],
             ]);
         }
 

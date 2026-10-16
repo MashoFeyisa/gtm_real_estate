@@ -34,6 +34,11 @@ class FinancialLedgerFactory extends Factory
             'description' => fake()->sentence(8),
             'reference' => fake()->boolean(50) ? strtoupper(fake()->bothify('REF-########')) : null,
             'user_id' => fake()->boolean(40) ? User::factory() : null,
+            // A lone row with no balancing `transaction_group` is, by
+            // construction, a legacy single-sided entry. Demo ledgers are
+            // therefore flagged as the legacy kind so reports can tell them
+            // apart from the balanced journals written by LedgerService.
+            'is_legacy' => true,
         ];
     }
 }

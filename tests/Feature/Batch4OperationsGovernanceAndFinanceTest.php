@@ -356,6 +356,11 @@ test('finance officer can disburse payout request and record financial ledger de
     ]);
 
     $response = $this->actingAs($finance)->patch(route('finance.payouts.process', $payout), [
+        'decision' => 'approve',
+    ]);
+    $response->assertRedirect();
+
+    $response = $this->actingAs($finance)->patch(route('finance.payouts.process', $payout), [
         'decision' => 'disburse',
         'transaction_reference' => 'TB-DISB-998822',
     ]);
@@ -367,12 +372,25 @@ test('finance officer can disburse payout request and record financial ledger de
     expect($payout->processed_by)->toBe($finance->id);
     expect($payout->processed_at)->not->toBeNull();
 
-    // Verify ledger debit
+    // Verify the balanced double-entry journal: the gross payout is debited and
+    // split into the net cash paid and the withholding tax owed to the authority.
     $ledger = FinancialLedger::where('category', 'payout')
         ->where('entry_type', 'debit')
-        ->where('amount', 19600.0)
+        ->where('amount', 20000.0)
         ->first();
     expect($ledger)->not->toBeNull();
+
+    $debits = (float) FinancialLedger::where('transaction_group', 'payout:'.$payout->id)->where('entry_type', 'debit')->sum('amount');
+    $credits = (float) FinancialLedger::where('transaction_group', 'payout:'.$payout->id)->where('entry_type', 'credit')->sum('amount');
+    expect($debits)->toBe($credits)
+        ->and($credits)->toBe(20000.0);
+
+    $this->assertDatabaseHas('financial_ledgers', [
+        'transaction_group' => 'payout:'.$payout->id,
+        'category' => 'tax_withholding',
+        'entry_type' => 'credit',
+        'amount' => 400.00,
+    ]);
 });
 
 test('unauthorized user without finance permissions cannot issue refund', function () {

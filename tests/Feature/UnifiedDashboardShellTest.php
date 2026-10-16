@@ -285,9 +285,181 @@ test('buyer host and agent: grant permission shows item and works, revoke remove
 
     // Grant bookings.view to agent
     UserPermissionOverride::create(['user_id' => $agent->id, 'permission_id' => $permBooking->id, 'granted' => true]);
-    $this->actingAs($agent)->get(route('user.bookings'))->assertOk();
+    $this->actingAs($agent)->get(route('user.bookings'))->assertRedirect($agent->dashboard_url.'#bookings');
 
     // Revoke bookings.view
     UserPermissionOverride::where(['user_id' => $agent->id, 'permission_id' => $permBooking->id])->update(['granted' => false]);
     $this->actingAs($agent)->get(route('user.bookings'))->assertForbidden();
+});
+
+test('no Granted Access text exists and no sidebar label is duplicated for any role', function (string $role) {
+    $user = User::factory()->create(['role' => $role]);
+    if ($role === 'agent') {
+        $user->ensureAgentProfile();
+    }
+
+    $response = $this->actingAs($user)->get($user->dashboard_url);
+    $response->assertOk();
+
+    // 1. Assert no "Granted Access" text or block
+    $response->assertDontSee('Granted Access');
+    $response->assertDontSee('id="authorized-granted-sidebar-section"', false);
+
+    // 2. Extract sidebar content
+    $content = $response->getContent();
+    expect($content)->toMatch('/<aside[^>]*class="[^"]*dashboard-sidebar[^"]*"[^>]*>(.*?)<\/aside>/s');
+
+    preg_match('/<aside[^>]*class="[^"]*dashboard-sidebar[^"]*"[^>]*>(.*?)<\/aside>/s', $content, $sidebarMatch);
+    $sidebarHtml = $sidebarMatch[1] ?? '';
+
+    // Extract all navigation link texts from the sidebar nav links
+    preg_match_all('/<a[^>]*>(.*?)<\/a>/s', $sidebarHtml, $linkMatches);
+    $labels = [];
+
+    foreach ($linkMatches[1] as $inner) {
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($inner)));
+        // Remove trailing numbers or badges
+        $cleanLabel = trim(preg_replace('/(\s*\d+\s*(overdue|active)?|\s*&rarr;.*|\s*→.*)$/i', '', $text));
+        // Remove leading emojis
+        $cleanLabel = trim(preg_replace('/^[\x{1F300}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\s]+/u', '', $cleanLabel));
+        if (! empty($cleanLabel) && ! in_array($cleanLabel, ['Sign Out', 'GTM Real Estate', 'Workspace', 'Compliance Desk', 'Developer Portal'])) {
+            $labels[] = $cleanLabel;
+        }
+    }
+
+    // Overview must appear exactly once
+    $overviewCount = count(array_filter($labels, fn ($l) => strcasecmp($l, 'Overview') === 0));
+    expect($overviewCount)->toBe(1, "Role [{$role}] has Overview count of {$overviewCount}, expected exactly 1.");
+
+    // No label may appear twice
+    $counts = array_count_values(array_map('strtolower', $labels));
+    $duplicates = array_filter($counts, fn ($count) => $count > 1);
+    expect($duplicates)->toBeEmpty("Role [{$role}] has duplicate sidebar labels: ".json_encode($duplicates));
+})->with([
+    'buyer',
+    'tenant',
+    'seller',
+    'host',
+    'agent',
+    'company',
+    'developer',
+    'property_manager',
+    'cleaner',
+    'moderator',
+    'verification_officer',
+    'campaign_officer',
+    'finance_officer',
+    'customer_support',
+    'investor',
+    'guest',
+]);
+
+test('permission-granted features open inside the unified dashboard shell and redirect old urls', function () {
+    $buyer = User::factory()->create(['role' => 'buyer']);
+
+    // Grant leases, maintenance, and bookings
+    $permLease = Permission::firstOrCreate(['key' => 'leases.view'], ['label' => 'My Leases & Rent', 'menu_label' => 'My Leases & Rent', 'icon' => '🔑', 'route' => 'user.leases', 'group' => 'lease']);
+    $permMaint = Permission::firstOrCreate(['key' => 'maintenance.view'], ['label' => 'Maintenance Requests', 'menu_label' => 'Maintenance Requests', 'icon' => '🛠️', 'route' => 'user.maintenance', 'group' => 'maintenance']);
+    $permBook = Permission::firstOrCreate(['key' => 'bookings.view'], ['label' => 'My Bookings', 'menu_label' => 'My Bookings', 'icon' => '🧳', 'route' => 'user.bookings', 'group' => 'booking']);
+
+    UserPermissionOverride::create(['user_id' => $buyer->id, 'permission_id' => $permLease->id, 'granted' => true]);
+    UserPermissionOverride::create(['user_id' => $buyer->id, 'permission_id' => $permMaint->id, 'granted' => true]);
+    UserPermissionOverride::create(['user_id' => $buyer->id, 'permission_id' => $permBook->id, 'granted' => true]);
+
+    // Test direct old URLs redirect to dashboard with hash
+    $this->actingAs($buyer)->get(route('user.leases'))->assertRedirect($buyer->dashboard_url.'#leases');
+    $this->actingAs($buyer)->get(route('user.maintenance'))->assertRedirect($buyer->dashboard_url.'#maintenance');
+    $this->actingAs($buyer)->get(route('user.bookings'))->assertRedirect($buyer->dashboard_url.'#bookings');
+
+    // Dashboard renders unified panels for all three features
+    $dashboardResponse = $this->actingAs($buyer)->get($buyer->dashboard_url);
+    $dashboardResponse->assertOk();
+    $dashboardResponse->assertSee('id="leases"', false);
+    $dashboardResponse->assertSee('id="maintenance"', false);
+    $dashboardResponse->assertSee('id="bookings"', false);
+
+    // Sidebar renders items under normal groups without Granted Access header
+    $dashboardResponse->assertDontSee('Granted Access');
+    $dashboardResponse->assertSee('Leases & Rent');
+    $dashboardResponse->assertSee('Maintenance Requests');
+    $dashboardResponse->assertSee('My Bookings');
+});
+
+test('revoking granted permission removes item from sidebar and URL returns 403', function () {
+    $buyer = User::factory()->create(['role' => 'buyer']);
+
+    $permLease = Permission::firstOrCreate(['key' => 'leases.view'], ['label' => 'Leases & Rent', 'menu_label' => 'Leases & Rent', 'icon' => '🔑', 'route' => 'user.leases', 'group' => 'lease']);
+    UserPermissionOverride::create(['user_id' => $buyer->id, 'permission_id' => $permLease->id, 'granted' => false]);
+
+    // URL returns 403
+    $this->actingAs($buyer)->get(route('user.leases'))->assertForbidden();
+
+    // Dashboard does not show Leases & Rent
+    $dashboardResponse = $this->actingAs($buyer)->get($buyer->dashboard_url);
+    $dashboardResponse->assertOk();
+    $dashboardResponse->assertDontSee('Leases & Rent');
+});
+
+test('design token color palette complies with WCAG AA minimum contrast ratio 4.5:1', function () {
+    $luminance = function ($hex) {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) === 3) {
+            $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        }
+        $r = hexdec(substr($hex, 0, 2)) / 255;
+        $g = hexdec(substr($hex, 2, 2)) / 255;
+        $b = hexdec(substr($hex, 4, 2)) / 255;
+
+        $transform = fn ($c) => ($c <= 0.03928) ? $c / 12.92 : pow(($c + 0.055) / 1.055, 2.4);
+
+        return 0.2126 * $transform($r) + 0.7152 * $transform($g) + 0.0722 * $transform($b);
+    };
+
+    $contrast = function ($c1, $c2) use ($luminance) {
+        $l1 = $luminance($c1);
+        $l2 = $luminance($c2);
+        $lighter = max($l1, $l2);
+        $darker = min($l1, $l2);
+
+        return ($lighter + 0.05) / ($darker + 0.05);
+    };
+
+    $tokenPairs = [
+        // Light mode
+        ['text' => '#0f172a', 'bg' => '#ffffff', 'label' => 'Light Text on Surface', 'min' => 4.5],
+        ['text' => '#475569', 'bg' => '#ffffff', 'label' => 'Light Muted Text on Surface', 'min' => 4.5],
+        ['text' => '#1d3c34', 'bg' => '#ffffff', 'label' => 'Light Primary on Surface', 'min' => 4.5],
+        ['text' => '#047857', 'bg' => '#ffffff', 'label' => 'Light Success on Surface', 'min' => 4.5],
+        ['text' => '#b45309', 'bg' => '#ffffff', 'label' => 'Light Warning on Surface', 'min' => 4.5],
+        ['text' => '#b91c1c', 'bg' => '#ffffff', 'label' => 'Light Danger on Surface', 'min' => 4.5],
+        ['text' => '#1d4ed8', 'bg' => '#ffffff', 'label' => 'Light Info on Surface', 'min' => 4.5],
+        ['text' => '#064e3b', 'bg' => '#ecfdf5', 'label' => 'Light Success Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#78350f', 'bg' => '#fffbeb', 'label' => 'Light Warning Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#7f1d1d', 'bg' => '#fef2f2', 'label' => 'Light Danger Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#1e3a8a', 'bg' => '#eff6ff', 'label' => 'Light Info Badge Text on Surface', 'min' => 4.5],
+
+        // Dark mode (against #111827 surface)
+        ['text' => '#f8fafc', 'bg' => '#111827', 'label' => 'Dark Text on Surface', 'min' => 4.5],
+        ['text' => '#94a3b8', 'bg' => '#111827', 'label' => 'Dark Muted Text on Surface', 'min' => 4.5],
+        ['text' => '#34d399', 'bg' => '#111827', 'label' => 'Dark Primary on Surface', 'min' => 4.5],
+        ['text' => '#fbbf24', 'bg' => '#111827', 'label' => 'Dark Warning on Surface', 'min' => 4.5],
+        ['text' => '#f87171', 'bg' => '#111827', 'label' => 'Dark Danger on Surface', 'min' => 4.5],
+        ['text' => '#60a5fa', 'bg' => '#111827', 'label' => 'Dark Info on Surface', 'min' => 4.5],
+        ['text' => '#6ee7b7', 'bg' => '#052e22', 'label' => 'Dark Success Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#fcd34d', 'bg' => '#381e05', 'label' => 'Dark Warning Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#fca5a5', 'bg' => '#3b0d0c', 'label' => 'Dark Danger Badge Text on Surface', 'min' => 4.5],
+        ['text' => '#93c5fd', 'bg' => '#0c2340', 'label' => 'Dark Info Badge Text on Surface', 'min' => 4.5],
+
+        // Banner text-on-color
+        ['text' => '#ffffff', 'bg' => '#1d3c34', 'label' => 'Banner White Text on Primary Dark', 'min' => 4.5],
+        ['text' => '#dfeee4', 'bg' => '#1d3c34', 'label' => 'Banner Mint Subtitle on Primary Dark', 'min' => 4.5],
+    ];
+
+    foreach ($tokenPairs as $pair) {
+        $ratio = $contrast($pair['text'], $pair['bg']);
+        expect($ratio)->toBeGreaterThanOrEqual(
+            $pair['min'],
+            "Contrast ratio for [{$pair['label']}] is {$ratio}:1, which is below WCAG AA {$pair['min']}:1 requirement."
+        );
+    }
 });

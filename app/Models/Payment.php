@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\FinanceSettings;
+use App\Services\LedgerService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +17,8 @@ class Payment extends Model
 
     protected $fillable = [
         'transaction_number',
+        'idempotency_key',
+        'idempotency_hash',
         'payable_type',
         'payable_id',
         'property_id',
@@ -31,7 +35,9 @@ class Payment extends Model
         'currency',
         'amount',
         'platform_fee',
+        'platform_fee_rate',
         'tax_amount',
+        'vat_rate',
         'net_amount',
         'status',
         'notes',
@@ -46,7 +52,9 @@ class Payment extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'platform_fee' => 'decimal:2',
+        'platform_fee_rate' => 'decimal:4',
         'tax_amount' => 'decimal:2',
+        'vat_rate' => 'decimal:4',
         'net_amount' => 'decimal:2',
         'refunded_amount' => 'decimal:2',
         'verified_at' => 'datetime',
@@ -62,8 +70,24 @@ class Payment extends Model
                 $payment->transaction_number = "TXN-ETH-{$year}-{$random}";
             }
 
+            // Freeze the rate that produced this payment's money (SRS §171).
+            // A later rate change must never recalculate this record.
+            $settings = app(FinanceSettings::class);
+
+            if ($payment->platform_fee_rate === null) {
+                $payment->platform_fee_rate = $settings->platformFeeRate();
+            }
+
+            if ($payment->vat_rate === null) {
+                $payment->vat_rate = $settings->vatRate();
+            }
+
             if (empty($payment->net_amount) && isset($payment->amount)) {
-                $payment->net_amount = max(0, (float) $payment->amount - (float) ($payment->platform_fee ?? 0) - (float) ($payment->tax_amount ?? 0));
+                $payment->net_amount = $settings->netAmount(
+                    (float) $payment->amount,
+                    (float) ($payment->platform_fee ?? 0),
+                    (float) ($payment->tax_amount ?? 0),
+                );
             }
         });
     }
@@ -91,6 +115,11 @@ class Payment extends Model
     public function ledgers(): HasMany
     {
         return $this->hasMany(FinancialLedger::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
     }
 
     public function getMethodLabelAttribute(): string
@@ -139,53 +168,256 @@ class Payment extends Model
     }
 
     /**
-     * Record the auditable ledger entries for a cleared transaction and advance
-     * the payable entity it settles (SRS §82).
+     * Record the auditable double-entry ledger entries for a cleared
+     * transaction and advance the payable entity it settles (SRS §82).
+     *
+     * The journal always balances: the cash received is split into the amount
+     * owed to the beneficiary (gross less the platform service fee and the VAT
+     * charged on top of it), the platform service fee itself, and the VAT
+     * payable the platform owes the tax authority.
      */
-    public function settle(): void
+    public function settle(bool $syncPayable = true): void
     {
-        FinancialLedger::firstOrCreate([
+        $revenueCategory = match ($this->payment_type) {
+            'stay_booking', 'booking_deposit' => 'booking_revenue',
+            'unit_reservation' => 'developer_deposit',
+            'rent_installment' => 'rental_revenue',
+            default => 'earnest_deposit',
+        };
+
+        $amount = (float) $this->amount;
+        $fee = (float) $this->platform_fee;
+        $vat = (float) $this->tax_amount;
+        $net = app(FinanceSettings::class)->netAmount($amount, $fee, $vat);
+
+        $common = [
             'payment_id' => $this->id,
-            'category' => match ($this->payment_type) {
-                'stay_booking' => 'booking_revenue',
-                'unit_reservation' => 'developer_deposit',
-                'rent_installment' => 'rental_revenue',
-                default => 'earnest_deposit',
-            },
-        ], [
-            'entry_type' => 'credit',
-            'amount' => $this->amount,
             'currency' => $this->currency,
-            'description' => "Gross credit for {$this->transaction_number} ({$this->type_label})",
             'reference' => $this->bank_transaction_reference,
             'user_id' => $this->user_id,
-        ]);
+        ];
 
-        if ($this->platform_fee > 0) {
-            FinancialLedger::firstOrCreate([
-                'payment_id' => $this->id,
-                'category' => 'platform_fee',
-            ], [
+        $legs = [
+            $common + [
+                'entry_type' => 'debit',
+                'category' => 'cash',
+                'amount' => $amount,
+                'description' => "Cash received for {$this->transaction_number} ({$this->type_label})",
+            ],
+            $common + [
                 'entry_type' => 'credit',
-                'amount' => $this->platform_fee,
-                'currency' => $this->currency,
+                'category' => $revenueCategory,
+                'amount' => $net,
+                'description' => "Net credit for {$this->transaction_number} ({$this->type_label})",
+            ],
+        ];
+
+        if ($fee > 0) {
+            $legs[] = $common + [
+                'entry_type' => 'credit',
+                'category' => 'platform_fee',
+                'amount' => $fee,
+                'rate_snapshot' => ['key' => FinanceRate::PLATFORM_FEE, 'rate' => (float) $this->platform_fee_rate],
                 'description' => "Platform service fee for {$this->transaction_number}",
-                'reference' => $this->bank_transaction_reference,
-                'user_id' => $this->user_id,
-            ]);
+            ];
         }
 
-        $this->syncPayableAfterSettlement();
+        if ($vat > 0) {
+            $legs[] = $common + [
+                'entry_type' => 'credit',
+                'category' => 'vat_payable',
+                'amount' => $vat,
+                'rate_snapshot' => ['key' => FinanceRate::VAT, 'rate' => (float) $this->vat_rate],
+                'description' => "VAT on the platform service fee for {$this->transaction_number}",
+            ];
+        }
+
+        app(LedgerService::class)->post('payment:'.$this->id, $legs);
+
+        if ($syncPayable) {
+            $this->syncPayableAfterSettlement();
+        }
+    }
+
+    /**
+     * Reverse or flag the payable entity after a refund (SRS §132).
+     *
+     * A refund undoes whatever the settled payment had advanced, but only while
+     * the payable is still in the exact state the payment set. If it has since
+     * moved on (an offer was countered or accepted, a reservation confirmed, a
+     * rent schedule re-let), forcing the old state would destroy a later
+     * business fact, so the refund records a flag for the finance desk instead.
+     */
+    public function reversePayableAfterRefund(bool $isFullRefund = true): void
+    {
+        if (! $this->payable_type || ! $this->payable_id) {
+            return;
+        }
+
+        if ($this->payableIs(Booking::class)) {
+            $booking = Booking::find($this->payable_id);
+
+            if (! $booking) {
+                return;
+            }
+
+            if ($booking->status === 'completed') {
+                $this->flagForReview($booking, "Refund on a booking already {$booking->status}.");
+
+                return;
+            }
+
+            $booking->update([
+                'status' => 'cancelled',
+                'payment_status' => 'refunded',
+                'refund_amount' => (float) $booking->refund_amount + (float) $this->refunded_amount,
+                'refund_status' => $isFullRefund ? 'refunded' : 'pending_disbursement',
+            ]);
+
+            return;
+        }
+
+        if ($this->payableIs(PropertyOffer::class)) {
+            $offer = PropertyOffer::find($this->payable_id);
+
+            if (! $offer) {
+                return;
+            }
+
+            if ($offer->status !== 'under_review') {
+                $this->flagForReview($offer, "Refund on an offer that is {$offer->status}, not the under_review state the payment set.");
+
+                return;
+            }
+
+            $offer->update(['status' => $isFullRefund ? 'rejected' : 'under_review']);
+
+            return;
+        }
+
+        if ($this->payableIs(UnitReservation::class)) {
+            $reservation = UnitReservation::find($this->payable_id);
+
+            if (! $reservation) {
+                return;
+            }
+
+            if ($reservation->status !== 'reserved') {
+                $this->flagForReview($reservation, "Refund on a reservation that is {$reservation->status}, not the reserved state the payment set.");
+
+                return;
+            }
+
+            $reservation->update(['status' => $isFullRefund ? 'cancelled' : 'reserved']);
+
+            return;
+        }
+
+        if ($this->payableIs(RentSchedule::class)) {
+            $schedule = RentSchedule::find($this->payable_id);
+
+            if (! $schedule) {
+                return;
+            }
+
+            if ($schedule->status !== 'paid') {
+                $this->flagForReview($schedule, "Refund on a rent schedule that is {$schedule->status}, not the paid state the payment set.");
+
+                return;
+            }
+
+            $schedule->update([
+                'status' => $isFullRefund ? 'pending' : 'partial',
+                'amount_paid' => 0,
+                'paid_at' => null,
+                'payment_id' => null,
+            ]);
+        }
     }
 
     /**
      * Flag the payable entity after a rejected transaction so the payer may retry.
+     *
+     * A failed payment must not leave an offer, reservation or rent schedule
+     * looking as though it had been paid, so each payable is put back to the
+     * state it held before the money was submitted - but only while it is still
+     * in the state this payment set. Anything that has moved on is flagged for
+     * the finance desk rather than silently rewritten.
      */
     public function flagPayableRejected(): void
     {
+        if (! $this->payable_type || ! $this->payable_id) {
+            return;
+        }
+
         if ($this->payableIs(Booking::class)) {
             Booking::find($this->payable_id)?->markPaymentRejected();
+
+            return;
         }
+
+        if ($this->payableIs(PropertyOffer::class)) {
+            $offer = PropertyOffer::find($this->payable_id);
+
+            if ($offer && $offer->status !== 'under_review') {
+                $this->flagForReview($offer, "Rejected payment on an offer that is {$offer->status}, not the under_review state the payment set.");
+
+                return;
+            }
+
+            PropertyOffer::where('id', $this->payable_id)
+                ->whereIn('status', ['under_review'])
+                ->update(['status' => 'submitted']);
+
+            return;
+        }
+
+        if ($this->payableIs(UnitReservation::class)) {
+            $reservation = UnitReservation::find($this->payable_id);
+
+            if ($reservation && $reservation->status !== 'reserved') {
+                $this->flagForReview($reservation, "Rejected payment on a reservation that is {$reservation->status}, not the reserved state the payment set.");
+
+                return;
+            }
+
+            UnitReservation::where('id', $this->payable_id)
+                ->whereIn('status', ['reserved'])
+                ->update(['status' => 'pending']);
+
+            return;
+        }
+
+        if ($this->payableIs(RentSchedule::class)) {
+            $schedule = RentSchedule::find($this->payable_id);
+
+            if ($schedule && $schedule->status !== 'paid') {
+                $this->flagForReview($schedule, "Rejected payment on a rent schedule that is {$schedule->status}, not the paid state the payment set.");
+
+                return;
+            }
+
+            RentSchedule::where('id', $this->payable_id)->update([
+                'status' => 'pending',
+                'amount_paid' => 0,
+                'paid_at' => null,
+                'payment_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * Record a durable flag that a money event could not safely roll back its
+     * payable because the payable had already moved on.
+     */
+    protected function flagForReview(Model $reviewable, string $reason): void
+    {
+        FinanceReviewFlag::create([
+            'reviewable_type' => $reviewable::class,
+            'reviewable_id' => $reviewable->getKey(),
+            'payment_id' => $this->id,
+            'reason' => $reason,
+        ]);
     }
 
     /**

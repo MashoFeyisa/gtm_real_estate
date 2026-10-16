@@ -32,6 +32,20 @@ class RolePermissionSeeder extends Seeder
             }
         }
 
+        // Catalogued capabilities that no persona grants by default. They must
+        // exist as permissions so a check on them resolves to a denial rather
+        // than an unknown key, and so an admin can grant them explicitly.
+        foreach (config('personas.catalogue', []) as $key => $label) {
+            Permission::query()->firstOrCreate(
+                ['key' => $key],
+                [
+                    'label' => $label,
+                    'group' => 'catalogue',
+                    'sort_order' => ++$sortOrder,
+                ]
+            );
+        }
+
         // Database-driven user-facing menu mapping (permission -> menu_label, icon, route)
         $menuMapping = [
             'properties.create' => ['menu_label' => 'Post Property', 'icon' => '🏠', 'route' => 'user.properties.create'],

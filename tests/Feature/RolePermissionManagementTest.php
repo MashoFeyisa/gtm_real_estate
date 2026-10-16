@@ -87,10 +87,10 @@ test('permission checks honour role defaults and per-user overrides', function (
     expect($user->fresh()->hasPermission('platform.roles_manage'))->toBeTrue();
 });
 
-test('permissions outside the seeded catalog are not restricted', function () {
+test('permissions outside the seeded catalog are denied by default', function () {
     $user = User::factory()->create(['role' => 'buyer']);
 
-    expect($user->hasPermission('not.a.real.permission'))->toBeTrue();
+    expect($user->hasPermission('not.a.real.permission'))->toBeFalse();
 });
 
 test('persona roles land on their dedicated dashboard with their capabilities', function () {

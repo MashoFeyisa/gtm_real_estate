@@ -78,6 +78,11 @@ class PropertyPolicy
 
     /**
      * Determine whether the user can update the property.
+     *
+     * Access is granted to every user who manages the property, which mirrors
+     * the list shown on the Property Owner dashboard. Contributors such as
+     * document uploaders and lease landlords are included so the dashboard
+     * never offers an action the policy then rejects.
      */
     public function update(User $user, Property $property): bool
     {
@@ -85,16 +90,14 @@ class PropertyPolicy
             return true;
         }
 
-        $isOwner = ($property->user_id !== null && $property->user_id === $user->id)
-            || ($property->host_id !== null && $property->host_id === $user->id);
-
-        $isAssignedAgent = $user->agentProfile && $property->agent_id === $user->agentProfile->id;
-
-        return $isOwner || $isAssignedAgent;
+        return $property->isManagedBy($user);
     }
 
     /**
      * Determine whether the user can delete the property.
+     *
+     * Deletion is irreversible, so it stays limited to the recorded owner or
+     * host rather than every manager.
      */
     public function delete(User $user, Property $property): bool
     {
@@ -102,10 +105,7 @@ class PropertyPolicy
             return true;
         }
 
-        $isOwner = ($property->user_id !== null && $property->user_id === $user->id)
-            || ($property->host_id !== null && $property->host_id === $user->id);
-
-        return $isOwner;
+        return $property->isOwnedBy($user);
     }
 
     /**
@@ -117,10 +117,7 @@ class PropertyPolicy
             return true;
         }
 
-        $isOwner = ($property->user_id !== null && $property->user_id === $user->id)
-            || ($property->host_id !== null && $property->host_id === $user->id);
-
-        return $isOwner;
+        return $property->isManagedBy($user);
     }
 
     /**

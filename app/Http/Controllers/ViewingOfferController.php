@@ -15,6 +15,7 @@ use App\Notifications\CommissionGeneratedNotification;
 use App\Notifications\OfferStatusNotification;
 use App\Notifications\ViewingStatusNotification;
 use App\Services\AgreementPdfService;
+use App\Services\FinanceSettings;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -315,13 +316,17 @@ class ViewingOfferController extends Controller
             ]);
 
             if ($offer->agent_id) {
+                $settings = app(FinanceSettings::class);
+                $rate = $settings->commissionRateFor($offer->agent_id, $property->property_category);
+                $commAmount = $settings->commissionFor($acceptedAmount, $rate);
+
                 $commission = Commission::firstOrCreate([
                     'property_id' => $property->id,
                     'agent_id' => $offer->agent_id,
                 ], [
                     'property_price' => $acceptedAmount,
-                    'commission_rate' => 100.0,
-                    'commission_amount' => $acceptedAmount,
+                    'commission_rate' => $rate,
+                    'commission_amount' => $commAmount,
                     'status' => 'pending',
                 ]);
 
@@ -337,7 +342,7 @@ class ViewingOfferController extends Controller
 
                 ActivityLog::record(
                     'commission_generated',
-                    'Rental commission of ETB '.number_format($acceptedAmount, 2)." generated for {$offer->agent->name} on Lease {$lease->lease_code}.",
+                    'Rental commission of ETB '.number_format($commAmount, 2)." ({$rate}%) generated for {$offer->agent->name} on Lease {$lease->lease_code}.",
                     $commission
                 );
             }
@@ -390,8 +395,9 @@ class ViewingOfferController extends Controller
 
         if ($offer->agent_id) {
             $agent = $offer->agent;
-            $rate = (float) ($agent?->commission_rate ?? 2.0);
-            $commAmount = round($acceptedAmount * ($rate / 100), 2);
+            $settings = app(FinanceSettings::class);
+            $rate = $settings->commissionRateFor($offer->agent_id, $property->property_category, null, $agent?->commission_rate);
+            $commAmount = $settings->commissionFor($acceptedAmount, $rate);
 
             $commission = Commission::firstOrCreate([
                 'order_id' => $order->id,

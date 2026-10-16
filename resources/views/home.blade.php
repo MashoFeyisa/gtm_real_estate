@@ -511,7 +511,7 @@
         </div>
 
         <div data-carousel="featured-properties" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
-            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
+            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 luxury-scrollbar select-none cursor-grab active:cursor-grabbing">
                 @forelse ($featuredProperties as $property)
                     @php
                         $cardGallery = $property->gallery_images;
@@ -848,7 +848,7 @@
         </div>
 
         <div data-carousel="latest-properties" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
-            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
+            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 luxury-scrollbar select-none cursor-grab active:cursor-grabbing">
                 @forelse ($latestProperties as $property)
                     @php
                         $latestGallery = $property->gallery_images;
@@ -930,7 +930,7 @@
                                         <span class="text-xl font-black text-[#102b25] currency-price" data-base-price="{{ $property->price }}" {{ $property->type === 'rent' ? 'data-price-suffix="/mo"' : '' }}>ETB {{ number_format($property->price) }}{{ $property->type === 'rent' ? '/mo' : '' }}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" data-quickview-btn class="rounded-full border border-[#d9cab3] bg-white px-3 py-1.5 text-sm font-black uppercase tracking-wider text-[#102b25] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer whitespace-nowrap">
+                                        <button type="button" data-quickview-btn class="rounded-full bg-[#f5ede0] px-3 py-1.5 text-sm font-black uppercase tracking-wider text-[#9b6c17] hover:bg-[#102b25] hover:text-[#e7d8b7] transition-colors cursor-pointer whitespace-nowrap">
                                             Preview
                                         </button>
                                         <a href="{{ route('properties.show', $property->slug) }}" class="rounded-full bg-[#f5ede0] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#9b6c17] group-hover:bg-[#102b25] group-hover:text-[#e7d8b7] transition-colors">
@@ -1037,7 +1037,7 @@
         </div>
 
         <div data-carousel="news" data-carousel-autoplay="true" data-carousel-interval="2000" class="relative mt-8">
-            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
+            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 luxury-scrollbar select-none cursor-grab active:cursor-grabbing">
                 @forelse ($posts as $post)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
                         @if ($post->type === 'job')
@@ -1288,7 +1288,7 @@
         </div>
 
         <div data-carousel="testimonials" data-carousel-autoplay="true" data-carousel-interval="3000" class="relative mt-8">
-            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
+            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 luxury-scrollbar select-none cursor-grab active:cursor-grabbing">
                 @forelse ($testimonials as $testimonial)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
                         <div class="flex flex-col h-full rounded-[2rem] border border-[#d9cab3] {{ $loop->index % 2 === 1 ? 'bg-[#f9f5ee]' : 'bg-white' }} p-7 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-[#c5a059]">
@@ -1372,7 +1372,7 @@
         </div>
 
         <div data-carousel="agents" data-carousel-autoplay="true" data-carousel-interval="3000" class="relative mt-8">
-            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 no-scrollbar select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing">
+            <div data-carousel-track class="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory py-4 -my-4 px-1 -mx-1 luxury-scrollbar select-none cursor-grab active:cursor-grabbing">
                 @forelse ($agents ?? collect() as $index => $agent)
                     <div data-carousel-slide class="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-start flex flex-col">
                         <div class="flex flex-col h-full overflow-hidden rounded-[2rem] border border-[#d9cab3] {{ $index % 2 === 1 ? 'bg-[#f9f5ee]' : 'bg-white' }} shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-[#c5a059]">

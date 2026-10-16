@@ -1,19 +1,19 @@
 {{-- Ethiopian Property Verification & Legal Documentation Shield --}}
-<div id="legal-verification-shield" class="mt-8 rounded-3xl border-2 border-[#102b25]/15 bg-white p-6 shadow-sm relative overflow-hidden">
+<div id="legal-verification-shield" class="flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 relative overflow-hidden min-w-0 break-words">
     {{-- Top Decorative Header Ribbon --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#f0e4cf] pb-5">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#f0e4cf] pb-5 dark:border-slate-800">
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37] flex items-center gap-1">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <span>Trust &amp; Safety</span>
                 </span>
-                <span class="text-xs font-bold text-[#587165]">የይዞታ ካርታ እና ህጋዊ ሰነዶች</span>
+                <span class="text-xs font-bold text-[#587165] dark:text-slate-400">የይዞታ ካርታ እና ህጋዊ ሰነዶች</span>
             </div>
-            <h3 class="mt-1 text-xl font-black text-[#1d3c34]">
+            <h3 class="mt-1 text-xl font-black text-[#1d3c34] dark:text-white">
                 Legal Verification &amp; Documentation Shield
             </h3>
-            <p class="text-xs text-slate-500">
+            <p class="text-xs text-slate-500 dark:text-slate-400">
                 Official Ethiopian Cadastre, Title Deed (Carta), and ownership audit status.
             </p>
         </div>

@@ -4,7 +4,7 @@
         return;
     }
 
-    // Admins manage from the central Admin Desk and do not have the user Granted Access block
+    // Admins manage from the central Admin Desk and do not have persona sidebar links
     if ($user->isAdmin()) {
         return;
     }
@@ -46,13 +46,26 @@
 
     // Routes that this role's base dashboard already handles internally
     $roleBaseHandledRoutes = match ($user->role) {
-        'buyer' => ['buyer.dashboard', 'user.offers', 'user.viewings'],
+        'buyer' => ['buyer.dashboard', 'user.offers', 'user.viewings', 'user.inquiries'],
         'host' => ['host.dashboard', 'user.bookings'],
         'agent' => ['agent.portal', 'user.properties.create', 'user.offers', 'user.viewings', 'user.leases', 'user.inquiries', 'user.reviews'],
-        'tenant', 'renter' => ['tenant.dashboard', 'user.leases'],
-        'seller', 'landlord', 'property_owner' => ['seller.dashboard', 'user.properties.create', 'user.offers', 'user.inquiries'],
+        'tenant', 'renter' => ['tenant.dashboard', 'user.leases', 'user.maintenance'],
+        'seller', 'landlord', 'property_owner' => ['seller.dashboard', 'user.properties.create', 'user.offers', 'user.inquiries', 'user.leases', 'user.maintenance'],
+        'guest', 'traveler' => ['guest.dashboard', 'user.bookings', 'user.reviews'],
         default => [],
     };
+
+    // Sensible semantic grouping and target routing for permission-granted features
+    $groupRegistry = [
+        'user.leases' => ['group' => 'Living', 'title' => 'Leases & Rent', 'target' => '#leases', 'section' => 'leases', 'in_dashboard' => true],
+        'user.maintenance' => ['group' => 'Living', 'title' => 'Maintenance Requests', 'target' => '#maintenance', 'section' => 'maintenance', 'in_dashboard' => true],
+        'user.bookings' => ['group' => 'Stays', 'title' => 'My Bookings', 'target' => '#bookings', 'section' => 'bookings', 'in_dashboard' => true],
+        'user.properties.create' => ['group' => 'Properties', 'title' => 'Post Property', 'target' => route('user.properties.create'), 'section' => null, 'in_dashboard' => false],
+        'user.offers' => ['group' => 'Deals', 'title' => 'My Offers', 'target' => '#offers', 'section' => 'offers', 'in_dashboard' => true],
+        'user.viewings' => ['group' => 'Viewings', 'title' => 'My Viewings', 'target' => '#viewings', 'section' => 'viewings', 'in_dashboard' => true],
+        'user.inquiries' => ['group' => 'Communication', 'title' => 'My Inquiries', 'target' => '#inquiries', 'section' => 'inquiries', 'in_dashboard' => true],
+        'user.reviews' => ['group' => 'Reviews', 'title' => 'My Reviews', 'target' => '#reviews', 'section' => 'reviews', 'in_dashboard' => true],
+    ];
 
     // Query database for all permissions that have a user-facing route configured
     $mappedPermissions = \App\Models\Permission::query()
@@ -118,35 +131,44 @@
         }
 
         $seenRoutes[$permission->route] = true;
+
+        $meta = $groupRegistry[$permission->route] ?? [
+            'group' => 'Features',
+            'title' => $permission->menu_label ?: $permission->label,
+            'target' => route($permission->route),
+            'section' => null,
+            'in_dashboard' => false,
+        ];
+
+        $cleanIcon = trim((string) ($permission->icon ?: '✨'));
+
         $grantedItems->push([
             'key' => $permission->key,
-            'title' => $permission->menu_label ?: $permission->label,
-            'icon' => $permission->icon ?: '✨',
-            'route' => $permission->route,
+            'group' => $meta['group'],
+            'title' => $meta['title'],
+            'icon' => $cleanIcon,
+            'target' => $meta['target'],
+            'section' => $meta['section'],
+            'in_dashboard' => $meta['in_dashboard'],
         ]);
     }
+
+    $groupedGrantedItems = $grantedItems->groupBy('group');
 @endphp
 
-@if ($grantedItems->isNotEmpty())
-    <div class="pt-4 mt-4 border-t border-white/10" id="authorized-granted-sidebar-section">
-        <div class="px-3 pb-2 flex items-center justify-between">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#d4af37]">Granted Access</p>
-            <span class="rounded-full bg-[#d4af37]/20 text-[#d4af37] px-2 py-0.5 text-[9px] font-black border border-[#d4af37]/30">
-                {{ $grantedItems->count() }}
-            </span>
+@if ($groupedGrantedItems->isNotEmpty())
+    @foreach ($groupedGrantedItems as $groupName => $items)
+        <div class="pt-3">
+            <div class="px-3 pb-1 token-sidebar-heading">{{ $groupName }}</div>
+            <div class="space-y-1">
+                @foreach ($items as $item)
+                    @if ($item['in_dashboard'])
+                        <x-sidebar-item :href="$item['target']" :target-section="$item['section']" :icon="$item['icon']" :label="$item['title']" />
+                    @else
+                        <x-sidebar-item :href="$item['target']" :icon="$item['icon']" :label="$item['title']" />
+                    @endif
+                @endforeach
+            </div>
         </div>
-        <div class="space-y-1">
-            @foreach ($grantedItems as $item)
-                <a href="{{ route($item['route']) }}" class="authorized-sidebar-link flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold text-[#dfeee4] transition hover:bg-white/10 hover:text-white group">
-                    <span class="flex items-center gap-2 truncate">
-                        <span>{{ $item['icon'] }}</span>
-                        <span class="truncate">{{ $item['title'] }}</span>
-                    </span>
-                    <span class="rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-1.5 py-0.5 text-[9px] font-bold text-[#f8e7b9] shrink-0 opacity-80 group-hover:opacity-100">
-                        &rarr;
-                    </span>
-                </a>
-            @endforeach
-        </div>
-    </div>
+    @endforeach
 @endif

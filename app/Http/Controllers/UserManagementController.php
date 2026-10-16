@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\UserPermission;
 use App\Models\UserPermissionOverride;
 use App\Services\CommissionSplitService;
+use App\Services\FinanceSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,7 +83,7 @@ class UserManagementController extends Controller
                     'split_percentage' => $validated['split_percentage'] ?? $defaultSplit,
                     'license_number' => $validated['license_number'] ?? null,
                     'license_verified' => $validated['license_verified'] ?? false,
-                    'commission_rate' => $validated['commission_rate'] ?? 5,
+                    'commission_rate' => $validated['commission_rate'] ?? app(FinanceSettings::class)->defaultCommissionRate(),
                     'is_active' => $validated['is_active'] ?? true,
                     'photo_path' => $this->storeAgentPhotoUpload($request),
                 ]

@@ -16,6 +16,7 @@ use App\Models\PropertyViewing;
 use App\Models\RentSchedule;
 use App\Models\User;
 use App\Services\ImageSecurityService;
+use App\Services\RentPaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -389,9 +390,11 @@ class SellerDashboardController extends Controller
     public function deletePhoto(Request $request, PropertyImage $image): RedirectResponse
     {
         $property = $image->property;
-        if (! $property || (int) $property->user_id !== (int) $request->user()->id) {
+        if (! $property) {
             abort(403, 'Unauthorized photo deletion.');
         }
+
+        $this->authorize('update', $property);
 
         if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
             Storage::disk('public')->delete($image->image_path);
@@ -415,9 +418,11 @@ class SellerDashboardController extends Controller
     public function setCoverPhoto(Request $request, PropertyImage $image): RedirectResponse
     {
         $property = $image->property;
-        if (! $property || (int) $property->user_id !== (int) $request->user()->id) {
+        if (! $property) {
             abort(403, 'Unauthorized.');
         }
+
+        $this->authorize('update', $property);
 
         $property->update(['image_path' => $image->image_path]);
 
@@ -486,9 +491,12 @@ class SellerDashboardController extends Controller
     public function destroyDocument(Request $request, PropertyDocument $document): RedirectResponse
     {
         $user = $request->user();
-        if ((int) $document->user_id !== (int) $user->id && (int) $document->property?->user_id !== (int) $user->id) {
+
+        if (! $document->property) {
             abort(403, 'Unauthorized document removal.');
         }
+
+        $this->authorize('update', $document->property);
 
         if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
             Storage::disk('public')->delete($document->file_path);
@@ -681,20 +689,16 @@ class SellerDashboardController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $schedule->update([
-            'status' => 'paid',
-            'amount_paid' => (float) $validated['amount_paid'],
-            'paid_at' => now(),
-            'payment_method' => $validated['payment_method'],
-            'notes' => $validated['notes'] ?? 'Offline collection recorded by landlord',
-        ]);
-
-        AuditLog::log(
-            action: 'landlord.rent_recorded',
-            entity: $schedule,
-            reason: "Recorded rent installment #{$schedule->installment_number} payment of ETB ".number_format($validated['amount_paid'], 2),
-            user: $user,
-            request: $request
+        // The landlord desk records an offline collection through the same
+        // writer the tenant desk uses, so it leaves the same payment row and
+        // balanced ledger journal as an online payment (SRS §87).
+        app(RentPaymentService::class)->record(
+            schedule: $schedule,
+            recorder: $user,
+            amount: (float) $validated['amount_paid'],
+            paymentMethod: $validated['payment_method'],
+            notes: $validated['notes'] ?? 'Offline collection recorded by landlord',
+            idempotencyKey: $request->header('Idempotency-Key'),
         );
 
         return redirect()->route('seller.dashboard')->with('success', "Rent installment #{$schedule->installment_number} recorded as paid.");

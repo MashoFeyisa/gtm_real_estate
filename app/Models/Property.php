@@ -251,6 +251,59 @@ class Property extends Model
         return $this->belongsTo(User::class, 'host_id');
     }
 
+    /**
+     * The single definition of "this user manages this property".
+     *
+     * Mirrors the property list shown on the Property Owner dashboard so the
+     * dashboard and PropertyPolicy can never disagree about who has access.
+     * A user manages a property when they are its owner, host, the landlord of
+     * one of its leases, a contributor of one of its documents, or its
+     * assigned agent.
+     */
+    public function isManagedBy(User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->user_id !== null && (int) $this->user_id === (int) $user->id) {
+            return true;
+        }
+
+        if ($this->host_id !== null && (int) $this->host_id === (int) $user->id) {
+            return true;
+        }
+
+        if ($user->agentProfile && $this->agent_id !== null && (int) $this->agent_id === (int) $user->agentProfile->id) {
+            return true;
+        }
+
+        if ($this->documents()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        return $this->leases()->where('landlord_user_id', $user->id)->exists();
+    }
+
+    /**
+     * Determines whether the user strictly owns the property record.
+     *
+     * Used for irreversible actions such as deleting the property itself,
+     * where contributing a document or holding a lease is not enough.
+     */
+    public function isOwnedBy(User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->user_id !== null && (int) $this->user_id === (int) $user->id) {
+            return true;
+        }
+
+        return $this->host_id !== null && (int) $this->host_id === (int) $user->id;
+    }
+
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class)->latest();

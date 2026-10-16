@@ -231,7 +231,8 @@
                         </p>
                     </form>
 
-                    {{-- 1-Click Demo Account Quick Fill --}}
+                    {{-- 1-Click Demo Account Quick Fill (development only) --}}
+                    @if (App\Support\DemoData::allowed())
                     <div class="mt-6 border-t border-[#e7ddca] pt-5">
                         <details class="group rounded-2xl border border-[#d9cab3] bg-[#fbf9f5] p-3.5 text-xs">
                             <summary class="flex cursor-pointer items-center justify-between font-bold text-[#1d3c34] select-none">
@@ -278,6 +279,7 @@
                             </div>
                         </details>
                     </div>
+                    @endif
                 </div>
             </section>
         </div>

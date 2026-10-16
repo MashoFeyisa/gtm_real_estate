@@ -115,3 +115,24 @@ test('homepage displays more than three items in carousels when available in dat
         $response->assertSee("Amazing service received from consultant {$i}.");
     }
 });
+
+test('preview button in latest properties matches explore button warm styling', function () {
+    Property::create([
+        'title' => 'Test Latest Property Styling',
+        'slug' => 'test-latest-property-styling',
+        'price' => 7500000,
+        'bedrooms' => 3,
+        'bathrooms' => 2,
+        'area' => 180,
+        'city' => 'Addis Ababa',
+        'type' => 'sale',
+        'featured' => false,
+        'status' => 'available',
+    ]);
+
+    $response = $this->get('/');
+
+    $response->assertOk();
+    $response->assertSee('text-[#9b6c17]', false);
+    $response->assertSee('bg-[#f5ede0]', false);
+});

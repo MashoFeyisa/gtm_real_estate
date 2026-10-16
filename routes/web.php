@@ -4,6 +4,7 @@ use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AgentPortalController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BuyerDashboardController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CategoryManagementController;
@@ -369,6 +370,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/company/listings/{property}/status/{status}', [CompanyListingController::class, 'setStatus'])->name('company.listings.status');
     Route::post('/company/listings/merge', [CompanyDashboardController::class, 'mergeListings'])->name('company.listings.merge');
     Route::post('/company/subscription', [CompanyDashboardController::class, 'updateSubscription'])->name('company.subscription.update');
+    Route::post('/company/bank-accounts', [BankAccountController::class, 'store'])->name('company.bank-accounts.store');
+    Route::put('/company/bank-accounts/{bankAccount}', [BankAccountController::class, 'update'])->name('company.bank-accounts.update');
+    Route::delete('/company/bank-accounts/{bankAccount}', [BankAccountController::class, 'destroy'])->name('company.bank-accounts.destroy');
+    Route::post('/company/bank-accounts/{bankAccount}/toggle-active', [BankAccountController::class, 'toggleActive'])->name('company.bank-accounts.toggle-active');
 
     Route::post('/dashboard/branches', [WorkerManagementController::class, 'storeBranch'])->name('dashboard.branches.store');
     Route::put('/dashboard/branches/{branch}', [WorkerManagementController::class, 'updateBranch'])->name('dashboard.branches.update');
@@ -515,8 +520,8 @@ Route::middleware('auth')->group(function () {
     Route::match(['put', 'patch'], '/properties/{property}/documents/{document}/status', [PropertyVerificationController::class, 'updateDocumentStatus'])->name('properties.documents.update-status');
 
     // Ethiopian Transaction & Payment Engine (SRS §78–§83)
-    Route::put('/payments/{payment}/verify', [PaymentController::class, 'verify'])->name('payments.verify');
-    Route::put('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::put('/payments/{payment}/verify', [PaymentController::class, 'verify'])->middleware('permission:payments.manage')->name('payments.verify');
+    Route::put('/payments/{payment}/reject', [PaymentController::class, 'reject'])->middleware('permission:payments.manage')->name('payments.reject');
     Route::get('/payments/{payment}/slip', [PaymentController::class, 'viewSlip'])->name('payments.slip');
 
     // Rental & Lease Management Engine (SRS §84–§88)
@@ -542,19 +547,27 @@ Route::middleware('auth')->group(function () {
     })->name('notifications.mark-all-read');
 
     // Financial Reporting, Commission Settlement, Refunds & Invoicing Desk (SRS §126–§135)
+    // The read desks keep their own in-controller scoping (agents see only their
+    // own rows); the routes that move money carry a route-level permission gate.
     Route::get('/finance', [FinancialReportingController::class, 'index'])->name('finance.index');
     Route::get('/dashboard/finance', [FinancialReportingController::class, 'index'])->name('finance.dashboard');
-    Route::post('/finance/payments/{payment}/refund', [FinancialReportingController::class, 'issueRefund'])->name('finance.payments.refund');
-    Route::post('/finance/invoices', [FinancialReportingController::class, 'storeInvoice'])->name('finance.invoices.store');
-    Route::patch('/finance/invoices/{invoice}/status', [FinancialReportingController::class, 'updateInvoiceStatus'])->name('finance.invoices.status');
-    Route::post('/finance/payouts', [FinancialReportingController::class, 'storePayoutRequest'])->name('finance.payouts.store');
-    Route::patch('/finance/payouts/{payout}', [FinancialReportingController::class, 'processPayout'])->name('finance.payouts.process');
-    Route::patch('/finance/subscriptions/{subscription}', [FinancialReportingController::class, 'updateSubscription'])->name('finance.subscriptions.update');
-    Route::post('/commissions/{commission}/settle', [FinancialReportingController::class, 'settleCommission'])->name('commissions.settle');
-    Route::get('/commissions/{commission}/voucher', [FinancialReportingController::class, 'voucher'])->name('commissions.voucher');
+    Route::post('/finance/payments/{payment}/refund', [FinancialReportingController::class, 'issueRefund'])->middleware('permission:refunds.manage')->name('finance.payments.refund');
+    Route::post('/finance/invoices', [FinancialReportingController::class, 'storeInvoice'])->middleware('permission:invoices.manage')->name('finance.invoices.store');
+    Route::patch('/finance/invoices/{invoice}/status', [FinancialReportingController::class, 'updateInvoiceStatus'])->middleware('permission:invoices.manage')->name('finance.invoices.status');
+    Route::post('/finance/payouts', [FinancialReportingController::class, 'storePayoutRequest'])->middleware('permission:commissions.manage')->name('finance.payouts.store');
+    Route::patch('/finance/payouts/{payout}', [FinancialReportingController::class, 'processPayout'])->middleware('permission:payouts.update')->name('finance.payouts.process');
+    Route::patch('/finance/subscriptions/{subscription}', [FinancialReportingController::class, 'updateSubscription'])->middleware('permission:subscriptions.manage')->name('finance.subscriptions.update');
+    Route::post('/finance/settings/rates', [FinancialReportingController::class, 'updateFinanceRate'])->middleware('permission:finance.settings.update')->name('finance.settings.rates.store');
+    Route::post('/finance/settings/rates/{rate}/approve', [FinancialReportingController::class, 'approveFinanceRate'])->middleware('permission:finance.settings.approve')->name('finance.settings.rates.approve');
+    Route::get('/finance/vat', [FinancialReportingController::class, 'vatReport'])->name('finance.vat');
+    Route::post('/finance/vat/remit', [FinancialReportingController::class, 'remitVat'])->middleware('permission:tax.manage')->name('finance.vat.remit');
+    Route::get('/finance/reconciliation', [FinancialReportingController::class, 'reconciliation'])->name('finance.reconciliation');
+    Route::post('/finance/reconciliation/match', [FinancialReportingController::class, 'matchBankReference'])->middleware('permission:reconciliation.manage')->name('finance.reconciliation.match');
+    Route::post('/commissions/{commission}/settle', [FinancialReportingController::class, 'settleCommission'])->middleware('permission:commissions.manage')->name('commissions.settle');
+    Route::get('/commissions/{commission}/voucher', [FinancialReportingController::class, 'voucher'])->middleware('permission:commissions.manage')->name('commissions.voucher');
     Route::get('/finance/export-csv', [FinancialReportingController::class, 'exportCsv'])->name('finance.export-csv');
     Route::get('/finance/statement', [FinancialReportingController::class, 'statement'])->name('finance.statement');
-    Route::post('/finance/shifts/{shift}/verify', [FinancialReportingController::class, 'verifyShift'])->name('finance.shifts.verify');
+    Route::post('/finance/shifts/{shift}/verify', [FinancialReportingController::class, 'verifyShift'])->middleware('permission:reconciliation.manage')->name('finance.shifts.verify');
 
     // Verification Company desk: document verification jobs & property certifications
     Route::get('/verification-company', [VerificationCompanyController::class, 'index'])->name('verification_company.portal');
@@ -745,7 +758,11 @@ Route::post('/campaigns/{campaign}/leads', [CampaignController::class, 'recordLe
 
 // Public Payment Submission & Receipt Routes
 Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
-Route::post('/payments/callback', [PaymentController::class, 'handleGatewayCallback'])->name('payments.callback');
+// Gateway webhooks are unauthenticated by session but must carry a valid HMAC
+// provider signature; every call is logged, accepted or rejected.
+Route::post('/payments/callback', [PaymentController::class, 'handleGatewayCallback'])
+    ->middleware(['throttle:payments-callback', 'provider.signature'])
+    ->name('payments.callback');
 Route::get('/payments/{transactionNumber}/receipt', [PaymentController::class, 'receipt'])->middleware('auth')->name('payments.receipt');
 
 // Permission-Gated Media & Document Access (Phase 4)

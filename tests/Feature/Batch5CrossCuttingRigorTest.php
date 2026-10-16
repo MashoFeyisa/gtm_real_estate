@@ -173,6 +173,8 @@ test('off-plan unit reservation prevents double reservation and locks unit statu
 // ══════════════════════════════════════════════════════════════════════════════
 
 test('payment webhook callback is strictly idempotent and prevents duplicate ledger records', function () {
+    config(['services.payments.providers.chapa.secret' => 'test-chapa-secret']);
+
     $payer = User::factory()->create(['role' => 'client']);
     $payment = Payment::create([
         'transaction_number' => 'TXN-IDEMPOTENT-TEST-001',
@@ -197,8 +199,17 @@ test('payment webhook callback is strictly idempotent and prevents duplicate led
         'status' => 'completed',
     ];
 
+    $callbackTimestamp = (string) now()->timestamp;
+
+    $headers = [
+        'X-Provider' => 'chapa',
+        'X-Provider-Timestamp' => $callbackTimestamp,
+        'X-Provider-Signature' => hash_hmac('sha256', $callbackTimestamp.'.'.json_encode($payload), 'test-chapa-secret'),
+        'Content-Type' => 'application/json',
+    ];
+
     // 1. Initial callback -> marks completed, creates ledger record
-    $res1 = $this->postJson(route('payments.callback'), $payload);
+    $res1 = $this->postJson(route('payments.callback'), $payload, $headers);
     $res1->assertStatus(200);
     $res1->assertJson([
         'success' => true,
@@ -214,7 +225,7 @@ test('payment webhook callback is strictly idempotent and prevents duplicate led
     expect($initialLedgerCount)->toBeGreaterThanOrEqual(1);
 
     // 2. Redelivery of the exact same callback -> returns 200 with already_processed and NO new ledger entries
-    $res2 = $this->postJson(route('payments.callback'), $payload);
+    $res2 = $this->postJson(route('payments.callback'), $payload, $headers);
     $res2->assertStatus(200);
     $res2->assertJson([
         'success' => true,

@@ -1,19 +1,19 @@
-<div id="property-reviews-section" class="scroll-mt-24 mt-8 rounded-[2rem] border border-[#d9cab3] bg-white p-6 md:p-8 shadow-sm">
-    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#f0e4cf] pb-5">
+<div id="property-reviews-section" class="scroll-mt-24 flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 min-w-0 break-words">
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#f0e4cf] pb-5 dark:border-slate-800">
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Verified Feedback</span>
-                <h3 class="text-2xl font-black text-[#1d3c34]">Guest & Client Reviews</h3>
+                <h3 class="text-2xl font-black text-[#1d3c34] dark:text-white">Guest & Client Reviews</h3>
             </div>
-            <p class="mt-1 text-xs text-slate-500">Transparent two-way reviews from verified guests, tenants, and property purchasers.</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Transparent two-way reviews from verified guests, tenants, and property purchasers.</p>
         </div>
         <div class="flex items-center gap-3">
             <div class="text-right">
                 <div class="flex items-center gap-1.5 justify-end">
-                    <span class="text-2xl font-black text-[#102b25]">{{ number_format($property->average_rating, 1) }}</span>
+                    <span class="text-2xl font-black text-[#102b25] dark:text-white">{{ number_format($property->average_rating, 1) }}</span>
                     <span class="text-lg text-amber-500">★</span>
                 </div>
-                <span class="text-[11px] font-bold text-slate-500">{{ $property->reviews_count }} {{ Str::plural('review', $property->reviews_count) }}</span>
+                <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">{{ $property->reviews_count }} {{ Str::plural('review', $property->reviews_count) }}</span>
             </div>
         </div>
     </div>

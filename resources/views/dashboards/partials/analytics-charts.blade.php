@@ -6,32 +6,32 @@
 
 <div id="overview-analytics-root" class="space-y-8" data-initial-period="{{ $analyticsData['period'] }}">
     {{-- Header Banner & Date Filter Toolbar --}}
-    <div class="rounded-3xl border border-[#d9cab3] bg-gradient-to-r from-[#1d3c34] to-[#2d5d4d] p-6 text-white shadow-sm md:p-8 dark:border-slate-800">
+    <div class="token-hero">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-                <div class="flex items-center gap-2">
-                    <span class="rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 px-3 py-1 text-[11px] font-bold text-[#f8e7b9] uppercase tracking-wider">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="token-hero-chip">
                         @yield('portal_name', ucfirst(str_replace('_', ' ', auth()->user()->role ?? 'Workspace'))) Intelligence
                     </span>
-                    <span class="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#dfeee4]">
+                    <span class="token-hero-tag">
                         Live Analytics
                     </span>
                 </div>
-                <h1 class="mt-2 text-2xl md:text-3xl font-black text-white">Performance Overview &amp; Insights</h1>
-                <p class="mt-1 text-sm text-slate-200 max-w-2xl">
+                <h1 class="token-hero-title mt-2 text-2xl md:text-3xl">Performance Overview &amp; Insights</h1>
+                <p class="token-hero-sub mt-1 text-sm max-w-2xl">
                     Real-time operational metrics, asking-price indicators, portfolio trends, and pipeline activity tailored to your verified access.
                 </p>
             </div>
 
             {{-- Date Filter (7D, 30D, 90D, 1Y) --}}
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <span class="text-xs font-semibold text-slate-300">Period:</span>
-                <div class="inline-flex rounded-2xl bg-black/20 p-1 border border-white/15 backdrop-blur-xs" id="analytics-date-filter" role="group" aria-label="Date Range Filter">
+                <span class="token-hero-sub text-xs font-semibold">Period:</span>
+                <div class="token-period-bar" id="analytics-date-filter" role="group" aria-label="Date Range Filter">
                     @foreach (['7d' => '7D', '30d' => '30D', '90d' => '90D', '1y' => '1Y'] as $key => $label)
                         <button type="button"
                                 data-period="{{ $key }}"
                                 onclick="switchAnalyticsPeriod('{{ $key }}')"
-                                class="period-btn rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer {{ $analyticsData['period'] === $key ? 'bg-[#d4af37] text-[#1d3c34] shadow-xs' : 'text-[#f8f3eb] hover:bg-white/10' }}">
+                                class="period-btn token-period-btn {{ $analyticsData['period'] === $key ? 'token-period-btn-active' : '' }}">
                             {{ $label }}
                         </button>
                     @endforeach
@@ -41,14 +41,14 @@
 
         {{-- Stat Cards Row (Permission-Gated) --}}
         @if (!empty($analyticsData['stat_cards']))
-            <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 border-t border-white/20 pt-6" id="overview-stat-cards">
+            <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 border-t border-[var(--token-hero-border)] pt-6" id="overview-stat-cards">
                 @foreach ($analyticsData['stat_cards'] as $card)
-                    <div class="rounded-2xl bg-white/10 p-4 border border-white/10 backdrop-blur-xs transition hover:bg-white/15">
-                        <div class="flex items-center justify-between text-xs text-slate-300">
-                            <span class="font-medium truncate">{{ $card['label'] }}</span>
+                    <div class="token-hero-stat transition">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="token-hero-stat-label truncate">{{ $card['label'] }}</span>
                             <span class="text-base">{{ $card['icon'] }}</span>
                         </div>
-                        <p class="mt-2 text-2xl font-black text-white stat-value" data-stat-key="{{ $card['key'] }}">{{ $card['value'] }}</p>
+                        <p class="token-hero-stat-value mt-2 text-2xl stat-value" data-stat-key="{{ $card['key'] }}">{{ $card['value'] }}</p>
                     </div>
                 @endforeach
             </div>
@@ -59,24 +59,24 @@
     <div class="grid gap-6 lg:grid-cols-2">
         {{-- 1. Line Chart: Market Asking-Price Trend (Platform Estimate) --}}
         @if ($perms['market_trends'])
-            <div class="chart-card rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#e7ddca] pb-4 mb-4 dark:border-slate-800">
+            <div class="chart-card token-chart-card">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--token-border-subtle)] pb-4 mb-4">
                     <div>
-                        <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                        <h2 class="token-chart-title text-base">
                             {{ $analyticsData['charts']['market_price_trends']['title'] ?? 'Average Asking Price / m²' }}
                         </h2>
                         {{-- MANDATORY LABEL REQUIREMENT --}}
-                        <div class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/30 px-2.5 py-0.5 text-[10px] font-bold text-[#9b6c17] dark:text-[#f8e7b9]">
+                        <div class="token-badge token-badge-accent mt-1">
                             <span>📈</span>
                             <span>asking-price indicator / platform estimate</span>
                         </div>
                     </div>
-                    <span class="text-[11px] font-semibold text-slate-400">ETB per sq. meter</span>
+                    <span class="token-chart-sub text-[11px] font-semibold">ETB per sq. meter</span>
                 </div>
 
                 {{-- Chart skeleton while loading --}}
-                <div class="chart-skeleton min-h-[260px] flex items-center justify-center animate-pulse bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                    <span class="text-xs text-slate-400 font-medium">Loading platform trends...</span>
+                <div class="chart-skeleton token-chart-tile min-h-[260px] flex items-center justify-center animate-pulse">
+                    <span class="token-muted text-xs font-medium">Loading platform trends...</span>
                 </div>
 
                 {{-- Chart Canvas --}}
@@ -87,21 +87,21 @@
         @endif
 
         {{-- 2. Line Chart: Platform Activity Trends --}}
-        <div class="chart-card rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between border-b border-[#e7ddca] pb-4 mb-4 dark:border-slate-800">
+        <div class="chart-card token-chart-card">
+            <div class="flex items-center justify-between border-b border-[var(--token-border-subtle)] pb-4 mb-4">
                 <div>
-                    <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                    <h2 class="token-chart-title text-base">
                         {{ $analyticsData['charts']['activity_trends']['title'] ?? 'Engagement & Interaction Trends' }}
                     </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Views, tours, and inquiries over the selected timeframe</p>
+                    <p class="token-chart-sub text-xs">Views, tours, and inquiries over the selected timeframe</p>
                 </div>
-                <span class="rounded-full bg-[#1d3c34]/10 px-2.5 py-1 text-[10px] font-bold text-[#1d3c34] dark:bg-slate-800 dark:text-slate-300">
+                <span class="token-badge token-badge-neutral">
                     Volume
                 </span>
             </div>
 
-            <div class="chart-skeleton min-h-[260px] flex items-center justify-center animate-pulse bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                <span class="text-xs text-slate-400 font-medium">Loading engagement trends...</span>
+            <div class="chart-skeleton token-chart-tile min-h-[260px] flex items-center justify-center animate-pulse">
+                <span class="token-muted text-xs font-medium">Loading engagement trends...</span>
             </div>
 
             <div class="chart-container hidden relative min-h-[260px] w-full">
@@ -111,21 +111,21 @@
 
         {{-- 3. Bar Chart: Category Inventory vs Demand Comparisons --}}
         @if (isset($analyticsData['charts']['category_comparisons']))
-            <div class="chart-card rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="flex items-center justify-between border-b border-[#e7ddca] pb-4 mb-4 dark:border-slate-800">
+            <div class="chart-card token-chart-card">
+                <div class="flex items-center justify-between border-b border-[var(--token-border-subtle)] pb-4 mb-4">
                     <div>
-                        <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                        <h2 class="token-chart-title text-base">
                             {{ $analyticsData['charts']['category_comparisons']['title'] }}
                         </h2>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Inventory comparison across residential &amp; commercial sectors</p>
+                        <p class="token-chart-sub text-xs">Inventory comparison across residential &amp; commercial sectors</p>
                     </div>
-                    <span class="rounded-full bg-[#d4af37]/15 px-2.5 py-1 text-[10px] font-bold text-[#9b6c17] dark:text-[#f8e7b9]">
+                    <span class="token-badge token-badge-accent">
                         Breakdown
                     </span>
                 </div>
 
-                <div class="chart-skeleton min-h-[260px] flex items-center justify-center animate-pulse bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                    <span class="text-xs text-slate-400 font-medium">Loading inventory comparisons...</span>
+                <div class="chart-skeleton token-chart-tile min-h-[260px] flex items-center justify-center animate-pulse">
+                    <span class="token-muted text-xs font-medium">Loading inventory comparisons...</span>
                 </div>
 
                 <div class="chart-container hidden relative min-h-[260px] w-full">
@@ -136,22 +136,22 @@
 
         {{-- 4. Donut Chart (STRICT REQUIREMENT: MAX 5 SLICES FOR SHARES!) --}}
         @if (isset($analyticsData['charts']['shares_donut']))
-            <div class="chart-card rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
+            <div class="chart-card token-chart-card flex flex-col justify-between">
                 <div>
-                    <div class="flex items-center justify-between border-b border-[#e7ddca] pb-4 mb-4 dark:border-slate-800">
+                    <div class="flex items-center justify-between border-b border-[var(--token-border-subtle)] pb-4 mb-4">
                         <div>
-                            <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                            <h2 class="token-chart-title text-base">
                                 {{ $analyticsData['charts']['shares_donut']['title'] }}
                             </h2>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Distribution shares (capped at top 5 slices)</p>
+                            <p class="token-chart-sub text-xs">Distribution shares (capped at top 5 slices)</p>
                         </div>
-                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span class="token-badge token-badge-neutral">
                             Shares (≤ 5)
                         </span>
                     </div>
 
-                    <div class="chart-skeleton min-h-[240px] flex items-center justify-center animate-pulse bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                        <span class="text-xs text-slate-400 font-medium">Loading shares...</span>
+                    <div class="chart-skeleton token-chart-tile min-h-[240px] flex items-center justify-center animate-pulse">
+                        <span class="token-muted text-xs font-medium">Loading shares...</span>
                     </div>
 
                     <div class="chart-container hidden relative min-h-[240px] w-full flex items-center justify-center">
@@ -160,12 +160,12 @@
                 </div>
 
                 {{-- Donut Custom Legend --}}
-                <div class="mt-4 pt-3 border-t border-[#e7ddca] dark:border-slate-800 flex flex-wrap items-center justify-center gap-3 text-xs">
+                <div class="mt-4 pt-3 border-t border-[var(--token-border-subtle)] flex flex-wrap items-center justify-center gap-3 text-xs">
                     @foreach ($analyticsData['charts']['shares_donut']['labels'] as $index => $label)
                         <div class="flex items-center gap-1.5">
-                            <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $analyticsData['charts']['shares_donut']['colors'][$index] ?? '#1d3c34' }}"></span>
-                            <span class="text-slate-600 dark:text-slate-300 font-medium">{{ $label }}</span>
-                            <span class="font-bold text-slate-800 dark:text-slate-100">{{ $analyticsData['charts']['shares_donut']['series'][$index] ?? 0 }}%</span>
+                            <span class="h-2.5 w-2.5 rounded-full" style="background-color: var(--token-chart-{{ $analyticsData['charts']['shares_donut']['colors'][$index] ?? 'primary' }})"></span>
+                            <span class="font-medium">{{ $label }}</span>
+                            <span class="font-bold">{{ $analyticsData['charts']['shares_donut']['series'][$index] ?? 0 }}%</span>
                         </div>
                     @endforeach
                 </div>
@@ -175,15 +175,15 @@
 
     {{-- 5. Agent CRM Funnel (Shown Strictly for CRM / Agent Permissions) --}}
     @if ($perms['agent_crm'] && isset($analyticsData['charts']['agent_crm_funnel']))
-        <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#e7ddca] pb-4 mb-6 dark:border-slate-800">
+        <div class="token-chart-card">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--token-border-subtle)] pb-4 mb-6">
                 <div>
-                    <h2 class="text-lg font-black text-[#1d3c34] dark:text-slate-100">
+                    <h2 class="token-chart-title text-lg">
                         {{ $analyticsData['charts']['agent_crm_funnel']['title'] }}
                     </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Step-by-step conversion pipeline from prospective lead to closed deal</p>
+                    <p class="token-chart-sub text-xs">Step-by-step conversion pipeline from prospective lead to closed deal</p>
                 </div>
-                <span class="rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/40">
+                <span class="token-badge token-badge-success">
                     Conversion Pipeline
                 </span>
             </div>
@@ -191,10 +191,10 @@
             {{-- Funnel Step Cards --}}
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 @foreach ($analyticsData['charts']['agent_crm_funnel']['stages'] as $stage)
-                    <div class="rounded-2xl border border-slate-100 bg-[#fbf8f3] p-4 text-center dark:border-slate-800 dark:bg-slate-800/50">
-                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 block">{{ $stage['name'] }}</span>
-                        <p class="mt-1 text-2xl font-black text-[#1d3c34] dark:text-slate-100">{{ $stage['count'] }}</p>
-                        <span class="mt-1 inline-block rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[#b7842d] border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-amber-300">
+                    <div class="token-chart-tile text-center">
+                        <span class="token-muted text-xs font-semibold block">{{ $stage['name'] }}</span>
+                        <p class="mt-1 text-2xl font-black">{{ $stage['count'] }}</p>
+                        <span class="token-badge token-badge-accent mt-1">
                             {{ $stage['conversion'] }} Conv.
                         </span>
                     </div>
@@ -202,9 +202,9 @@
             </div>
 
             {{-- Funnel Horizontal Visualization Canvas --}}
-            <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div class="chart-skeleton min-h-[160px] flex items-center justify-center animate-pulse bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                    <span class="text-xs text-slate-400 font-medium">Rendering funnel stages...</span>
+            <div class="mt-6 pt-4 border-t border-[var(--token-border-subtle)]">
+                <div class="chart-skeleton token-chart-tile min-h-[160px] flex items-center justify-center animate-pulse">
+                    <span class="token-muted text-xs font-medium">Rendering funnel stages...</span>
                 </div>
                 <div class="chart-container hidden relative min-h-[160px] w-full">
                     <canvas id="chart-crm-funnel" height="160"></canvas>
@@ -218,26 +218,26 @@
         <div class="grid gap-6 {{ isset($analyticsData['progress_bars']['construction'], $analyticsData['progress_bars']['occupancy']) ? 'lg:grid-cols-2' : '' }}">
             {{-- Construction Milestones (Developer / Projects) --}}
             @if (isset($analyticsData['progress_bars']['construction']))
-                <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3 mb-4 dark:border-slate-800">
+                <div class="token-chart-card">
+                    <div class="flex items-center justify-between border-b border-[var(--token-border-subtle)] pb-3 mb-4">
                         <div>
-                            <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                            <h2 class="token-chart-title text-base">
                                 {{ $analyticsData['progress_bars']['construction']['title'] }}
                             </h2>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Real-time completion tracking on active project developments</p>
+                            <p class="token-chart-sub text-xs">Real-time completion tracking on active project developments</p>
                         </div>
-                        <span class="text-xs font-bold text-[#d4af37]">Milestones</span>
+                        <span class="token-badge token-badge-accent">Milestones</span>
                     </div>
 
                     <div class="space-y-4">
                         @foreach ($analyticsData['progress_bars']['construction']['items'] as $item)
                             <div>
-                                <div class="flex items-center justify-between text-xs mb-1">
-                                    <span class="font-bold text-slate-800 dark:text-slate-200">{{ $item['name'] }}</span>
-                                    <span class="font-extrabold text-[#1d3c34] dark:text-[#f8e7b9]">{{ $item['percentage'] }}% &bull; {{ $item['status'] }}</span>
+                                <div class="flex items-center justify-between gap-2 text-xs mb-1">
+                                    <span class="font-bold">{{ $item['name'] }}</span>
+                                    <span class="font-extrabold">{{ $item['percentage'] }}% &bull; {{ $item['status'] }}</span>
                                 </div>
-                                <div class="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                    <div class="h-full rounded-full transition-all duration-700 {{ $item['color'] === 'emerald' ? 'bg-emerald-600' : ($item['color'] === 'amber' ? 'bg-[#d4af37]' : 'bg-sky-600') }}"
+                                <div class="h-3 w-full rounded-full bg-[var(--token-surface-hover)] overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-700 {{ $item['color'] === 'emerald' ? 'token-fill-success' : ($item['color'] === 'amber' ? 'token-fill-warning' : 'token-fill-info') }}"
                                          style="width: {{ $item['percentage'] }}%;"></div>
                                 </div>
                             </div>
@@ -249,34 +249,34 @@
             {{-- Occupancy Progress (Property Manager / Landlord) --}}
             @if (isset($analyticsData['progress_bars']['occupancy']))
                 @php $occ = $analyticsData['progress_bars']['occupancy']; @endphp
-                <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3 mb-4 dark:border-slate-800">
+                <div class="token-chart-card">
+                    <div class="flex items-center justify-between border-b border-[var(--token-border-subtle)] pb-3 mb-4">
                         <div>
-                            <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">
+                            <h2 class="token-chart-title text-base">
                                 {{ $occ['title'] }}
                             </h2>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Total units managed vs occupied leases</p>
+                            <p class="token-chart-sub text-xs">Total units managed vs occupied leases</p>
                         </div>
-                        <span class="text-xs font-bold text-emerald-600">{{ $occ['occupancy_rate'] }}% Target</span>
+                        <span class="token-badge token-badge-success">{{ $occ['occupancy_rate'] }}% Target</span>
                     </div>
 
                     <div class="mt-4">
-                        <div class="flex items-center justify-between text-xs mb-1.5 font-bold">
-                            <span class="text-emerald-700 dark:text-emerald-400">Occupied: {{ $occ['occupied_units'] }}</span>
-                            <span class="text-amber-700 dark:text-amber-400">Vacant: {{ $occ['vacant_units'] }}</span>
-                            <span class="text-slate-700 dark:text-slate-300">Total: {{ $occ['total_units'] }} Units</span>
+                        <div class="flex items-center justify-between gap-2 text-xs mb-1.5 font-bold">
+                            <span class="token-badge token-badge-success">Occupied: {{ $occ['occupied_units'] }}</span>
+                            <span class="token-badge token-badge-warning">Vacant: {{ $occ['vacant_units'] }}</span>
+                            <span class="token-badge token-badge-neutral">Total: {{ $occ['total_units'] }} Units</span>
                         </div>
-                        <div class="h-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-                            <div class="h-full bg-emerald-600 transition-all duration-700" style="width: {{ $occ['occupancy_rate'] }}%;"></div>
-                            <div class="h-full bg-amber-400 transition-all duration-700" style="width: {{ max(0, 100 - $occ['occupancy_rate']) }}%;"></div>
+                        <div class="h-4 w-full rounded-full bg-[var(--token-surface-hover)] overflow-hidden flex">
+                            <div class="h-full token-fill-success transition-all duration-700" style="width: {{ $occ['occupancy_rate'] }}%;"></div>
+                            <div class="h-full token-fill-warning transition-all duration-700" style="width: {{ max(0, 100 - $occ['occupancy_rate']) }}%;"></div>
                         </div>
-                        <div class="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] token-muted">
                             <div class="flex items-center gap-1.5">
-                                <span class="h-2 w-2 rounded-full bg-emerald-600"></span>
+                                <span class="h-2 w-2 rounded-full token-fill-success"></span>
                                 <span>Occupied (Active Lease / Check-in)</span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                <span class="h-2 w-2 rounded-full token-fill-warning"></span>
                                 <span>Vacant (Turnover / Marketing)</span>
                             </div>
                         </div>
@@ -287,52 +287,52 @@
     @endif
 
     {{-- 7. Recent Records Table with Status Badges --}}
-    <div class="rounded-3xl border border-[#e7ddca] bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-center justify-between border-b border-[#e7ddca] pb-3 mb-4 dark:border-slate-800">
+    <div class="token-chart-card">
+        <div class="flex items-center justify-between gap-3 border-b border-[var(--token-border-subtle)] pb-3 mb-4">
             <div>
-                <h2 class="text-base font-black text-[#1d3c34] dark:text-slate-100">Recent Records &amp; Activity Log</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Most recent actions, transactions, and requests permitted for your profile</p>
+                <h2 class="token-chart-title text-base">Recent Records &amp; Activity Log</h2>
+                <p class="token-chart-sub text-xs">Most recent actions, transactions, and requests permitted for your profile</p>
             </div>
-            <span class="rounded-full bg-[#1d3c34]/10 px-2.5 py-0.5 text-xs font-bold text-[#1d3c34] dark:bg-slate-800 dark:text-slate-300">
+            <span class="token-badge token-badge-neutral">
                 Verified Records
             </span>
         </div>
 
         @if (!empty($analyticsData['recent_records']))
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
+                <table class="token-table">
                     <thead>
-                        <tr class="border-b border-[#e7ddca] text-slate-400 uppercase tracking-wider text-[10px] dark:border-slate-800">
-                            <th class="py-2.5 px-3">Type</th>
-                            <th class="py-2.5 px-3">Subject / Title</th>
-                            <th class="py-2.5 px-3">Counterparty / Client</th>
-                            <th class="py-2.5 px-3">Amount / Terms</th>
-                            <th class="py-2.5 px-3">Date</th>
-                            <th class="py-2.5 px-3 text-right">Status</th>
+                        <tr>
+                            <th>Type</th>
+                            <th>Subject / Title</th>
+                            <th>Counterparty / Client</th>
+                            <th>Amount / Terms</th>
+                            <th>Date</th>
+                            <th class="text-right">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-[#f2ebd9] dark:divide-slate-800/60">
+                    <tbody>
                         @foreach ($analyticsData['recent_records'] as $record)
-                            <tr class="hover:bg-[#fbf8f3] dark:hover:bg-slate-800/40 transition">
-                                <td class="py-3 px-3">
-                                    <span class="inline-block rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <tr>
+                                <td>
+                                    <span class="token-badge token-badge-neutral">
                                         {{ $record['category'] }}
                                     </span>
                                 </td>
-                                <td class="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100 max-w-[220px] truncate">
+                                <td class="font-semibold max-w-[220px]">
                                     {{ $record['title'] }}
                                 </td>
-                                <td class="py-3 px-3 text-slate-600 dark:text-slate-400">
+                                <td class="token-muted">
                                     {{ $record['counterparty'] }}
                                 </td>
-                                <td class="py-3 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
+                                <td class="font-mono font-bold">
                                     {{ $record['amount'] }}
                                 </td>
-                                <td class="py-3 px-3 text-slate-500 dark:text-slate-400">
+                                <td class="token-muted">
                                     {{ $record['date'] }}
                                 </td>
-                                <td class="py-3 px-3 text-right">
-                                    <span class="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold {{ $record['badge']['class'] }}">
+                                <td class="text-right">
+                                    <span class="{{ $record['badge']['class'] }}">
                                         {{ $record['badge']['text'] }}
                                     </span>
                                 </td>
@@ -343,10 +343,10 @@
             </div>
         @else
             {{-- Empty State --}}
-            <div class="py-10 text-center text-slate-400">
+            <div class="py-10 text-center token-muted">
                 <span class="text-4xl block mb-2">📋</span>
-                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">No recent records found for this period</p>
-                <p class="text-xs text-slate-400 mt-0.5">As you create listings, book stays, or submit offers, status logs will appear here.</p>
+                <p class="text-sm font-semibold">No recent records found for this period</p>
+                <p class="text-xs mt-0.5">As you create listings, book stays, or submit offers, status logs will appear here.</p>
             </div>
         @endif
     </div>
@@ -365,16 +365,51 @@
         let dashboardData = JSON.parse(rawDataEl.textContent || '{}');
         const chartInstances = {};
 
+        // ── Token palette helpers: charts resolve colors from CSS variables so
+        //    they re-theme automatically in light and dark mode. ──────────────
+        function cssVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        // Chart palette references arrive from the payload as token names,
+        // optionally suffixed with an alpha (e.g. "primary:0.08").
+        const CHART_TOKEN_NAMES = ['primary', 'primary-2', 'primary-3', 'warning', 'info', 'success', 'accent', 'danger', 'grid', 'text'];
+
+        function tc(name) {
+            return cssVar('--token-chart-' + name);
+        }
+
+        function toToken(ref) {
+            if (typeof ref !== 'string') return ref;
+            const [name, alpha] = ref.trim().split(':');
+            if (!CHART_TOKEN_NAMES.includes(name)) return ref;
+            const base = tc(name);
+            if (alpha !== undefined && alpha !== '') {
+                return `color-mix(in srgb, ${base} ${Math.round(parseFloat(alpha) * 100)}%, transparent)`;
+            }
+            return base;
+        }
+
         function isDarkMode() {
             return document.documentElement.classList.contains('dark');
         }
 
         function getChartTextColor() {
-            return isDarkMode() ? '#94a3b8' : '#64748b';
+            return tc('text');
         }
 
         function getChartGridColor() {
-            return isDarkMode() ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+            return tc('grid');
+        }
+
+        function adaptDatasets(datasets) {
+            if (!datasets || !Array.isArray(datasets)) return datasets;
+            return datasets.map(ds => {
+                const copy = Object.assign({}, ds);
+                if ('borderColor' in copy) copy.borderColor = toToken(copy.borderColor);
+                if ('backgroundColor' in copy) copy.backgroundColor = toToken(copy.backgroundColor);
+                return copy;
+            });
         }
 
         function destroyAllCharts() {
@@ -406,7 +441,7 @@
                     type: 'line',
                     data: {
                         labels: config.labels,
-                        datasets: config.datasets
+                        datasets: adaptDatasets(config.datasets)
                     },
                     options: {
                         responsive: true,
@@ -447,7 +482,7 @@
                     type: 'line',
                     data: {
                         labels: config.labels,
-                        datasets: config.datasets
+                        datasets: adaptDatasets(config.datasets)
                     },
                     options: {
                         responsive: true,
@@ -480,7 +515,7 @@
                     type: 'bar',
                     data: {
                         labels: config.labels,
-                        datasets: config.datasets
+                        datasets: adaptDatasets(config.datasets)
                     },
                     options: {
                         responsive: true,
@@ -508,15 +543,16 @@
             const donutCanvas = document.getElementById('chart-shares-donut');
             if (donutCanvas && charts.shares_donut) {
                 const config = charts.shares_donut;
+                const sliceColors = (config.colors && config.colors.length ? config.colors : ['primary', 'warning', 'info', 'success', 'accent']).map(toToken);
                 chartInstances.donut = new Chart(donutCanvas.getContext('2d'), {
                     type: 'doughnut',
                     data: {
                         labels: config.labels,
                         datasets: [{
                             data: config.series,
-                            backgroundColor: config.colors,
+                            backgroundColor: sliceColors,
                             borderWidth: 2,
-                            borderColor: isDarkMode() ? '#0f172a' : '#ffffff'
+                            borderColor: cssVar('--token-surface')
                         }]
                     },
                     options: {
@@ -541,7 +577,7 @@
                 const funnelConfig = charts.agent_crm_funnel;
                 const labels = funnelConfig.stages.map(s => s.name);
                 const counts = funnelConfig.stages.map(s => s.count);
-                const colors = funnelConfig.stages.map(s => s.color);
+                const funnelColors = funnelConfig.stages.map(s => toToken(s.color || 'primary'));
 
                 chartInstances.funnel = new Chart(funnelCanvas.getContext('2d'), {
                     type: 'bar',
@@ -549,7 +585,7 @@
                         labels: labels,
                         datasets: [{
                             data: counts,
-                            backgroundColor: colors,
+                            backgroundColor: funnelColors,
                             borderRadius: 8
                         }]
                     },
@@ -582,11 +618,7 @@
         window.switchAnalyticsPeriod = function(periodKey) {
             // Update button styles
             document.querySelectorAll('#analytics-date-filter .period-btn').forEach(btn => {
-                const isActive = btn.dataset.period === periodKey;
-                btn.classList.toggle('bg-[#d4af37]', isActive);
-                btn.classList.toggle('text-[#1d3c34]', isActive);
-                btn.classList.toggle('shadow-xs', isActive);
-                btn.classList.toggle('text-[#f8f3eb]', !isActive);
+                btn.classList.toggle('token-period-btn-active', btn.dataset.period === periodKey);
             });
 
             // Instant switch if precalculated payload exists
@@ -632,6 +664,22 @@
                 }, 50);
                 setTimeout(function() { clearInterval(checkInterval); }, 5000);
             }
+        }
+
+        window.addEventListener('themechanged', function() {
+            initCharts(dashboardData);
+        });
+
+        if (window.MutationObserver) {
+            const themeObserver = new MutationObserver(function(mutations) {
+                for (let m of mutations) {
+                    if (m.attributeName === 'class') {
+                        initCharts(dashboardData);
+                        break;
+                    }
+                }
+            });
+            themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
         }
 
         if (document.readyState === 'loading') {

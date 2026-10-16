@@ -106,11 +106,14 @@ beforeEach(function () {
     ]);
 });
 
-test('an agent sees their own pending payment on the finance desk', function () {
+test('an agent reaches the finance desk and sees only their own ledger rows', function () {
+    // Agents may view their own deal ledger, but the confirmation queue (with
+    // its Confirm/Reject actions) is finance-only.
     $this->actingAs($this->agentAUser)
         ->get(route('finance.index'))
         ->assertOk()
-        ->assertSee('Own Deal Payer Alpha');
+        ->assertSee('Agent Alpha own deal deposit')
+        ->assertDontSee('Payments Awaiting Confirmation');
 });
 
 test('an agent cannot see other agents pending payments or ledger entries', function () {
@@ -137,12 +140,28 @@ test('finance officers still see every pending payment', function () {
         ->assertSee('Confidential Buyer Beta');
 });
 
-test('agent b sees their own payment but not agent a ledger', function () {
+test('agent b sees their own ledger rows but not agent a ledger', function () {
     $this->actingAs($this->agentBUser)
         ->get(route('finance.index'))
         ->assertOk()
-        ->assertSee('Confidential Buyer Beta')
-        ->assertDontSee('LEDGER-ALPHA-OWN-111');
+        ->assertSee('Agent Beta confidential deal deposit')
+        ->assertDontSee('LEDGER-ALPHA-OWN-111')
+        ->assertDontSee('Agent Alpha own deal deposit');
+});
+
+test('the payment confirmation queue is finance-only and hidden from agents', function () {
+    // The queue carries Confirm / Reject actions, which are finance work. An
+    // agent holds payments.view, not payments.manage, so the queue is hidden
+    // from them while finance officers still get it.
+    $this->actingAs($this->agentAUser)
+        ->get(route('finance.index'))
+        ->assertOk()
+        ->assertDontSee('Payments Awaiting Confirmation');
+
+    $this->actingAs($this->financeOfficer)
+        ->get(route('finance.index'))
+        ->assertOk()
+        ->assertSee('Payments Awaiting Confirmation');
 });
 
 test('agents do not receive global company cashflow charts on the finance desk', function () {
@@ -157,4 +176,24 @@ test('agents do not receive global company cashflow charts on the finance desk',
         ->assertOk()
         ->assertSee('Monthly Cash Inflow vs. Outflow (ETB)')
         ->assertSee('id="finance-cashflow-chart"', false);
+});
+
+test('an agent sees their own scoped payments in a read-only section', function () {
+    $this->actingAs($this->agentAUser)
+        ->get(route('finance.index'))
+        ->assertOk()
+        ->assertSee('My Payments')
+        ->assertSee('Own Deal Payer Alpha')
+        ->assertDontSee('Confidential Buyer Beta')
+        // No finance confirm/reject actions for a non-finance viewer.
+        ->assertDontSee('✓ Confirm')
+        ->assertDontSee(route('payments.verify', $this->ownPayment), false);
+});
+
+test('finance keeps the confirmation queue and does not get the agent-only section', function () {
+    $this->actingAs($this->financeOfficer)
+        ->get(route('finance.index'))
+        ->assertOk()
+        ->assertSee('Payments Awaiting Confirmation')
+        ->assertDontSee('My Payments');
 });

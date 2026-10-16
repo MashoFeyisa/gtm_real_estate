@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FinancialLedger;
 use App\Models\Lease;
-use App\Models\Payment;
 use App\Models\Property;
 use App\Models\RentSchedule;
 use App\Models\User;
 use App\Services\AgreementPdfService;
+use App\Services\RentPaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -219,55 +218,18 @@ class LeaseManagementController extends Controller
         ]);
 
         $amount = (float) $validated['amount_paid'];
-        $alreadyPaid = (float) $schedule->amount_paid;
-        $totalPaidNow = $alreadyPaid + $amount;
-        $status = $totalPaidNow >= (float) $schedule->amount_due ? 'paid' : 'partial';
 
-        // 1. Create matching verified payment record
-        $payment = Payment::create([
-            'payable_type' => RentSchedule::class,
-            'payable_id' => $schedule->id,
-            'property_id' => $lease->property_id,
-            'user_id' => $lease->tenant_user_id ?? $user->id,
-            'payer_name' => $lease->tenant_name ?: $user->name,
-            'payer_email' => $lease->tenant_email ?: $user->email,
-            'payer_phone' => $lease->tenant_phone ?: $user->phone,
-            'payment_type' => 'rent_installment',
-            'payment_method' => $validated['payment_method'],
-            'bank_name' => $validated['payment_method'] === 'cbe_birr' ? 'Commercial Bank of Ethiopia' : null,
-            'bank_transaction_reference' => $validated['bank_transaction_reference'] ?? null,
-            'currency' => 'ETB',
-            'amount' => $amount,
-            'platform_fee' => 0.00,
-            'tax_amount' => 0.00,
-            'net_amount' => $amount,
-            'status' => 'completed',
-            'notes' => $validated['notes'] ?? "Rent payment for {$schedule->period_label}",
-            'verified_at' => now(),
-            'verified_by' => $user->id,
-        ]);
-
-        // 2. Record Financial Ledger entry
-        FinancialLedger::create([
-            'payment_id' => $payment->id,
-            'entry_type' => 'credit',
-            'category' => 'rental_revenue',
-            'amount' => $amount,
-            'currency' => 'ETB',
-            'description' => "Rental installment collected for Lease {$lease->lease_code} ({$schedule->period_label})",
-            'reference' => $payment->bank_transaction_reference,
-            'user_id' => $user->id,
-        ]);
-
-        // 3. Update RentSchedule
-        $schedule->update([
-            'amount_paid' => $totalPaidNow,
-            'status' => $status,
-            'paid_at' => now(),
-            'payment_id' => $payment->id,
-            'payment_method' => $validated['payment_method'],
-            'notes' => $validated['notes'] ?? $schedule->notes,
-        ]);
+        // The one rent writer: a verified payment row plus a balanced journal,
+        // shared with the landlord desk so both leave the same trace.
+        app(RentPaymentService::class)->record(
+            schedule: $schedule,
+            recorder: $user,
+            amount: $amount,
+            paymentMethod: $validated['payment_method'],
+            reference: $validated['bank_transaction_reference'] ?? null,
+            notes: $validated['notes'] ?? null,
+            idempotencyKey: $request->header('Idempotency-Key'),
+        );
 
         return back()->with('success', 'Payment of '.number_format($amount, 2)." ETB recorded for {$schedule->period_label}.");
     }

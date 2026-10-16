@@ -82,11 +82,21 @@ test('corporate billing statement generates itemized list with Ethiopian VAT bre
 });
 
 test('developer can request milestone escrow disbursement and admin can approve', function () {
+    // Only the project's own developer may request an escrow disbursement, so
+    // the project must belong to the developer who is asking.
+    $owner = User::create([
+        'name' => 'Sunshine Developer Owner',
+        'email' => 'sunshine.owner@example.com',
+        'password' => Hash::make('password123'),
+        'role' => 'developer',
+    ]);
+
     $project = Project::create([
         'project_code' => 'DEV-ESC-2026',
         'name' => 'Kazanchis Heights Development',
         'slug' => 'kazanchis-heights-development',
         'developer_name' => 'Sunshine Construction',
+        'developer_user_id' => $owner->id,
         'city' => 'Addis Ababa',
         'subcity' => 'Kirkos',
         'project_type' => 'residential',
@@ -103,8 +113,8 @@ test('developer can request milestone escrow disbursement and admin can approve'
         'order_index' => 1,
     ]);
 
-    // Request escrow disbursement
-    $response = $this->actingAs($this->user)->post(route('developer.escrow.request', $project), [
+    // Request escrow disbursement (the project's own developer only)
+    $response = $this->actingAs($owner)->post(route('developer.escrow.request', $project), [
         'milestone_id' => $milestone->id,
         'amount_etb' => 1800000.00,
         'bank_reference' => 'CBE-ESC-998877',

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Agent;
 use App\Models\User;
+use App\Support\DemoData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -22,6 +23,18 @@ class DatabaseSeeder extends Seeder
 
         // Subcity polygon boundaries & GIS mapping
         $this->call(SubcityBoundarySeeder::class);
+
+        // Demo accounts with a shared, well-known password are fabricated data.
+        // They may only exist on a developer machine: production seeding must
+        // refuse rather than create accounts anyone can log into.
+        if (! DemoData::allowed()) {
+            $this->command?->warn(
+                'Skipping demo account seeding: APP_ENV is "'.app()->environment().'". '
+                .'Set APP_ENV=local to seed the fabricated demo accounts.'
+            );
+
+            return;
+        }
 
         // ── Shared password for all fabricated test users ────────────
         $sharedPassword = Hash::make('secret123');

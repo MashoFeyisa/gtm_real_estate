@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\DemoData;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -27,6 +28,12 @@ class DemoResetCommand extends Command
      */
     public function handle()
     {
+        if (! DemoData::allowed()) {
+            $this->error('Refusing to build the demo dataset outside a local environment.');
+
+            return self::FAILURE;
+        }
+
         if (! $this->option('no-seed')) {
             $this->info('Seeding database (idempotent — no duplicate personas on re-run).');
             Artisan::call('db:seed', ['--class' => 'DatabaseSeeder', '--no-interaction' => true], $this->output);
@@ -37,6 +44,9 @@ class DemoResetCommand extends Command
 
         $this->info('Applying the one-account-per-role cleanup.');
         Artisan::call('users:cleanup', ['--force' => true, '--no-interaction' => true], $this->output);
+
+        $this->info('Flagging the canonical demo accounts.');
+        Artisan::call('demo:user-accounts', ['--sync' => true, '--no-interaction' => true], $this->output);
 
         $this->newLine();
         $this->info('Demo reset complete. Verify with:');

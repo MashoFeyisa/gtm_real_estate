@@ -189,6 +189,7 @@ class ProfileController extends Controller
             $updates['language'] = $validated['language'];
             session(['locale' => $validated['language']]);
             app()->setLocale($validated['language']);
+            cookie()->queue(cookie('app_locale', $validated['language'], 60 * 24 * 365, null, null, false, false));
         }
 
         if (isset($validated['notification_preferences'])) {

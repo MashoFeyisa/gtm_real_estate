@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Booking;
-use App\Models\FinancialLedger;
 use App\Models\FrontDeskShift;
 use App\Models\GuestServiceRequest;
 use App\Models\Inquiry;
@@ -15,6 +14,7 @@ use App\Models\PropertyReview;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Notifications\GuestBookingNotification;
+use App\Services\LedgerService;
 use App\Services\WorkflowIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -308,7 +308,9 @@ class ReceptionistDashboardController extends Controller
                     'currency' => $booking->currency ?? 'ETB',
                     'amount' => $amount,
                     'platform_fee' => 0,
-                    'tax_amount' => round($amount * 0.15, 2),
+                    // No platform fee is charged on a desk collection, so no
+                    // VAT arises on it (VAT is only ever charged on the fee).
+                    'tax_amount' => 0.00,
                     'net_amount' => $amount,
                     'status' => 'confirmed',
                     'verified_at' => now(),
@@ -317,15 +319,27 @@ class ReceptionistDashboardController extends Controller
                     'bank_transaction_reference' => $validated['payment_reference'] ?? null,
                 ]);
 
-                FinancialLedger::create([
-                    'payment_id' => $payment->id,
-                    'entry_type' => 'credit',
-                    'category' => 'booking_revenue',
-                    'amount' => $amount,
-                    'currency' => $booking->currency ?? 'ETB',
-                    'description' => "Front Desk Check-in Room {$validated['room_number']} — {$booking->booking_reference}",
-                    'reference' => $payment->transaction_number,
-                    'user_id' => $user->id,
+                app(LedgerService::class)->post('payment:'.$payment->id, [
+                    [
+                        'payment_id' => $payment->id,
+                        'entry_type' => 'debit',
+                        'category' => 'cash',
+                        'amount' => $amount,
+                        'currency' => $booking->currency ?? 'ETB',
+                        'description' => "Front Desk cash received Room {$validated['room_number']} — {$booking->booking_reference}",
+                        'reference' => $payment->transaction_number,
+                        'user_id' => $user->id,
+                    ],
+                    [
+                        'payment_id' => $payment->id,
+                        'entry_type' => 'credit',
+                        'category' => 'booking_revenue',
+                        'amount' => $amount,
+                        'currency' => $booking->currency ?? 'ETB',
+                        'description' => "Front Desk Check-in Room {$validated['room_number']} — {$booking->booking_reference}",
+                        'reference' => $payment->transaction_number,
+                        'user_id' => $user->id,
+                    ],
                 ]);
 
                 $booking->update([
@@ -457,7 +471,9 @@ class ReceptionistDashboardController extends Controller
                 'currency' => 'ETB',
                 'amount' => $totalAmount,
                 'platform_fee' => 0,
-                'tax_amount' => round($totalAmount * 0.15, 2),
+                // No platform fee is charged on a desk collection, so no VAT
+                // arises on it (VAT is only ever charged on the fee).
+                'tax_amount' => 0.00,
                 'net_amount' => $totalAmount,
                 'status' => 'confirmed',
                 'verified_at' => now(),
@@ -466,15 +482,27 @@ class ReceptionistDashboardController extends Controller
                 'bank_transaction_reference' => $validated['payment_reference'] ?? null,
             ]);
 
-            FinancialLedger::create([
-                'payment_id' => $payment->id,
-                'entry_type' => 'credit',
-                'category' => 'booking_revenue',
-                'amount' => $totalAmount,
-                'currency' => 'ETB',
-                'description' => "Front Desk Walk-In Booking Room {$validated['room_number']} — {$booking->booking_reference}",
-                'reference' => $payment->transaction_number,
-                'user_id' => $user->id,
+            app(LedgerService::class)->post('payment:'.$payment->id, [
+                [
+                    'payment_id' => $payment->id,
+                    'entry_type' => 'debit',
+                    'category' => 'cash',
+                    'amount' => $totalAmount,
+                    'currency' => 'ETB',
+                    'description' => "Front Desk Walk-In cash received Room {$validated['room_number']} — {$booking->booking_reference}",
+                    'reference' => $payment->transaction_number,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'payment_id' => $payment->id,
+                    'entry_type' => 'credit',
+                    'category' => 'booking_revenue',
+                    'amount' => $totalAmount,
+                    'currency' => 'ETB',
+                    'description' => "Front Desk Walk-In Booking Room {$validated['room_number']} — {$booking->booking_reference}",
+                    'reference' => $payment->transaction_number,
+                    'user_id' => $user->id,
+                ],
             ]);
         });
 

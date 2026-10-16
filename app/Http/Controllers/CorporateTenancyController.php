@@ -9,8 +9,10 @@ use App\Models\CorporateTenant;
 use App\Models\DeveloperEscrowDisbursement;
 use App\Models\Lease;
 use App\Models\Project;
+use App\Services\FinanceSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class CorporateTenancyController extends Controller
@@ -105,7 +107,8 @@ class CorporateTenancyController extends Controller
             ->get();
 
         $subtotal = $assignments->sum('monthly_rent_etb');
-        $vat = $subtotal * 0.15; // Standard 15% Ethiopian VAT
+        $vatRate = app(FinanceSettings::class)->vatRate();
+        $vat = round($subtotal * $vatRate / 100, 2); // Ethiopian VAT
         $total = $subtotal + $vat;
 
         return view('corporate.billing-statement', [
@@ -113,6 +116,7 @@ class CorporateTenancyController extends Controller
             'assignments' => $assignments,
             'subtotal' => $subtotal,
             'vat' => $vat,
+            'vatRate' => $vatRate,
             'total' => $total,
             'statementDate' => now()->format('F d, Y'),
             'invoiceNumber' => 'CORP-INV-'.now()->format('Ym').'-'.str_pad((string) $tenant->id, 4, '0', STR_PAD_LEFT),
@@ -121,9 +125,14 @@ class CorporateTenancyController extends Controller
 
     /**
      * Request milestone escrow disbursement for developers.
+     *
+     * Only the developer who owns the project may request; everyone else is
+     * refused by the DeveloperEscrowDisbursementPolicy.
      */
     public function requestEscrowDisbursement(Request $request, Project $project): RedirectResponse
     {
+        Gate::authorize('request', $project);
+
         $validated = $request->validate([
             'milestone_id' => ['required', 'exists:construction_milestones,id'],
             'amount_etb' => ['required', 'numeric', 'min:1000'],
@@ -132,6 +141,8 @@ class CorporateTenancyController extends Controller
         ]);
 
         $milestone = ConstructionMilestone::findOrFail($validated['milestone_id']);
+
+        abort_if($milestone->project_id !== $project->id, 422, 'The milestone does not belong to this project.');
 
         DeveloperEscrowDisbursement::create([
             'project_id' => $project->id,
@@ -148,9 +159,16 @@ class CorporateTenancyController extends Controller
 
     /**
      * Approve and disburse milestone escrow funds following inspector sign-off.
+     *
+     * Finance staff and administrators only, and never the requester - the
+     * DeveloperEscrowDisbursementPolicy enforces both.
      */
     public function approveEscrowDisbursement(Request $request, DeveloperEscrowDisbursement $disbursement): RedirectResponse
     {
+        Gate::authorize('approve', $disbursement->project);
+
+        abort_if($disbursement->status !== 'pending', 422, 'Only a pending escrow request can be approved.');
+
         $disbursement->update([
             'status' => 'disbursed',
             'verified_by' => $request->user()->id,

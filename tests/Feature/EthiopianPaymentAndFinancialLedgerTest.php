@@ -74,7 +74,7 @@ beforeEach(function () {
     ]);
 });
 
-test('buyer can submit instant Telebirr payment for earnest deposit with automatic ledger credit', function () {
+test('a submitted Telebirr payment stays pending until finance verifies it', function () {
     $response = $this->actingAs($this->buyerUser)->post(route('payments.store'), [
         'payment_type' => 'earnest_deposit',
         'payment_method' => 'telebirr',
@@ -90,25 +90,45 @@ test('buyer can submit instant Telebirr payment for earnest deposit with automat
     ]);
 
     $response->assertRedirect();
+
+    // SRS §83: no payment method verifies itself. A payer can never be the
+    // verifier of their own payment, so the row is pending and unsettled.
     $this->assertDatabaseHas('payments', [
         'payer_name' => 'Henok Tesfaye',
         'payment_method' => 'telebirr',
         'amount' => 150000.00,
-        'status' => 'completed',
+        'status' => 'pending',
         'bank_transaction_reference' => 'TB2627998102',
     ]);
 
-    // Financial ledger verification (SRS §82)
     $payment = Payment::where('bank_transaction_reference', 'TB2627998102')->first();
-    expect($payment)->not->toBeNull();
-    expect($payment->platform_fee)->toBeGreaterThan(0);
-    expect($payment->net_amount)->toBeLessThan(150000.00);
+    expect($payment)->not->toBeNull()
+        ->and($payment->verified_at)->toBeNull()
+        ->and($payment->verified_by)->toBeNull()
+        ->and($payment->platform_fee)->toBeGreaterThan(0)
+        ->and($payment->net_amount)->toBeLessThan(150000.00);
+
+    expect($payment->ledgers()->count())->toBe(0);
+
+    // The payer cannot verify their own payment.
+    $this->actingAs($this->buyerUser)->putJson(route('payments.verify', $payment))->assertForbidden();
+
+    // Finance verifies it and only then is the ledger written and the payable advanced.
+    $this->actingAs($this->adminUser)->put(route('payments.verify', $payment), [
+        'bank_transaction_reference' => 'TB2627998102',
+    ])->assertRedirect();
+
+    $payment->refresh();
+    expect($payment->status)->toBe('completed')
+        ->and($payment->verified_by)->toBe($this->adminUser->id)
+        ->and($payment->verified_at)->not->toBeNull();
 
     $this->assertDatabaseHas('financial_ledgers', [
         'payment_id' => $payment->id,
         'category' => 'earnest_deposit',
         'entry_type' => 'credit',
-        'amount' => 150000.00,
+        // 150,000 - 3,000 platform fee - 450 VAT on the fee.
+        'amount' => 146550.00,
     ]);
 
     $this->assertDatabaseHas('financial_ledgers', [
@@ -117,7 +137,7 @@ test('buyer can submit instant Telebirr payment for earnest deposit with automat
         'entry_type' => 'credit',
     ]);
 
-    // Payable sync
+    // Payable sync happens on settlement, not on submission.
     $this->offer->refresh();
     expect($this->offer->status)->toBe('under_review');
 });

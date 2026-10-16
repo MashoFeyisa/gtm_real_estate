@@ -253,15 +253,29 @@ test('tenant can view active lease and pay rent installment via payment engine',
         'property_id' => $rentalProperty->id,
     ]);
 
+    // SRS §83: no self-verification. The submission is pending and the schedule
+    // only becomes paid once finance confirms the transfer.
     $firstSchedule->refresh();
-    expect($firstSchedule->status)->toBe('paid');
-    expect((float) $firstSchedule->amount_paid)->toBe(45000.0);
+    expect($firstSchedule->status)->not->toBe('paid');
 
-    // Verify payment record created
     $payment = Payment::where('payable_id', $firstSchedule->id)->first();
-    expect($payment)->not->toBeNull();
-    expect($payment->status)->toBe('completed');
+    expect($payment)->not->toBeNull()
+        ->and($payment->status)->toBe('pending');
     $paymentResponse->assertRedirect(route('payments.receipt', $payment->transaction_number));
+
+    $finance = User::create([
+        'name' => 'Finance Verifier',
+        'email' => 'finance.verifier@example.com',
+        'password' => Hash::make('secret123'),
+        'role' => 'finance_officer',
+    ]);
+
+    $this->actingAs($finance)->put(route('payments.verify', $payment))->assertRedirect();
+
+    $firstSchedule->refresh();
+    expect($firstSchedule->status)->toBe('paid')
+        ->and((float) $firstSchedule->amount_paid)->toBe(45000.0)
+        ->and($payment->fresh()->status)->toBe('completed');
 });
 
 test('client can cancel their viewing appointment', function () {

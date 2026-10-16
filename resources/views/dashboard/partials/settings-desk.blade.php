@@ -1590,6 +1590,17 @@
                                 </div>
                             </div>
 
+                            {{-- Direct Treasury Link --}}
+                            <div class="mt-4 rounded-xl border border-[#d4af37]/40 bg-[#fbf8f2] p-4 flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-xs uppercase tracking-wider text-[#1d3c34]">Official Bank Accounts &amp; CBE Birr Merchant Desk</h4>
+                                    <p class="text-xs text-slate-600 mt-0.5">Manage default accounts (CBE Bank, Awash Bank, Dashen Bank, CBE Birr Merchant) displayed on client checkout.</p>
+                                </div>
+                                <a href="#bank-accounts" data-target-section="bank-accounts" class="nav-section-link rounded-xl bg-[#1d3c34] px-4 py-2 text-xs font-bold text-white hover:bg-[#254d43] transition">
+                                    Manage Bank Accounts &rarr;
+                                </a>
+                            </div>
+
                             <div class="flex items-center justify-between border-t border-[#e7ddca] pt-4 mt-6">
                                 <button type="button" data-settings-jump="panel-newsletter" class="rounded-full border border-[#d9cab3] bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f5f0e7] transition">
                                     &larr; Prev: Floating Concierge

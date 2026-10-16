@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\FinanceSettings;
+use App\Services\LedgerService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -98,9 +100,16 @@ class Commission extends Model
 
     /**
      * Settle commission payout deducting Ethiopian withholding tax (SRS §126–§135).
+     *
+     * The journal balances: the gross commission is debited and split into the
+     * net cash paid to the agent and the withholding tax owed to the authority.
      */
-    public function settlePayout(User $disbursedBy, string $method, ?string $reference = null, ?string $note = null, float $taxRate = 2.0): self
+    public function settlePayout(User $disbursedBy, string $method, ?string $reference = null, ?string $note = null, ?float $taxRate = null): self
     {
+        $settings = app(FinanceSettings::class);
+
+        $taxRate ??= $settings->withholdingTaxRate();
+
         $gross = (float) $this->commission_amount;
         $whtAmount = round($gross * ($taxRate / 100), 2);
         $netPayout = round($gross - $whtAmount, 2);
@@ -122,15 +131,41 @@ class Commission extends Model
             'paid_at' => now(),
         ]);
 
-        // Record auditable debit entry into Financial Ledger
-        FinancialLedger::create([
-            'entry_type' => 'debit',
-            'category' => 'agent_commission',
-            'amount' => $gross,
-            'currency' => 'ETB',
-            'description' => "Commission disbursed to {$this->agent?->name} ({$this->voucher_number}). Net: {$netPayout} ETB, WHT (2%): {$whtAmount} ETB",
-            'reference' => $this->payout_reference ?: $this->voucher_number,
-            'user_id' => $disbursedBy->id,
+        $ledgerReference = $this->payout_reference ?: $this->voucher_number;
+        $partyUserId = $this->agent?->user_id;
+
+        app(LedgerService::class)->post('commission:'.$this->id, [
+            [
+                'entry_type' => 'debit',
+                'category' => 'agent_commission',
+                'amount' => $gross,
+                'currency' => 'ETB',
+                'description' => "Commission disbursed to {$this->agent?->name} ({$this->voucher_number}). Gross: {$gross} ETB",
+                'reference' => $ledgerReference,
+                'user_id' => $disbursedBy->id,
+                'party_user_id' => $partyUserId,
+            ],
+            [
+                'entry_type' => 'credit',
+                'category' => 'cash',
+                'amount' => $netPayout,
+                'currency' => 'ETB',
+                'description' => "Net commission paid to {$this->agent?->name} ({$this->voucher_number})",
+                'reference' => $ledgerReference,
+                'user_id' => $disbursedBy->id,
+                'party_user_id' => $partyUserId,
+            ],
+            [
+                'entry_type' => 'credit',
+                'category' => 'tax_withholding',
+                'amount' => $whtAmount,
+                'rate_snapshot' => ['key' => FinanceRate::WITHHOLDING, 'rate' => $taxRate],
+                'currency' => 'ETB',
+                'description' => "Withholding tax ({$taxRate}%) on commission {$this->voucher_number}",
+                'reference' => $ledgerReference,
+                'user_id' => $disbursedBy->id,
+                'party_user_id' => $partyUserId,
+            ],
         ]);
 
         return $this;

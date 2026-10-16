@@ -86,10 +86,10 @@ test('buyer: base menu is kept, granted property.create adds Post Property, revo
         'granted' => true,
     ]);
 
-    // 3. Buyer refreshes dashboard: "Granted Access" appears with "Post Property"
+    // 3. Buyer refreshes dashboard: "Granted Access" is gone, item appears in normal navigation
     $responseGranted = $this->actingAs($buyer->fresh())->get(route('buyer.dashboard'));
     $responseGranted->assertOk();
-    $responseGranted->assertSee('Granted Access', false);
+    $responseGranted->assertDontSee('Granted Access', false);
     $responseGranted->assertSee('Post Property', false);
     $responseGranted->assertSee(route('user.properties.create'), false);
 
@@ -154,12 +154,12 @@ test('host: base menu is kept, granted offer.create adds My Offers, revoking rem
         'granted' => true,
     ]);
 
-    // 3. Host refreshes dashboard: "Granted Access" appears with "My Offers"
+    // 3. Host refreshes dashboard: "Granted Access" is gone, "My Offers" appears
     $responseGranted = $this->actingAs($host->fresh())->get(route('host.dashboard'));
     $responseGranted->assertOk();
-    $responseGranted->assertSee('Granted Access', false);
+    $responseGranted->assertDontSee('Granted Access', false);
     $responseGranted->assertSee('My Offers', false);
-    $responseGranted->assertSee(route('user.offers'), false);
+    $responseGranted->assertSee('#offers', false);
 
     // 4. Working page: Host opens My Offers page
     $offersPage = $this->actingAs($host->fresh())->get(route('user.offers'));
@@ -173,6 +173,7 @@ test('host: base menu is kept, granted offer.create adds My Offers, revoking rem
     $responseRevoked = $this->actingAs($host->fresh())->get(route('host.dashboard'));
     $responseRevoked->assertOk();
     $responseRevoked->assertDontSee('My Offers', false);
+    $responseRevoked->assertDontSee('#offers', false);
     $responseRevoked->assertDontSee('Granted Access', false);
 
     // 7. Visiting URL returns 403 Forbidden
@@ -208,17 +209,19 @@ test('agent: base menu is kept, granted booking.view adds My Bookings, revoking 
         'granted' => true,
     ]);
 
-    // 3. Agent refreshes dashboard: "Granted Access" appears with "My Bookings"
+    // 3. Agent refreshes dashboard: "Granted Access" is gone, "My Bookings" appears in Living/Stays group
     $responseGranted = $this->actingAs($agentUser->fresh())->get(route('agent.portal'));
     $responseGranted->assertOk();
-    $responseGranted->assertSee('Granted Access', false);
+    $responseGranted->assertDontSee('Granted Access', false);
     $responseGranted->assertSee('My Bookings', false);
-    $responseGranted->assertSee(route('user.bookings'), false);
+    $responseGranted->assertSee('#bookings', false);
 
-    // 4. Working page: Agent opens My Bookings page
-    $bookingsPage = $this->actingAs($agentUser->fresh())->get(route('user.bookings'));
-    $bookingsPage->assertOk();
-    $bookingsPage->assertSee('My Bookings');
+    // 4. Working page: Agent opens My Bookings and is redirected inside unified dashboard shell
+    $bookingsRedirect = $this->actingAs($agentUser->fresh())->get(route('user.bookings'));
+    $bookingsRedirect->assertRedirect($agentUser->dashboard_url.'#bookings');
+    $agentDash = $this->actingAs($agentUser->fresh())->get($agentUser->dashboard_url);
+    $agentDash->assertOk();
+    $agentDash->assertSee('id="bookings"', false);
 
     // 5. Admin revokes booking.view
     UserPermissionOverride::where('user_id', $agentUser->id)->where('permission_id', $permId)->update(['granted' => false]);
@@ -227,6 +230,7 @@ test('agent: base menu is kept, granted booking.view adds My Bookings, revoking 
     $responseRevoked = $this->actingAs($agentUser->fresh())->get(route('agent.portal'));
     $responseRevoked->assertOk();
     $responseRevoked->assertDontSee('My Bookings', false);
+    $responseRevoked->assertDontSee('#bookings', false);
     $responseRevoked->assertDontSee('Granted Access', false);
 
     // 7. Visiting URL returns 403 Forbidden

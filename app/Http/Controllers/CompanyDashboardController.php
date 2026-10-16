@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Agent;
 use App\Models\AuditLog;
+use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\Commission;
 use App\Models\CompanyWhiteLabel;
@@ -143,6 +144,10 @@ class CompanyDashboardController extends Controller
             ? Property::query()->whereKey($request->query('edit_property'))->first()
             : null;
         $companyWhiteLabel = CompanyWhiteLabel::where('user_id', $user->id)->first();
+        $bankAccounts = BankAccount::query()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
 
         return view('dashboards.company', compact(
             'user',
@@ -162,7 +167,8 @@ class CompanyDashboardController extends Controller
             'reports',
             'companyKpis',
             'siteBrand',
-            'companyWhiteLabel'
+            'companyWhiteLabel',
+            'bankAccounts'
         ));
     }
 
@@ -368,6 +374,11 @@ class CompanyDashboardController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
+            // `agents.commission_rate` is the company's internal split share
+            // (the form labels it "commission split ratios", default 70%), not
+            // the platform commission rate. It must not be replaced by the
+            // platform default rate - that would silently rewrite the company's
+            // share. The platform commission rate lives in FinanceSettings.
             'commission_rate' => $validated['commission_rate'] ?? 70.0,
             'license_number' => $validated['license_number'] ?? null,
             'is_active' => true,

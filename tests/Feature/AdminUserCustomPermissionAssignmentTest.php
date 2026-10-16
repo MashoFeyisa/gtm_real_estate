@@ -194,19 +194,19 @@ test('sidebar dynamically renders granted capability feature when admin grants p
 
     $buyer->refresh();
 
-    // Buyer visits dashboard; sidebar now includes Granted Access section with user-facing links
+    // Buyer visits dashboard; sidebar includes normal grouped links, no Granted Access header
     $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Granted Access');
+    $response->assertDontSee('Granted Access');
     $response->assertSee('Post Property');
     $response->assertSee(route('user.properties.create'));
     $response->assertSee('My Bookings');
-    $response->assertSee(route('user.bookings'));
+    $response->assertSee('#bookings');
 
-    // And buyer can successfully access the user-facing granted pages
+    // And buyer can successfully access user-facing granted pages (direct bookings redirects to shell)
     $this->actingAs($buyer)->get(route('user.properties.create'))->assertOk();
-    $this->actingAs($buyer)->get(route('user.bookings'))->assertOk();
+    $this->actingAs($buyer)->get(route('user.bookings'))->assertRedirect(route('buyer.dashboard').'#bookings');
 });
 
 test('sidebar dynamically shows all user features when admin grants everything and hides them when reset', function () {
@@ -222,10 +222,10 @@ test('sidebar dynamically shows all user features when admin grants everything a
 
     $response = $this->actingAs($buyer)->get(route('buyer.dashboard'));
     $response->assertOk();
-    $response->assertSee('Granted Access');
+    $response->assertDontSee('Granted Access');
     $response->assertSee(route('user.properties.create'));
-    $response->assertSee(route('user.bookings'));
-    $response->assertSee(route('user.maintenance'));
+    $response->assertSee('#bookings');
+    $response->assertSee('#maintenance');
 
     // Admin resets to role default
     $this->actingAs($admin)->post(route('dashboard.users.permissions.update', $buyer), [
@@ -238,7 +238,7 @@ test('sidebar dynamically shows all user features when admin grants everything a
     $responseReset->assertOk();
     $responseReset->assertDontSee('Granted Access');
     $responseReset->assertDontSee(route('user.properties.create'));
-    $responseReset->assertDontSee(route('user.bookings'));
+    $responseReset->assertDontSee('#bookings');
 });
 
 test('developer portal renders granted access links when developer has additional permissions', function () {
@@ -257,8 +257,9 @@ test('developer portal renders granted access links when developer has additiona
 
     $response = $this->actingAs($developer)->get(route('developer.portal'));
     $response->assertOk();
-    $response->assertSee('Granted Access');
-    $response->assertSee(route('user.bookings'));
+    $response->assertDontSee('Granted Access');
+    $response->assertSee('My Bookings');
+    $response->assertSee('#bookings');
 });
 
 test('agent portal renders granted access links when agent has additional user permissions', function () {
@@ -278,6 +279,7 @@ test('agent portal renders granted access links when agent has additional user p
 
     $response = $this->actingAs($agentUser)->get(route('agent.portal'));
     $response->assertOk();
-    $response->assertSee('Granted Access');
-    $response->assertSee(route('user.bookings'));
+    $response->assertDontSee('Granted Access');
+    $response->assertSee('My Bookings');
+    $response->assertSee('#bookings');
 });

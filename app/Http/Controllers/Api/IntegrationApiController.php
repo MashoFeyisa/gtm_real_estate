@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Experience;
 use App\Models\ExperienceBooking;
 use App\Models\Property;
+use App\Services\FinanceSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -143,7 +144,7 @@ class IntegrationApiController extends Controller
 
         $experience = Experience::findOrFail($validated['experience_id']);
         $total = $experience->price_etb * $validated['number_of_guests'];
-        $fee = $total * 0.15;
+        $fee = round($total * app(FinanceSettings::class)->experiencePlatformFeeRate() / 100, 2);
 
         $booking = ExperienceBooking::create([
             'experience_id' => $experience->id,

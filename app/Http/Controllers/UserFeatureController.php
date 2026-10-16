@@ -3,10 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\Booking;
 use App\Models\Inquiry;
-use App\Models\Lease;
-use App\Models\MaintenanceTicket;
 use App\Models\Property;
 use App\Models\PropertyOffer;
 use App\Models\PropertyReview;
@@ -83,21 +80,16 @@ class UserFeatureController extends Controller
     }
 
     /**
-     * Show the user's "My Bookings" page.
+     * Show the user's "My Bookings" page inside the unified dashboard shell.
      */
-    public function bookings(Request $request): View
+    public function bookings(Request $request): RedirectResponse
     {
         $user = $request->user();
         if (! $user || (! $user->hasPermission('bookings.view') && ! $user->hasPermission('booking.view'))) {
             abort(403, 'Permission denied: Booking view permission required.');
         }
 
-        $bookings = Booking::where('user_id', $user->id)
-            ->with('property')
-            ->latest()
-            ->get();
-
-        return view('user.bookings', compact('bookings'));
+        return redirect()->to($user->dashboard_url.'#bookings');
     }
 
     /**
@@ -137,40 +129,29 @@ class UserFeatureController extends Controller
     }
 
     /**
-     * Show the user's "My Leases & Rent" page.
+     * Show the user's "My Leases & Rent" page inside the unified dashboard shell.
      */
-    public function leases(Request $request): View
+    public function leases(Request $request): RedirectResponse
     {
         $user = $request->user();
         if (! $user || (! $user->hasPermission('leases.view') && ! $user->hasPermission('lease.view') && ! $user->hasPermission('rent.pay'))) {
             abort(403, 'Permission denied: Leases access required.');
         }
 
-        $leases = Lease::where('tenant_user_id', $user->id)
-            ->orWhere('landlord_user_id', $user->id)
-            ->with('property')
-            ->latest()
-            ->get();
-
-        return view('user.leases', compact('leases'));
+        return redirect()->to($user->dashboard_url.'#leases');
     }
 
     /**
-     * Show the user's "Maintenance Requests" page.
+     * Show the user's "Maintenance Requests" page inside the unified dashboard shell.
      */
-    public function maintenance(Request $request): View
+    public function maintenance(Request $request): RedirectResponse
     {
         $user = $request->user();
         if (! $user || (! $user->hasPermission('maintenance.view') && ! $user->hasPermission('maintenance.create'))) {
             abort(403, 'Permission denied: Maintenance access required.');
         }
 
-        $tickets = MaintenanceTicket::where('user_id', $user->id)
-            ->with('property')
-            ->latest()
-            ->get();
-
-        return view('user.maintenance', compact('tickets'));
+        return redirect()->to($user->dashboard_url.'#maintenance');
     }
 
     /**

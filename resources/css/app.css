@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 @import 'leaflet/dist/leaflet.css';
 
+/*
+ * The app toggles dark mode by adding/removing the `dark` class on <html>
+ * (see dashboards/layout.blade.php theme script). Tailwind v4 defaults `dark:`
+ * to the OS media query, which disconnects the switch from every utility —
+ * this variant re-attaches `dark:` to the app's class toggle.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
@@ -10,12 +18,23 @@
 }
 
 /* Luxury Carousel Utilities */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
+.luxury-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #9b6c17 #e7ddca;
 }
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+.luxury-scrollbar::-webkit-scrollbar {
+    height: 8px;
+}
+.luxury-scrollbar::-webkit-scrollbar-track {
+    background: #e7ddca;
+    border-radius: 999px;
+}
+.luxury-scrollbar::-webkit-scrollbar-thumb {
+    background: #9b6c17;
+    border-radius: 999px;
+}
+.luxury-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #7d5512;
 }
 
 /* Completely hide Google Translate floating translation icons, popups, banners & badges */

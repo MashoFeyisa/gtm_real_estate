@@ -93,6 +93,10 @@ return [
 
                 // Reports
                 'reports.create' => 'Report listings',
+
+                // Stays & housekeeping
+                'maintenance.create' => 'Submit housekeeping & maintenance requests',
+                'maintenance.view' => 'View own housekeeping & maintenance requests',
             ],
         ],
 
@@ -131,6 +135,7 @@ return [
                 'agreements.view' => 'View lease agreements',
                 'agreements.sign' => 'Sign & receive supported agreements',
                 'leases.view' => 'View lease agreements',
+                'lease.view' => 'View lease agreements',
                 'leases.sign' => 'Digitally accept & sign leases',
 
                 // Rent tracking
@@ -200,6 +205,10 @@ return [
                 // Disputes
                 'disputes.create' => 'Open disputes',
                 'disputes.view' => 'View own disputes',
+
+                // Stays & housekeeping
+                'maintenance.create' => 'Submit housekeeping & maintenance requests',
+                'maintenance.view' => 'View own housekeeping & maintenance requests',
             ],
         ],
 
@@ -248,6 +257,10 @@ return [
                 // Disputes
                 'disputes.create' => 'Open disputes',
                 'disputes.view' => 'View own disputes',
+
+                // Stays & housekeeping
+                'maintenance.create' => 'Submit housekeeping & maintenance requests',
+                'maintenance.view' => 'View own housekeeping & maintenance requests',
             ],
         ],
 
@@ -409,6 +422,7 @@ return [
                 // Leases CRUD
                 'leases.create' => 'Create lease agreements',
                 'leases.view' => 'View leases',
+                'lease.view' => 'View lease agreements',
                 'leases.update' => 'Update lease terms',
                 'leases.terminate' => 'Terminate leases',
 
@@ -723,6 +737,7 @@ return [
                 'bookings.update' => 'Update booking status',
                 'bookings.cancel' => 'Cancel bookings',
                 'bookings.update' => 'Manage bookings',
+                'bookings.manage' => 'Manage bookings across the portfolio',
 
                 // Maintenance CRUD
                 'maintenance.create' => 'Create maintenance tickets',
@@ -739,6 +754,7 @@ return [
 
                 // Leases
                 'leases.view' => 'View leases',
+                'lease.view' => 'View lease agreements',
                 'leases.update' => 'Update lease records',
 
                 // Rent
@@ -1025,6 +1041,10 @@ return [
                 // Tax
                 'tax.view' => 'View tax records',
                 'tax.manage' => 'Manage tax configuration',
+
+                // Finance settings (dated rate book, SRS §171)
+                'finance.settings.update' => 'Change finance rates and effective dates',
+                'finance.settings.approve' => 'Approve a pending finance rate change',
             ],
             'sections' => [
                 ['key' => 'ledger', 'label' => 'Financial Ledger', 'icon' => '📒', 'permissions' => ['ledger.view']],
@@ -1153,6 +1173,7 @@ return [
                 // Bookings
                 'bookings.view' => 'View all bookings',
                 'bookings.update' => 'Manage all bookings',
+                'bookings.manage' => 'Manage all bookings',
 
                 // Payments
                 // Moderation
@@ -1228,6 +1249,117 @@ return [
             'permissions' => [],
         ],
 
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Catalogued Capabilities
+    |--------------------------------------------------------------------------
+    | Permission keys that code and tests reference but that no persona grants
+    | by default. They are catalogued so that a check on them resolves (and is
+    | denied unless explicitly granted) instead of being an unknown key, and so
+    | an administrator can grant them from the permission screens.
+    */
+    'catalogue' => [
+        'benchmarks.view' => 'View market benchmarks',
+        'buildings.manage' => 'Manage buildings',
+        'campaigns.leads_view' => 'View campaign leads',
+        'cleaner.tasks' => 'View assigned housekeeping tasks',
+        'documents.upload' => 'Upload documents',
+        'finance.audit' => 'Audit financial records',
+        'finance.manage' => 'Manage financial records',
+        'finance.view' => 'View financial records',
+        'inquiries.reply' => 'Reply to inquiries',
+        'leases.manage' => 'Manage leases',
+        'listings.manage' => 'Manage listings',
+        'maintenance.tickets' => 'Manage maintenance tickets',
+        'market.view' => 'View market intelligence',
+        'properties.publish' => 'Publish properties',
+        'property.documents' => 'Manage property documents',
+        'rent.track' => 'Track rent payments',
+        'reviews.reply' => 'Reply to reviews',
+        'services.reports_upload' => 'Upload service reports',
+        'stays.booking_view' => 'View stay bookings',
+        'stays.payouts' => 'Manage stay payouts',
+        'tenants.manage' => 'Manage tenants',
+        'units.manage' => 'Manage units',
+        'users.lookup' => 'Look up users',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Aliases
+    |--------------------------------------------------------------------------
+    | Legacy/alternate permission keys mapped to their canonical catalogued
+    | key. hasPermission() checks a key together with its alias (in both
+    | directions), so code that still asks for `property.view` resolves
+    | against the catalogued `properties.view`.
+    */
+    'aliases' => [
+        'property.view' => 'properties.view',
+        'property.create' => 'properties.create',
+        'property.update' => 'properties.update',
+        'property.delete' => 'properties.delete',
+        'property.approve' => 'properties.approve',
+        'property.verify' => 'properties.verify',
+        'property.save' => 'properties.save',
+        'properties.favorite' => 'properties.save',
+        'property.favorite' => 'properties.save',
+        'booking.view' => 'bookings.view',
+        'booking.create' => 'bookings.create',
+        'booking.cancel' => 'bookings.cancel',
+        'payment.view' => 'payments.view',
+        'payment.create' => 'payments.create',
+        'document.view' => 'documents.view',
+        'media.view' => 'photos.view',
+        'media.upload' => 'photos.create',
+        'offer.view' => 'offers.view',
+        'offer.create' => 'offers.create',
+        'offer.make' => 'offers.make',
+        'offer.update' => 'offers.update',
+        'offer.cancel' => 'offers.cancel',
+        'viewing.view' => 'viewings.view',
+        'viewing.create' => 'viewings.create',
+        'viewing.request' => 'viewings.request',
+        'viewing.schedule' => 'viewings.schedule',
+        'viewing.book' => 'viewings.create',
+        'viewings.book' => 'viewings.create',
+        'viewing.cancel' => 'viewings.cancel',
+        'inquiry.view' => 'inquiries.view',
+        'inquiry.create' => 'inquiries.create',
+        'inquiry.update' => 'inquiries.update',
+        'lead.view' => 'leads.view',
+        'lead.manage' => 'leads.manage',
+        'listing.view' => 'listings.view',
+        'listing.create' => 'listings.create',
+        'listing.update' => 'listings.update',
+        'listing.delete' => 'listings.delete',
+        'listing.publish' => 'listings.publish',
+        'searches.view' => 'properties.search',
+        'searches.save' => 'properties.search',
+        'search.view' => 'properties.search',
+        'search.save' => 'properties.search',
+        'users.edit' => 'users.update',
+        'user.edit' => 'users.update',
+        'user.update' => 'users.update',
+        'users.manage' => 'platform.users_manage',
+        'user.manage' => 'platform.users_manage',
+        'user.delete' => 'users.delete',
+        'user.create' => 'users.create',
+        'user.suspend' => 'users.suspend',
+        'user.view' => 'users.view',
+        'roles.manage' => 'platform.roles_manage',
+        'role.manage' => 'platform.roles_manage',
+        'roles.update' => 'platform.roles_manage',
+        'roles.edit' => 'platform.roles_manage',
+        'roles.create' => 'platform.roles_manage',
+        'roles.delete' => 'platform.roles_manage',
+        'permissions.manage' => 'platform.roles_manage',
+        'permission.manage' => 'platform.roles_manage',
+        'permissions.create' => 'platform.roles_manage',
+        'permissions.update' => 'platform.roles_manage',
+        'permissions.delete' => 'platform.roles_manage',
+        'platform.permissions_manage' => 'platform.roles_manage',
     ],
 
     /*

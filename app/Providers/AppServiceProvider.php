@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Models\Listing;
+use App\Models\Project;
 use App\Models\Property;
 use App\Models\SiteSetting;
+use App\Policies\DeveloperEscrowDisbursementPolicy;
 use App\Policies\ListingPolicy;
 use App\Policies\PropertyPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -39,16 +41,21 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Property::class, PropertyPolicy::class);
         Gate::policy(Listing::class, ListingPolicy::class);
+        Gate::policy(Project::class, DeveloperEscrowDisbursementPolicy::class);
 
         $this->configureRateLimiting();
     }
 
     /**
-     * Named rate limiters for credential endpoints.
+     * Named rate limiters for credential and unauthenticated gateway endpoints.
      *
      * Login attempts are keyed by email + IP so one attacker cannot lock out
      * every account behind a shared address, and one account cannot be
      * brute-forced from a single source.
+     *
+     * The payment callback is keyed by IP so a flood of forged webhooks cannot
+     * exhaust the audit table or the signature check before a real provider
+     * notification arrives.
      */
     private function configureRateLimiting(): void
     {
@@ -56,6 +63,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by(
                 'login|'.Str::transliterate(Str::lower((string) $request->input('email'))).'|'.$request->ip()
             );
+        });
+
+        RateLimiter::for('payments-callback', function (Request $request) {
+            $perMinute = (int) config('services.payments.callback_rate_limit', 60);
+
+            return Limit::perMinute(max(1, $perMinute))->by('payments-callback|'.$request->ip());
         });
     }
 

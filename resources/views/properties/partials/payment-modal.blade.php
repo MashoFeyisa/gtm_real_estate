@@ -98,13 +98,18 @@
                 </div>
             </div>
 
+            @php
+                $displayBankAccounts = \App\Models\BankAccount::getActiveBanks();
+                $cbeBirrMerchantCode = \App\Models\BankAccount::getCbeBirrMerchantCode();
+            @endphp
+
             {{-- 2. CBE Birr Panel --}}
             <div id="panel-cbe_birr" class="payment-method-panel hidden rounded-2xl border border-[#6f1d75]/20 bg-[#faf2fb] p-4 space-y-3">
                 <div class="flex items-center gap-2">
                     <span class="rounded bg-[#6f1d75] px-2 py-0.5 text-[10px] font-bold text-white uppercase">CBE Birr</span>
                     <span class="text-[11px] text-slate-600">Commercial Bank of Ethiopia Mobile Banking</span>
                 </div>
-                <p class="text-[11px] text-slate-600">Transfer funds to GTM CBE Merchant Account: <strong class="font-mono text-[#6f1d75]">284920</strong></p>
+                <p class="text-[11px] text-slate-600">Transfer funds to GTM CBE Merchant Account: <strong class="font-mono text-[#6f1d75]">{{ $cbeBirrMerchantCode }}</strong></p>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">CBE Transaction / FT Reference Number</label>
                     <input type="text" placeholder="e.g. FT262799XXXX" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2 text-xs font-mono focus:ring-2 focus:ring-[#6f1d75]/20 focus:outline-none">
@@ -119,27 +124,24 @@
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] bg-white p-3 rounded-xl border border-[#e8dcc7]">
-                    <div>
-                        <strong class="block text-[#1d3c34]">CBE Bank</strong>
-                        <span class="font-mono text-slate-600 font-bold">1000 2837 4920 1</span>
-                    </div>
-                    <div>
-                        <strong class="block text-[#1d3c34]">Awash Bank</strong>
-                        <span class="font-mono text-slate-600 font-bold">0132 0492 8172 00</span>
-                    </div>
-                    <div>
-                        <strong class="block text-[#1d3c34]">Dashen Bank</strong>
-                        <span class="font-mono text-slate-600 font-bold">0029 3847 2918 01</span>
-                    </div>
+                    @foreach ($displayBankAccounts as $bAccount)
+                        <div>
+                            <strong class="block text-[#1d3c34]">{{ $bAccount->bank_name }}</strong>
+                            <span class="font-mono text-slate-600 font-bold select-all">{{ $bAccount->account_number }}</span>
+                            @if (!empty($bAccount->account_name))
+                                <span class="block text-[10px] text-slate-500 truncate">{{ $bAccount->account_name }}</span>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Bank Name Used *</label>
                         <select name="bank_name" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-[#1d3c34]/20 focus:outline-none">
-                            <option value="Commercial Bank of Ethiopia">Commercial Bank of Ethiopia (CBE)</option>
-                            <option value="Awash Bank">Awash Bank</option>
-                            <option value="Dashen Bank">Dashen Bank</option>
+                            @foreach ($displayBankAccounts as $bAccount)
+                                <option value="{{ $bAccount->bank_name }}">{{ $bAccount->bank_name }}</option>
+                            @endforeach
                             <option value="Bank of Abyssinia">Bank of Abyssinia</option>
                             <option value="Cooperative Bank of Oromia">Coop Bank of Oromia</option>
                             <option value="Other Ethiopian Bank">Other Licensed Bank</option>

@@ -339,10 +339,10 @@
                                     <span>WhatsApp</span>
                                 </a>
                             @endif
-                            <a href="#schedule-viewing-section" data-auth-gate class="inline-flex flex-1 min-w-[140px] items-center justify-center gap-1.5 rounded-xl bg-[#102b25] px-4 py-3 text-sm font-black text-[#d4af37] shadow-md transition hover:bg-[#1d3c34]">
+                            <a href="#schedule-viewing-section" data-auth-gate="viewing" data-redirect="{{ url()->current() }}#schedule-viewing-section" class="inline-flex flex-1 min-w-[140px] items-center justify-center gap-1.5 rounded-xl bg-[#102b25] px-4 py-3 text-sm font-black text-[#d4af37] shadow-md transition hover:bg-[#1d3c34]">
                                 <span>📅 Schedule Viewing</span>
                             </a>
-                            <a href="#formal-offer-section" data-auth-gate class="inline-flex flex-1 min-w-[140px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#9b6c17] to-[#d4af37] px-4 py-3 text-sm font-black text-white shadow-md transition hover:opacity-95">
+                            <a href="#formal-offer-section" data-auth-gate="offer" data-redirect="{{ url()->current() }}#formal-offer-section" class="inline-flex flex-1 min-w-[140px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#9b6c17] to-[#d4af37] px-4 py-3 text-sm font-black text-white shadow-md transition hover:opacity-95">
                                 <span>💼 Make Formal Offer</span>
                             </a>
                             <button type="button" onclick="openUniversalPaymentModal({ propertyId: {{ $property->id }}, title: 'Pay Property Deposit / Earnest Money', purpose: 'Earnest Money Deposit for {{ addslashes($property->title) }}', amount: {{ round($property->price * 0.05, -3) ?: 50000 }} })" class="inline-flex flex-1 min-w-[150px] items-center justify-center gap-2 rounded-xl border-2 border-[#102b25] bg-white px-4 py-3 text-sm font-black text-[#102b25] shadow-lg transition hover:bg-[#102b25] hover:text-white cursor-pointer ring-2 ring-emerald-600/30">
@@ -355,7 +355,7 @@
                                     <span class="font-black text-[#102b25] uppercase tracking-wide">Book Stay</span>
                                 </a>
                             @endif
-                            <a href="#buy-request" class="inline-flex flex-1 min-w-[120px] items-center justify-center gap-1.5 rounded-xl border border-[#d9cab3] bg-white px-3.5 py-3 text-sm font-bold text-[#1d3c34] shadow-sm transition hover:bg-[#f8f3eb]">
+                            <a href="#buy-request" data-auth-gate="inquiry" data-redirect="{{ url()->current() }}#buy-request" class="inline-flex flex-1 min-w-[120px] items-center justify-center gap-1.5 rounded-xl border border-[#d9cab3] bg-white px-3.5 py-3 text-sm font-bold text-[#1d3c34] shadow-sm transition hover:bg-[#f8f3eb]">
                                 <span>Buy / Request</span>
                             </a>
                         </div>
@@ -400,9 +400,15 @@
         </div>
 
         {{-- Property Overview & Specifications --}}
-        <div class="mt-8 grid gap-8 md:grid-cols-[1.4fr_0.6fr]">
-            <div class="rounded-[2rem] border border-[#d9cab3] bg-white p-6 shadow-sm sm:p-8">
-                <h2 class="text-2xl font-black text-[#1d3c34]">Property Description</h2>
+        {{-- 8 Core Property Sections: Two-Column Grid (Two by Two) --}}
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+            {{-- 1. Property Description --}}
+            <div id="property-description-block" class="md:col-span-2 flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 min-w-0 break-words">
+                <div class="flex items-center gap-2 border-b border-[#f0e4cf] pb-4 dark:border-slate-800">
+                    <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Overview</span>
+                    <h2 class="text-2xl font-black text-[#1d3c34] dark:text-white">Property Description</h2>
+                </div>
+                <div class="mt-4 flex-1 flex flex-col justify-between space-y-6">
                 <div class="mt-4 text-base leading-8 text-slate-600 space-y-4">
                     <p>{{ $property->description ?: 'This property offers a premium living experience in a desirable location with thoughtful design, practical comfort, and strong investment value.' }}</p>
                 </div>
@@ -505,19 +511,19 @@
                     </div>
                 </div>
 
-                {{-- Ethiopian Property Verification & Legal Documentation Shield --}}
-                @include('properties.partials.verification-shield')
+                </div>
+            </div>
 
-                {{-- Luxury Mortgage & Investment Calculator --}}
-                <div id="luxury-financial-calculator" data-property-price="{{ $property->price }}" data-property-type="{{ $property->type }}" class="mt-8 border-t border-[#f0e4cf] pt-8">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Financial Advisory</span>
-                                <h3 class="text-xl font-black text-[#1d3c34]">Financing & Investment Studio</h3>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-500">Estimate monthly mortgage payments or analyze rental yields and 5-year capital appreciation.</p>
+            {{-- 2. Financial Advisory --}}
+            <div id="luxury-financial-calculator" data-property-price="{{ $property->price }}" data-property-type="{{ $property->type }}" class="md:col-span-2 flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 min-w-0 break-words">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#f0e4cf] pb-4 dark:border-slate-800">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Financial Advisory</span>
+                            <h3 class="text-xl font-black text-[#1d3c34] dark:text-white">Financing & Investment Studio</h3>
                         </div>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Estimate monthly mortgage payments or analyze rental yields and 5-year capital appreciation.</p>
+                    </div>
 
                         {{-- Dual Mode Tabs --}}
                         <div class="inline-flex rounded-2xl bg-[#f0e4cf]/80 p-1 border-2 border-[#d9cab3]">
@@ -681,27 +687,39 @@
                     </div>
                 </div>
 
-                {{-- Interactive Location Map Section --}}
-                {{-- Interactive Location Map & Ethiopian Amenity Radar --}}
-                <div class="mt-8 border-t border-[#f0e4cf] pt-8">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">GIS Engine </span>
-                                <span class="text-xs font-bold text-[#587165]">አካባቢያዊ መረጃ እና ምቹ ሁኔታዎች</span>
-                            </div>
-                            <h3 class="text-2xl font-black text-[#1d3c34] mt-1">Explore Location & Neighborhood</h3>
-                            <p class="mt-0.5 text-xs text-slate-500">
-                                {{ $property->subcity ? $property->subcity.' Sub-City · ' : '' }}
-                                {{ $property->neighborhood ? $property->neighborhood.' · ' : '' }}
-                                {{ $property->city ?? 'Addis Ababa' }}
-                            </p>
+
+            {{-- 3. Legal Verification --}}
+            @include('properties.partials.verification-shield')
+
+
+
+
+            {{-- 6. Verified Feedback --}}
+            @include('properties.partials.reviews-section')
+
+            {{-- 7. Property Management --}}
+            @include('properties.partials.maintenance-section')
+
+            {{-- 8. GIS Engine --}}
+            <div id="gis-engine-section" class="md:col-span-2 flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 min-w-0 break-words">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e4cf] pb-4 dark:border-slate-800">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">GIS Engine</span>
+                            <span class="text-xs font-bold text-[#587165] dark:text-slate-400">አካባቢያዊ መረጃ እና ምቹ ሁኔታዎች</span>
                         </div>
-                        <a href="https://www.google.com/maps/search/?api=1&query={{ $property->coordinates[0] }},{{ $property->coordinates[1] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-full border border-[#d9cab3] bg-[#fffaf2] px-4 py-2 text-xs font-bold text-[#1d3c34] hover:bg-[#f0e4cf] transition shadow-xs">
-                            <svg class="h-3.5 w-3.5 text-[#1d3c34]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                            <span>Open in Google Maps</span>
-                        </a>
+                        <h3 class="text-2xl font-black text-[#1d3c34] dark:text-white mt-1">Explore Location & Neighborhood</h3>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            {{ $property->subcity ? $property->subcity.' Sub-City · ' : '' }}
+                            {{ $property->neighborhood ? $property->neighborhood.' · ' : '' }}
+                            {{ $property->city ?? 'Addis Ababa' }}
+                        </p>
                     </div>
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ $property->coordinates[0] }},{{ $property->coordinates[1] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-full border border-[#d9cab3] bg-[#fffaf2] px-4 py-2 text-xs font-bold text-[#1d3c34] hover:bg-[#f0e4cf] transition shadow-xs dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">
+                        <svg class="h-3.5 w-3.5 text-[#1d3c34] dark:text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        <span>Open in Google Maps</span>
+                    </a>
+                </div>
 
                     {{-- Geographic Sub-City & Woreda Taxonomy Badges --}}
                     <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
@@ -746,297 +764,10 @@
 
                 </div>
 
-                {{-- Module 4: Property Viewing Engine --}}
-                @php
-                    $myViewings = auth()->check()
-                        ? $property->viewings()->where('user_id', auth()->id())->latest()->get()
-                        : collect();
-                    $myOffers = auth()->check()
-                        ? $property->offers()->where('user_id', auth()->id())->with('negotiations')->latest()->get()
-                        : collect();
-                @endphp
+        </div>
 
-                <div id="schedule-viewing-section" class="scroll-mt-24 mt-8 rounded-[2rem] border border-[#d9cab3] bg-white p-6 md:p-8 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e4cf] pb-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Appointment Core</span>
-                                <h3 class="text-xl font-black text-[#1d3c34]">Schedule a Property Viewing</h3>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-500">Choose between an on-site guided inspection or a live interactive virtual tour.</p>
-                        </div>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34]">
-                            <svg class="h-3.5 w-3.5 text-[#00b53f]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                            Verified Agent Accompanied
-                        </span>
-                    </div>
-
-                    @if ($myViewings->isNotEmpty())
-                        <div class="mt-4 rounded-2xl bg-[#f8f3eb] p-4 border border-[#ecd9be]">
-                            <h4 class="text-xs font-black uppercase tracking-wider text-[#1d3c34]">Your Scheduled Appointments</h4>
-                            <div class="mt-2 space-y-2">
-                                @foreach ($myViewings as $v)
-                                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-xs border border-[#e2d5c3]">
-                                        <div>
-                                            <span class="font-mono font-bold text-[#1d3c34]">{{ $v->viewing_reference }}</span>
-                                            <span class="text-slate-500">· {{ \Carbon\Carbon::parse($v->viewing_date)->format('M d, Y') }} ({{ $v->formatted_time_slot }})</span>
-                                            <span class="ml-1 text-[11px] font-semibold text-slate-600">[{{ ucfirst(str_replace('_', ' ', $v->viewing_type)) }}]</span>
-                                        </div>
-                                        <span class="rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider
-                                            @if($v->status === 'confirmed') bg-emerald-100 text-emerald-800
-                                            @elseif($v->status === 'requested') bg-amber-100 text-amber-800
-                                            @elseif($v->status === 'completed') bg-blue-100 text-blue-800
-                                            @else bg-slate-100 text-slate-700 @endif">
-                                            {{ ucfirst($v->status) }}
-                                        </span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('properties.viewings.store', $property) }}" data-auth-gate class="mt-6 space-y-4">
-                        @csrf
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Inspection Format <span class="text-red-500">*</span></label>
-                                <div class="mt-1.5 grid grid-cols-2 gap-2">
-                                    <label class="flex items-center gap-2 rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee]">
-                                        <input type="radio" name="viewing_type" value="in_person" checked class="text-[#102b25] focus:ring-[#102b25]">
-                                        <span>🚶 In-Person Visit</span>
-                                    </label>
-                                    <label class="flex items-center gap-2 rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee]">
-                                        <input type="radio" name="viewing_type" value="virtual_tour" class="text-[#102b25] focus:ring-[#102b25]">
-                                        <span>📹 Virtual Tour</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <x-ethiopian-date-picker
-                                    name="viewing_date"
-                                    id="viewing-date"
-                                    label="Preferred Date"
-                                    min="{{ date('Y-m-d') }}"
-                                    value="{{ old('viewing_date', date('Y-m-d', strtotime('+1 day'))) }}"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Time Window Slot <span class="text-red-500">*</span></label>
-                            <div class="mt-1.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee]">
-                                    <div>
-                                        <span class="block font-black">🌅 Morning</span>
-                                        <span class="text-[10px] text-slate-500 font-normal">09:00 AM – 11:00 AM</span>
-                                    </div>
-                                    <input type="radio" name="viewing_time" value="morning_09_11" checked class="text-[#102b25] focus:ring-[#102b25]">
-                                </label>
-                                <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee]">
-                                    <div>
-                                        <span class="block font-black">☀️ Afternoon</span>
-                                        <span class="text-[10px] text-slate-500 font-normal">02:00 PM – 04:00 PM</span>
-                                    </div>
-                                    <input type="radio" name="viewing_time" value="afternoon_14_16" class="text-[#102b25] focus:ring-[#102b25]">
-                                </label>
-                                <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee]">
-                                    <div>
-                                        <span class="block font-black">🌇 Evening</span>
-                                        <span class="text-[10px] text-slate-500 font-normal">05:00 PM – 07:00 PM</span>
-                                    </div>
-                                    <input type="radio" name="viewing_time" value="evening_17_19" class="text-[#102b25] focus:ring-[#102b25]">
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Your Full Name <span class="text-red-500">*</span></label>
-                                <input type="text" name="buyer_name" value="{{ old('buyer_name', auth()->user()?->name ?? '') }}" required placeholder="e.g. Dawit Tadesse" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Email Address <span class="text-red-500">*</span></label>
-                                <input type="email" name="buyer_email" value="{{ old('buyer_email', auth()->user()?->email ?? '') }}" required placeholder="e.g. dawit@example.com" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Phone Number <span class="text-red-500">*</span></label>
-                                <input type="tel" name="buyer_phone" value="{{ old('buyer_phone') }}" required placeholder="e.g. +251 91 123 4567" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Special Requests / Notes (Optional)</label>
-                            <textarea name="buyer_notes" rows="2" placeholder="e.g. Interested in inspecting boundary walls, parking access, or electrical installations." class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">{{ old('buyer_notes') }}</textarea>
-                        </div>
-
-                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                            <span class="text-[11px] text-slate-500">🔒 Free appointment reservation · Confirmation provided by verified agent</span>
-                            <button type="submit" class="rounded-xl bg-[#102b25] px-6 py-2.5 text-xs font-black uppercase tracking-wider text-[#d4af37] shadow-md hover:bg-[#1d3c34] transition">
-                                Confirm Viewing Request
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {{-- Module 4: Formal Offer & Multi-Round Negotiation Engine --}}
-                <div id="formal-offer-section" class="scroll-mt-24 mt-8 rounded-[2rem] border-2 border-[#d4af37] bg-white p-6 md:p-8 shadow-xl">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e4cf] pb-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Transaction Engine</span>
-                                <h3 class="text-xl font-black text-[#1d3c34]">Make Formal Offer & Negotiation Desk</h3>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-500">Submit an official purchase or lease proposal with transparent financing and deposit terms.</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="block text-[10px] uppercase font-bold text-slate-400">Asking Price</span>
-                            <span class="text-lg font-black text-[#1d3c34] currency-price" data-base-price="{{ $property->price }}">ETB {{ number_format($property->price) }}</span>
-                        </div>
-                    </div>
-
-                    {{-- Active Negotiation Trail (if user is logged in and has offers) --}}
-                    @if ($myOffers->isNotEmpty())
-                        <div class="mt-6 space-y-4">
-                            <h4 class="text-xs font-black uppercase tracking-wider text-[#1d3c34]">Your Active Offer & Negotiation Trail</h4>
-                            @foreach ($myOffers as $offer)
-                                <div class="rounded-2xl border border-[#d9cab3] bg-[#fffaf2] p-4 text-xs">
-                                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#ecd9be] pb-3">
-                                        <div>
-                                            <span class="font-mono font-black text-sm text-[#102b25]">{{ $offer->offer_reference }}</span>
-                                            <span class="text-slate-500">· Original Offer: <strong>ETB {{ number_format($offer->offered_price) }}</strong></span>
-                                            @if ($offer->current_counter_amount)
-                                                <span class="ml-2 font-bold text-[#b45309]">Current Round: ETB {{ number_format($offer->current_counter_amount) }}</span>
-                                            @endif
-                                        </div>
-                                        <span class="rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider
-                                            @if($offer->status === 'accepted') bg-emerald-100 text-emerald-800
-                                            @elseif($offer->status === 'countered') bg-amber-100 text-amber-800
-                                            @elseif($offer->status === 'declined') bg-rose-100 text-rose-800
-                                            @else bg-blue-100 text-blue-800 @endif">
-                                            {{ ucfirst(str_replace('_', ' ', $offer->status)) }}
-                                        </span>
-                                    </div>
-
-                                    {{-- Negotiation log --}}
-                                    @if ($offer->negotiations->isNotEmpty())
-                                        <div class="mt-3 space-y-2">
-                                            @foreach ($offer->negotiations as $neg)
-                                                <div class="flex items-start gap-2.5 rounded-xl p-2.5 {{ $neg->sender_type === 'buyer' ? 'bg-white border border-[#ecd9be]' : 'bg-[#102b25]/5 border border-[#102b25]/10' }}">
-                                                    <span class="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider {{ $neg->sender_type === 'buyer' ? 'bg-slate-200 text-slate-800' : 'bg-[#102b25] text-[#d4af37]' }}">
-                                                        {{ $neg->sender_type === 'buyer' ? 'Buyer' : 'Agent/Owner' }}
-                                                    </span>
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center justify-between">
-                                                            <strong class="font-bold text-[#1d3c34]">ETB {{ number_format($neg->amount) }}</strong>
-                                                            <span class="text-[10px] text-slate-400">{{ $neg->created_at->diffForHumans() }}</span>
-                                                        </div>
-                                                        @if ($neg->message)
-                                                            <p class="mt-0.5 text-slate-600 italic">“{{ $neg->message }}”</p>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
-
-                                    {{-- Buyer Counter Action if status is countered --}}
-                                    @if ($offer->status === 'countered' && $offer->latest_counter_by !== 'buyer')
-                                        <form method="POST" action="{{ route('offers.counter', $offer) }}" class="mt-4 pt-3 border-t border-[#ecd9be] flex flex-wrap items-center gap-2">
-                                            @csrf
-                                            <input type="number" step="0.01" min="1000" name="counter_amount" placeholder="Your Counter Proposal (ETB)" required class="rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] flex-1 min-w-[180px]">
-                                            <input type="text" name="message" placeholder="Optional response note..." class="rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] flex-1 min-w-[200px]">
-                                            <button type="submit" class="rounded-xl bg-[#102b25] px-4 py-2 text-xs font-black text-[#d4af37] hover:bg-[#1d3c34] transition">
-                                                Counter Propose
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    {{-- New Offer Form --}}
-                    <form method="POST" action="{{ route('properties.offers.store', $property) }}" data-auth-gate class="mt-6 space-y-4" id="formal-offer-form">
-                        @csrf
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label for="offered-price-input" class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Your Proposed Price (ETB) <span class="text-red-500">*</span></label>
-                                <div class="relative mt-1">
-                                    <input type="number" step="0.01" min="1000" id="offered-price-input" name="offered_price" value="{{ old('offered_price', $property->price) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-sm font-black text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                                </div>
-                                <div id="offer-variance-tag" class="mt-1 text-[11px] font-bold text-slate-500">
-                                    Full asking price (ETB {{ number_format($property->price) }})
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Financing Structure <span class="text-red-500">*</span></label>
-                                <select name="financing_type" required class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                                    <option value="cash" {{ old('financing_type') === 'cash' ? 'selected' : '' }}>💵 Cash Settlement (100% Upfront)</option>
-                                    <option value="bank_loan" {{ old('financing_type') === 'bank_loan' ? 'selected' : '' }}>🏦 Bank Loan / Commercial Mortgage</option>
-                                    <option value="diaspora_remittance" {{ old('financing_type') === 'diaspora_remittance' ? 'selected' : '' }}>🌍 Diaspora Remittance (USD/EUR via CBE / Awash / Dashen)</option>
-                                    <option value="installments" {{ old('financing_type') === 'installments' ? 'selected' : '' }}>📅 Structured Installment Plan</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label for="earnest-deposit-input" class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Earnest Money Deposit (ETB, Optional)</label>
-                                <input type="number" step="0.01" min="0" id="earnest-deposit-input" name="earnest_deposit" value="{{ old('earnest_deposit', round($property->price * 0.05)) }}" placeholder="e.g. 5% - 10% commitment deposit" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                                <span class="text-[10px] text-slate-400">Guarantees exclusivity upon offer acceptance</span>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Offer Validity Duration</label>
-                                <select name="validity_days" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                                    <option value="7" selected>7 Days (Standard)</option>
-                                    <option value="14">14 Days</option>
-                                    <option value="30">30 Days</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Your Full Name <span class="text-red-500">*</span></label>
-                                <input type="text" name="buyer_name" value="{{ old('buyer_name', auth()->user()?->name ?? '') }}" required placeholder="e.g. Betelhem Girma" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Email Address <span class="text-red-500">*</span></label>
-                                <input type="email" name="buyer_email" value="{{ old('buyer_email', auth()->user()?->email ?? '') }}" required placeholder="e.g. betelhem@example.com" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Phone Number <span class="text-red-500">*</span></label>
-                                <input type="tel" name="buyer_phone" value="{{ old('buyer_phone') }}" required placeholder="e.g. +251 92 345 6789" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165]">Offer Terms & Contingencies (Optional)</label>
-                            <textarea name="buyer_notes" rows="2" placeholder="e.g. Subject to municipal title deed verification (የካርታ ማረጋገጫ) and structural inspection within 5 business days." class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25]">{{ old('buyer_notes') }}</textarea>
-                        </div>
-
-                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                            <span class="text-[11px] text-slate-500">📋 Generates official audit reference for formal transaction ledger</span>
-                            <button type="submit" class="w-full sm:w-auto rounded-xl bg-gradient-to-r from-[#9b6c17] to-[#d4af37] px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer">
-                                Submit Formal Offer
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {{-- Verified Multi-Criteria Reviews & Ratings --}}
-                @include('properties.partials.reviews-section')
-
-                {{-- Resident & Tenant Maintenance & Housekeeping Service Desk --}}
-                @include('properties.partials.maintenance-section')
-            </div>
-
-            {{-- Safety & Direct Agent Card sidebar --}}
-            <div class="space-y-6">
+        {{-- Supplementary Direct Deal, Agent & Stays Desk --}}
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
                 @if ($property->isShortStay())
                     @php
                         $stayListing = $property->stayListing();
@@ -1181,91 +912,395 @@
                     </ul>
                 </div>
             </div>
-        </div>
 
-        {{-- Jiji-style Quick Contact & Request Section --}}
-        <div id="buy-request" class="mt-10 scroll-mt-24 rounded-[2rem] bg-[#1d3c34] p-8 text-[#f9f3e9] shadow-lg shadow-[#1d3c34]/20 lg:p-10">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <p class="text-sm font-bold uppercase tracking-[0.25em] text-[#d9cab3]">{{ $property->type === 'rent' ? 'Rental Request' : 'Buy Request' }}</p>
-                    <h2 class="mt-2 text-3xl font-black">Request “{{ $property->title }}”</h2>
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-[#ebefd9]">
-                        Connect directly with {{ $property->agent ? $property->agent->name : 'our sales team' }} to arrange a viewing or submit an offer.
-                    </p>
-                </div>
-                <div class="flex items-center gap-3 rounded-2xl bg-white/10 p-3 backdrop-blur-sm">
-                    @if ($property->agent)
-                        <img src="{{ $property->agent->photo_url }}" alt="{{ $property->agent->name }}" class="h-10 w-10 rounded-full object-cover ring-1 ring-white">
-                        <div class="text-left text-xs">
-                            <span class="block text-slate-300">Listing Agent</span>
-                            <span class="font-bold text-white">{{ $property->agent->name }}</span>
+
+        {{-- Action Modals: Schedule Viewing, Formal Offer, Buy/Request (Hidden by default, opened via header buttons or URL hash) --}}
+        @php
+            $myViewings = auth()->check()
+                ? $property->viewings()->where('user_id', auth()->id())->latest()->get()
+                : collect();
+            $myOffers = auth()->check()
+                ? $property->offers()->where('user_id', auth()->id())->with('negotiations')->latest()->get()
+                : collect();
+        @endphp
+
+        {{-- 1. Schedule Viewing Modal Panel --}}
+        <div id="schedule-viewing-section" class="property-action-panel fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/65 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="viewing-panel-title">
+            <div class="property-panel-backdrop absolute inset-0" aria-hidden="true"></div>
+            <div class="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-2xl dark:bg-[#111827] dark:border-slate-800 my-auto min-w-0 break-words">
+                <button type="button" class="property-panel-close-btn absolute top-5 right-5 sm:top-6 sm:right-6 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4ebdc] text-lg font-black text-[#1d3c34] transition hover:bg-[#e7d8b7] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer" aria-label="Close modal">
+                    &times;
+                </button>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e4cf] pb-4 pr-12 dark:border-slate-800">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Appointment Core</span>
+                            <h3 class="text-xl font-black text-[#1d3c34] dark:text-white" id="viewing-panel-title">Schedule a Property Viewing</h3>
                         </div>
-                    @else
-                        <span class="text-xs font-bold text-white">GTM Central Desk</span>
-                    @endif
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Choose between an on-site guided inspection or a live interactive virtual tour.</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#edf2ee] px-3 py-1 text-xs font-bold text-[#1d3c34] dark:bg-emerald-950/40 dark:border dark:border-emerald-800 dark:text-emerald-300">
+                        <svg class="h-3.5 w-3.5 text-[#00b53f]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        Verified Agent Accompanied
+                    </span>
                 </div>
-            </div>
 
-            <div class="mt-8 rounded-[1.5rem] bg-[#f8f3eb] p-6 text-[#1d3c34] md:p-8">
-                @if (session('success'))
-                    <div class="mb-5 rounded-xl border border-[#d7e5d2] bg-[#edf9ee] px-4 py-3 text-sm font-semibold text-[#214f3a]">
-                        {{ session('success') }}
+                @if ($myViewings->isNotEmpty())
+                    <div class="mt-4 rounded-2xl bg-[#f8f3eb] p-4 border border-[#ecd9be] dark:bg-slate-900/80 dark:border-slate-800">
+                        <h4 class="text-xs font-black uppercase tracking-wider text-[#1d3c34] dark:text-white">Your Scheduled Appointments</h4>
+                        <div class="mt-2 space-y-2">
+                            @foreach ($myViewings as $v)
+                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-xs border border-[#e2d5c3] dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">
+                                    <div>
+                                        <span class="font-mono font-bold text-[#1d3c34] dark:text-amber-400">{{ $v->viewing_reference }}</span>
+                                        <span class="text-slate-500 dark:text-slate-400">· {{ \Carbon\Carbon::parse($v->viewing_date)->format('M d, Y') }} ({{ $v->formatted_time_slot }})</span>
+                                        <span class="ml-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">[{{ ucfirst(str_replace('_', ' ', $v->viewing_type)) }}]</span>
+                                    </div>
+                                    <span class="rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider
+                                        @if($v->status === 'confirmed') bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300
+                                        @elseif($v->status === 'requested') bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300
+                                        @elseif($v->status === 'completed') bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300
+                                        @else bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 @endif">
+                                        {{ ucfirst($v->status) }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                 @endif
-                @if ($errors->any())
-                    <div class="mb-5 rounded-xl border border-[#c86b5c] bg-[#fef3f1] px-4 py-3 text-sm font-semibold text-[#a24339]">
-                        @foreach ($errors->all() as $error)
-                            <p>{{ $error }}</p>
+
+                <form method="POST" action="{{ route('properties.viewings.store', $property) }}" data-auth-gate class="mt-6 space-y-4">
+                    @csrf
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Inspection Format <span class="text-red-500">*</span></label>
+                            <div class="mt-1.5 grid grid-cols-2 gap-2">
+                                <label class="flex items-center gap-2 rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:has-[:checked]:bg-[#102b25]/60 dark:has-[:checked]:border-[#d4af37]">
+                                    <input type="radio" name="viewing_type" value="in_person" checked class="text-[#102b25] focus:ring-[#102b25]">
+                                    <span>🚶 In-Person Visit</span>
+                                </label>
+                                <label class="flex items-center gap-2 rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:has-[:checked]:bg-[#102b25]/60 dark:has-[:checked]:border-[#d4af37]">
+                                    <input type="radio" name="viewing_type" value="virtual_tour" class="text-[#102b25] focus:ring-[#102b25]">
+                                    <span>📹 Virtual Tour</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <x-ethiopian-date-picker
+                                name="viewing_date"
+                                id="viewing-date"
+                                label="Preferred Date"
+                                min="{{ date('Y-m-d') }}"
+                                value="{{ old('viewing_date', date('Y-m-d', strtotime('+1 day'))) }}"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Time Window Slot <span class="text-red-500">*</span></label>
+                        <div class="mt-1.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:has-[:checked]:bg-[#102b25]/60 dark:has-[:checked]:border-[#d4af37]">
+                                <div>
+                                    <span class="block font-black">🌅 Morning</span>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-normal">09:00 AM – 11:00 AM</span>
+                                </div>
+                                <input type="radio" name="viewing_time" value="morning_09_11" checked class="text-[#102b25] focus:ring-[#102b25]">
+                            </label>
+                            <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:has-[:checked]:bg-[#102b25]/60 dark:has-[:checked]:border-[#d4af37]">
+                                <div>
+                                    <span class="block font-black">☀️ Afternoon</span>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-normal">02:00 PM – 04:00 PM</span>
+                                </div>
+                                <input type="radio" name="viewing_time" value="afternoon_14_16" class="text-[#102b25] focus:ring-[#102b25]">
+                            </label>
+                            <label class="flex items-center justify-between rounded-xl border border-[#d9cab3] bg-[#fffdfa] p-3 text-xs font-bold text-[#1d3c34] cursor-pointer hover:border-[#102b25] transition has-[:checked]:border-[#102b25] has-[:checked]:bg-[#edf2ee] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:has-[:checked]:bg-[#102b25]/60 dark:has-[:checked]:border-[#d4af37]">
+                                <div>
+                                    <span class="block font-black">🌇 Evening</span>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-normal">05:00 PM – 07:00 PM</span>
+                                </div>
+                                <input type="radio" name="viewing_time" value="evening_17_19" class="text-[#102b25] focus:ring-[#102b25]">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Your Full Name <span class="text-red-500">*</span></label>
+                            <input type="text" name="buyer_name" value="{{ old('buyer_name', auth()->user()?->name ?? '') }}" required placeholder="e.g. Dawit Tadesse" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Email Address <span class="text-red-500">*</span></label>
+                            <input type="email" name="buyer_email" value="{{ old('buyer_email', auth()->user()?->email ?? '') }}" required placeholder="e.g. dawit@example.com" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Phone Number <span class="text-red-500">*</span></label>
+                            <input type="tel" name="buyer_phone" value="{{ old('buyer_phone') }}" required placeholder="e.g. +251 91 123 4567" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Special Requests / Notes (Optional)</label>
+                        <textarea name="buyer_notes" rows="2" placeholder="e.g. Interested in inspecting boundary walls, parking access, or electrical installations." class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">{{ old('buyer_notes') }}</textarea>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                        <span class="text-[11px] text-slate-500 dark:text-slate-400">🔒 Free appointment reservation · Confirmation provided by verified agent</span>
+                        <button type="submit" class="rounded-xl bg-[#102b25] px-6 py-2.5 text-xs font-black uppercase tracking-wider text-[#d4af37] shadow-md hover:bg-[#1d3c34] transition">
+                            Confirm Viewing Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- 2. Make Formal Offer and Negotiation Modal Panel --}}
+        <div id="formal-offer-section" class="property-action-panel fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/65 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="offer-panel-title">
+            <div class="property-panel-backdrop absolute inset-0" aria-hidden="true"></div>
+            <div class="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2rem] border-2 border-[#d4af37] bg-white p-6 sm:p-8 shadow-2xl dark:bg-[#111827] dark:border-[#d4af37] my-auto min-w-0 break-words">
+                <button type="button" class="property-panel-close-btn absolute top-5 right-5 sm:top-6 sm:right-6 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4ebdc] text-lg font-black text-[#1d3c34] transition hover:bg-[#e7d8b7] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer" aria-label="Close modal">
+                    &times;
+                </button>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e4cf] pb-4 pr-12 dark:border-slate-800">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-[#102b25] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#d4af37]">Make Formal Offer and Negotiation</span>
+                            <h3 class="text-xl font-black text-[#1d3c34] dark:text-white" id="offer-panel-title">Make Formal Offer & Negotiation Desk</h3>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Submit an official purchase or lease proposal with transparent financing and deposit terms.</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-[10px] uppercase font-bold text-slate-400">Asking Price</span>
+                        <span class="text-lg font-black text-[#1d3c34] currency-price dark:text-white" data-base-price="{{ $property->price }}">ETB {{ number_format($property->price) }}</span>
+                    </div>
+                </div>
+
+                {{-- Active Negotiation Trail (if user is logged in and has offers) --}}
+                @if ($myOffers->isNotEmpty())
+                    <div class="mt-6 space-y-4">
+                        <h4 class="text-xs font-black uppercase tracking-wider text-[#1d3c34] dark:text-white">Your Active Offer & Negotiation Trail</h4>
+                        @foreach ($myOffers as $offer)
+                            <div class="rounded-2xl border border-[#d9cab3] bg-[#fffaf2] p-4 text-xs dark:bg-slate-900/80 dark:border-slate-800">
+                                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#ecd9be] pb-3 dark:border-slate-700">
+                                    <div>
+                                        <span class="font-mono font-black text-sm text-[#102b25] dark:text-amber-400">{{ $offer->offer_reference }}</span>
+                                        <span class="text-slate-500 dark:text-slate-400">· Original Offer: <strong class="dark:text-slate-200">ETB {{ number_format($offer->offered_price) }}</strong></span>
+                                        @if ($offer->current_counter_amount)
+                                            <span class="ml-2 font-bold text-[#b45309] dark:text-amber-300">Current Round: ETB {{ number_format($offer->current_counter_amount) }}</span>
+                                        @endif
+                                    </div>
+                                    <span class="rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider
+                                        @if($offer->status === 'accepted') bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300
+                                        @elseif($offer->status === 'countered') bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300
+                                        @elseif($offer->status === 'declined') bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300
+                                        @else bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 @endif">
+                                        {{ ucfirst(str_replace('_', ' ', $offer->status)) }}
+                                    </span>
+                                </div>
+
+                                {{-- Negotiation log --}}
+                                @if ($offer->negotiations->isNotEmpty())
+                                    <div class="mt-3 space-y-2">
+                                        @foreach ($offer->negotiations as $neg)
+                                            <div class="flex items-start gap-2.5 rounded-xl p-2.5 {{ $neg->sender_type === 'buyer' ? 'bg-white border border-[#ecd9be] dark:bg-slate-800 dark:border-slate-700' : 'bg-[#102b25]/5 border border-[#102b25]/10 dark:bg-[#102b25]/30 dark:border-[#d4af37]/20' }}">
+                                                <span class="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider {{ $neg->sender_type === 'buyer' ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200' : 'bg-[#102b25] text-[#d4af37]' }}">
+                                                    {{ $neg->sender_type === 'buyer' ? 'Buyer' : 'Agent/Owner' }}
+                                                </span>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center justify-between">
+                                                        <strong class="font-bold text-[#1d3c34] dark:text-slate-200">ETB {{ number_format($neg->amount) }}</strong>
+                                                        <span class="text-[10px] text-slate-400">{{ $neg->created_at->diffForHumans() }}</span>
+                                                    </div>
+                                                    @if ($neg->message)
+                                                        <p class="mt-0.5 text-slate-600 italic dark:text-slate-300">“{{ $neg->message }}”</p>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                {{-- Buyer Counter Action if status is countered --}}
+                                @if ($offer->status === 'countered' && $offer->latest_counter_by !== 'buyer')
+                                    <form method="POST" action="{{ route('offers.counter', $offer) }}" class="mt-4 pt-3 border-t border-[#ecd9be] flex flex-wrap items-center gap-2 dark:border-slate-700">
+                                        @csrf
+                                        <input type="number" step="0.01" min="1000" name="counter_amount" placeholder="Your Counter Proposal (ETB)" required class="rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] flex-1 min-w-[180px] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                                        <input type="text" name="message" placeholder="Optional response note..." class="rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] flex-1 min-w-[200px] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                                        <button type="submit" class="rounded-xl bg-[#102b25] px-4 py-2 text-xs font-black text-[#d4af37] hover:bg-[#1d3c34] transition">
+                                            Counter Propose
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
                         @endforeach
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('orders.store', $property) }}" class="grid gap-4 md:grid-cols-2">
+                {{-- New Offer Form --}}
+                <form method="POST" action="{{ route('properties.offers.store', $property) }}" data-auth-gate class="mt-6 space-y-4" id="formal-offer-form">
                     @csrf
-
-                    <div>
-                        <label for="order-name" class="mb-1 block text-sm font-semibold">Your Name <span class="text-red-500">*</span></label>
-                        <input id="order-name" name="name" type="text" value="{{ old('name') }}" required placeholder="e.g. Abebe Kebede" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-
-                    <div>
-                        <label for="order-phone" class="mb-1 block text-sm font-semibold">Phone Number <span class="text-red-500">*</span></label>
-                        <input id="order-phone" name="phone" type="tel" value="{{ old('phone') }}" required placeholder="e.g. +251 91 123 4567" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-
-                    <div>
-                        <label for="order-email" class="mb-1 block text-sm font-semibold">Email Address <span class="text-red-500">*</span></label>
-                        <input id="order-email" name="email" type="email" value="{{ old('email') }}" required placeholder="e.g. client@example.com" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-
-                    <div>
-                        <label for="order-offer" class="mb-1 block text-sm font-semibold">{{ $property->type === 'rent' ? 'Proposed Rent (ETB / month, optional)' : 'Your Offer (ETB, optional)' }}</label>
-                        <input id="order-offer" name="offer_amount" type="number" step="0.01" min="0" value="{{ old('offer_amount') }}" placeholder="Listed: ETB {{ number_format($property->price) }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                    </div>
-
-                    @if ($property->type === 'rent')
+                    <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label for="order-lease-start" class="mb-1 block text-sm font-semibold">Preferred Move-in Date</label>
-                            <input id="order-lease-start" name="lease_start" type="date" value="{{ old('lease_start') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            <label for="offered-price-input" class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Your Proposed Price (ETB) <span class="text-red-500">*</span></label>
+                            <div class="relative mt-1">
+                                <input type="number" step="0.01" min="1000" id="offered-price-input" name="offered_price" value="{{ old('offered_price', $property->price) }}" required class="w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-sm font-black text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                            </div>
+                            <div id="offer-variance-tag" class="mt-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                Full asking price (ETB {{ number_format($property->price) }})
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Financing Structure <span class="text-red-500">*</span></label>
+                            <select name="financing_type" required class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                                <option value="cash" {{ old('financing_type') === 'cash' ? 'selected' : '' }}>💵 Cash Settlement (100% Upfront)</option>
+                                <option value="bank_loan" {{ old('financing_type') === 'bank_loan' ? 'selected' : '' }}>🏦 Bank Loan / Commercial Mortgage</option>
+                                <option value="diaspora_remittance" {{ old('financing_type') === 'diaspora_remittance' ? 'selected' : '' }}>🌍 Diaspora Remittance (USD/EUR via CBE / Awash / Dashen)</option>
+                                <option value="installments" {{ old('financing_type') === 'installments' ? 'selected' : '' }}>📅 Structured Installment Plan</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="earnest-deposit-input" class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Earnest Money Deposit (ETB, Optional)</label>
+                            <input type="number" step="0.01" min="0" id="earnest-deposit-input" name="earnest_deposit" value="{{ old('earnest_deposit', round($property->price * 0.05)) }}" placeholder="e.g. 5% - 10% commitment deposit" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                            <span class="text-[10px] text-slate-400">Guarantees exclusivity upon offer acceptance</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Offer Validity Duration</label>
+                            <select name="validity_days" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3.5 py-2.5 text-xs font-bold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                                <option value="7" selected>7 Days (Standard)</option>
+                                <option value="14">14 Days</option>
+                                <option value="30">30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Your Full Name <span class="text-red-500">*</span></label>
+                            <input type="text" name="buyer_name" value="{{ old('buyer_name', auth()->user()?->name ?? '') }}" required placeholder="e.g. Betelhem Girma" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                         </div>
                         <div>
-                            <label for="order-lease-months" class="mb-1 block text-sm font-semibold">Lease Duration (Months)</label>
-                            <input id="order-lease-months" name="lease_months" type="number" min="1" max="120" value="{{ old('lease_months', 12) }}" placeholder="e.g. 6, 12, 24" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
-                            <p class="mt-1 text-xs text-slate-500">Specify your desired duration in months</p>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Email Address <span class="text-red-500">*</span></label>
+                            <input type="email" name="buyer_email" value="{{ old('buyer_email', auth()->user()?->email ?? '') }}" required placeholder="e.g. betelhem@example.com" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                         </div>
-                    @endif
-
-                    <div class="md:col-span-2">
-                        <label for="order-message" class="mb-1 block text-sm font-semibold">Message / Request Details</label>
-                        <textarea id="order-message" name="message" rows="3" placeholder="Tell the agent when you are available for a visit or if you have specific questions." class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('message') }}</textarea>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Phone Number <span class="text-red-500">*</span></label>
+                            <input type="tel" name="buyer_phone" value="{{ old('buyer_phone') }}" required placeholder="e.g. +251 92 345 6789" class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                        </div>
                     </div>
 
-                    <div class="md:col-span-2 flex flex-wrap gap-3">
-                        <button type="submit" class="rounded-full bg-[#1d3c34] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#254d43]">
-                            Send Formal {{ $property->type === 'rent' ? 'Rental' : 'Buy' }} Request
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-[#587165] dark:text-slate-400">Offer Terms & Contingencies (Optional)</label>
+                        <textarea name="buyer_notes" rows="2" placeholder="e.g. Subject to municipal title deed verification (የካርታ ማረጋገጫ) and structural inspection within 5 business days." class="mt-1 w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2 text-xs font-semibold text-[#1d3c34] focus:outline-none focus:ring-2 focus:ring-[#102b25] dark:bg-slate-900 dark:border-slate-700 dark:text-white">{{ old('buyer_notes') }}</textarea>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                        <span class="text-[11px] text-slate-500 dark:text-slate-400">📋 Generates official audit reference for formal transaction ledger</span>
+                        <button type="submit" class="w-full sm:w-auto rounded-xl bg-gradient-to-r from-[#9b6c17] to-[#d4af37] px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer">
+                            Submit Formal Offer
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        {{-- 3. Buy / Request Modal Panel --}}
+        <div id="buy-request" class="property-action-panel fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/65 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="buy-request-title">
+            <div class="property-panel-backdrop absolute inset-0" aria-hidden="true"></div>
+            <div class="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2rem] bg-[#1d3c34] p-6 sm:p-8 text-[#f9f3e9] shadow-2xl dark:bg-[#111827] dark:border dark:border-slate-800 my-auto min-w-0 break-words">
+                <button type="button" class="property-panel-close-btn absolute top-5 right-5 sm:top-6 sm:right-6 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-lg font-black text-white transition hover:bg-white/30 cursor-pointer" aria-label="Close modal">
+                    &times;
+                </button>
+
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pr-12">
+                    <div>
+                        <p class="text-sm font-bold uppercase tracking-[0.25em] text-[#d9cab3]">{{ $property->type === 'rent' ? 'Rental Request' : 'Buy Request' }}</p>
+                        <h2 class="mt-2 text-2xl sm:text-3xl font-black" id="buy-request-title">Request “{{ $property->title }}”</h2>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-[#ebefd9] dark:text-slate-300">
+                            Connect directly with {{ $property->agent ? $property->agent->name : 'our sales team' }} to arrange a viewing or submit an offer.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3 rounded-2xl bg-white/10 p-3 backdrop-blur-sm self-start md:self-auto">
+                        @if ($property->agent)
+                            <img src="{{ $property->agent->photo_url }}" alt="{{ $property->agent->name }}" class="h-10 w-10 rounded-full object-cover ring-1 ring-white">
+                            <div class="text-left text-xs">
+                                <span class="block text-slate-300">Listing Agent</span>
+                                <span class="font-bold text-white">{{ $property->agent->name }}</span>
+                            </div>
+                        @else
+                            <span class="text-xs font-bold text-white">GTM Central Desk</span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-6 rounded-[1.5rem] bg-[#f8f3eb] p-6 text-[#1d3c34] dark:bg-slate-900 dark:border dark:border-slate-800 dark:text-slate-200 md:p-8">
+                    @if (session('success'))
+                        <div class="mb-5 rounded-xl border border-[#d7e5d2] bg-[#edf9ee] px-4 py-3 text-sm font-semibold text-[#214f3a] dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-200">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+                    @if ($errors->any())
+                        <div class="mb-5 rounded-xl border border-[#c86b5c] bg-[#fef3f1] px-4 py-3 text-sm font-semibold text-[#a24339] dark:bg-rose-950/50 dark:border-rose-800 dark:text-rose-200">
+                            @foreach ($errors->all() as $error)
+                                <p>{{ $error }}</p>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <form method="POST" action="{{ route('orders.store', $property) }}" class="grid gap-4 md:grid-cols-2">
+                        @csrf
+
+                        <div>
+                            <label for="order-name" class="mb-1 block text-sm font-semibold">Your Name <span class="text-red-500">*</span></label>
+                            <input id="order-name" name="name" type="text" value="{{ old('name') }}" required placeholder="e.g. Abebe Kebede" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label for="order-phone" class="mb-1 block text-sm font-semibold">Phone Number <span class="text-red-500">*</span></label>
+                            <input id="order-phone" name="phone" type="tel" value="{{ old('phone') }}" required placeholder="e.g. +251 91 123 4567" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label for="order-email" class="mb-1 block text-sm font-semibold">Email Address <span class="text-red-500">*</span></label>
+                            <input id="order-email" name="email" type="email" value="{{ old('email') }}" required placeholder="e.g. client@example.com" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        <div>
+                            <label for="order-offer" class="mb-1 block text-sm font-semibold">{{ $property->type === 'rent' ? 'Proposed Rent (ETB / month, optional)' : 'Your Offer (ETB, optional)' }}</label>
+                            <input id="order-offer" name="offer_amount" type="number" step="0.01" min="0" value="{{ old('offer_amount') }}" placeholder="Listed: ETB {{ number_format($property->price) }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                        </div>
+
+                        @if ($property->type === 'rent')
+                            <div>
+                                <label for="order-lease-start" class="mb-1 block text-sm font-semibold">Preferred Move-in Date</label>
+                                <input id="order-lease-start" name="lease_start" type="date" value="{{ old('lease_start') }}" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                            </div>
+                            <div>
+                                <label for="order-lease-months" class="mb-1 block text-sm font-semibold">Lease Duration (Months)</label>
+                                <input id="order-lease-months" name="lease_months" type="number" min="1" max="120" value="{{ old('lease_months', 12) }}" placeholder="e.g. 6, 12, 24" class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Specify your desired duration in months</p>
+                            </div>
+                        @endif
+
+                        <div class="md:col-span-2">
+                            <label for="order-message" class="mb-1 block text-sm font-semibold">Message / Request Details</label>
+                            <textarea id="order-message" name="message" rows="3" placeholder="Tell the agent when you are available for a visit or if you have specific questions." class="w-full rounded-xl border border-[#d9cab3] bg-white px-3 py-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#dfeee4]">{{ old('message') }}</textarea>
+                        </div>
+
+                        <div class="md:col-span-2 flex flex-wrap gap-3">
+                            <button type="submit" class="rounded-full bg-[#1d3c34] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#254d43] dark:bg-emerald-700 dark:hover:bg-emerald-600">
+                                Send Formal {{ $property->type === 'rent' ? 'Rental' : 'Buy' }} Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </section>
@@ -1357,6 +1392,98 @@
                     }
                 });
             }
+
+            // Action Panel (Modals) Controller for Schedule Viewing, Formal Offer, Buy/Request
+            const actionPanels = ['schedule-viewing-section', 'formal-offer-section', 'buy-request'];
+
+            function openPropertyPanel(id) {
+                if (!actionPanels.includes(id)) return;
+
+                actionPanels.forEach(function (panelId) {
+                    const el = document.getElementById(panelId);
+                    if (el) {
+                        el.classList.add('hidden');
+                        el.classList.remove('flex');
+                    }
+                });
+
+                const target = document.getElementById(id);
+                if (target) {
+                    target.classList.remove('hidden');
+                    target.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+
+                    if (window.location.hash !== '#' + id) {
+                        history.pushState(null, '', '#' + id);
+                    }
+                }
+            }
+
+            function closePropertyPanels() {
+                let closedAny = false;
+                actionPanels.forEach(function (panelId) {
+                    const el = document.getElementById(panelId);
+                    if (el && !el.classList.contains('hidden')) {
+                        el.classList.add('hidden');
+                        el.classList.remove('flex');
+                        closedAny = true;
+                    }
+                });
+
+                if (closedAny) {
+                    document.body.style.overflow = '';
+                    if (window.location.hash && actionPanels.includes(window.location.hash.replace('#', ''))) {
+                        history.replaceState(null, '', window.location.pathname + window.location.search);
+                    }
+                }
+            }
+
+            // Global click handler for header action triggers, close buttons, and backdrops
+            document.addEventListener('click', function (e) {
+                const trigger = e.target.closest('a[href="#schedule-viewing-section"], a[href="#formal-offer-section"], a[href="#buy-request"]');
+                if (trigger) {
+                    if (!window.GTM_IS_GUEST) {
+                        e.preventDefault();
+                        const targetId = trigger.getAttribute('href').replace('#', '');
+                        openPropertyPanel(targetId);
+                    }
+                    return;
+                }
+
+                const closeBtn = e.target.closest('.property-panel-close-btn');
+                if (closeBtn) {
+                    e.preventDefault();
+                    closePropertyPanels();
+                    return;
+                }
+
+                if (e.target.classList.contains('property-panel-backdrop') || e.target.classList.contains('property-action-panel')) {
+                    closePropertyPanels();
+                }
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    closePropertyPanels();
+                }
+            });
+
+            const initialHash = window.location.hash ? window.location.hash.replace('#', '') : '';
+            if (actionPanels.includes(initialHash)) {
+                openPropertyPanel(initialHash);
+            }
+
+            window.addEventListener('hashchange', function () {
+                const hash = window.location.hash ? window.location.hash.replace('#', '') : '';
+                if (actionPanels.includes(hash)) {
+                    openPropertyPanel(hash);
+                } else if (!hash) {
+                    closePropertyPanels();
+                }
+            });
+
+            window.openPropertyPanel = openPropertyPanel;
+            window.closePropertyPanels = closePropertyPanels;
         });
     </script>
 

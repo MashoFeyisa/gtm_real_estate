@@ -76,6 +76,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => 'string',
+            'is_demo' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'notification_preferences' => 'array',
             'deactivated_at' => 'datetime',
@@ -486,72 +487,7 @@ class User extends Authenticatable
 
         $catalog = $this->permissionCatalog();
 
-        $aliasMap = [
-            'property.view' => 'properties.view',
-            'property.create' => 'properties.create',
-            'property.update' => 'properties.update',
-            'property.delete' => 'properties.delete',
-            'property.approve' => 'properties.approve',
-            'property.verify' => 'properties.verify',
-            'property.save' => 'properties.save',
-            'properties.favorite' => 'properties.save',
-            'property.favorite' => 'properties.save',
-            'booking.view' => 'bookings.view',
-            'booking.create' => 'bookings.create',
-            'booking.cancel' => 'bookings.cancel',
-            'payment.view' => 'payments.view',
-            'payment.create' => 'payments.create',
-            'document.view' => 'documents.view',
-            'media.view' => 'photos.view',
-            'media.upload' => 'photos.create',
-            'offer.view' => 'offers.view',
-            'offer.create' => 'offers.create',
-            'offer.make' => 'offers.make',
-            'offer.update' => 'offers.update',
-            'offer.cancel' => 'offers.cancel',
-            'viewing.view' => 'viewings.view',
-            'viewing.create' => 'viewings.create',
-            'viewing.request' => 'viewings.request',
-            'viewing.schedule' => 'viewings.schedule',
-            'viewing.book' => 'viewings.create',
-            'viewings.book' => 'viewings.create',
-            'viewing.cancel' => 'viewings.cancel',
-            'inquiry.view' => 'inquiries.view',
-            'inquiry.create' => 'inquiries.create',
-            'inquiry.update' => 'inquiries.update',
-            'lead.view' => 'leads.view',
-            'lead.manage' => 'leads.manage',
-            'listing.view' => 'listings.view',
-            'listing.create' => 'listings.create',
-            'listing.update' => 'listings.update',
-            'listing.delete' => 'listings.delete',
-            'listing.publish' => 'listings.publish',
-            'searches.view' => 'properties.search',
-            'searches.save' => 'properties.search',
-            'search.view' => 'properties.search',
-            'search.save' => 'properties.search',
-            'users.edit' => 'users.update',
-            'user.edit' => 'users.update',
-            'user.update' => 'users.update',
-            'users.manage' => 'platform.users_manage',
-            'user.manage' => 'platform.users_manage',
-            'user.delete' => 'users.delete',
-            'user.create' => 'users.create',
-            'user.suspend' => 'users.suspend',
-            'user.view' => 'users.view',
-            'roles.manage' => 'platform.roles_manage',
-            'role.manage' => 'platform.roles_manage',
-            'roles.update' => 'platform.roles_manage',
-            'roles.edit' => 'platform.roles_manage',
-            'roles.create' => 'platform.roles_manage',
-            'roles.delete' => 'platform.roles_manage',
-            'permissions.manage' => 'platform.roles_manage',
-            'permission.manage' => 'platform.roles_manage',
-            'permissions.create' => 'platform.roles_manage',
-            'permissions.update' => 'platform.roles_manage',
-            'permissions.delete' => 'platform.roles_manage',
-            'platform.permissions_manage' => 'platform.roles_manage',
-        ];
+        $aliasMap = config('personas.aliases', []);
 
         $keysToCheck = [$permissionKey];
         if (isset($aliasMap[$permissionKey])) {
@@ -611,23 +547,11 @@ class User extends Authenticatable
             }
         }
 
-        // 4. If none of the keys exist in catalog:
+        // 4. If none of the keys exist in the catalog, the request names a
+        //    capability this platform does not define. The default is deny:
+        //    an uncatalogued permission key must never widen access.
         if (empty($knownPermissionIds)) {
-            // Administrative & user management permissions are never granted by default to non-admins
-            $isAdminAction = false;
-            foreach ($keysToCheck as $k) {
-                if (str_starts_with($k, 'users.') || str_starts_with($k, 'platform.') || str_starts_with($k, 'roles.') || str_starts_with($k, 'audit.')) {
-                    $isAdminAction = true;
-                    break;
-                }
-            }
-
-            if ($isAdminAction) {
-                return false;
-            }
-
-            // Permissions outside the seeded catalog are not restricted (legacy / open capability)
-            return true;
+            return false;
         }
 
         return false;

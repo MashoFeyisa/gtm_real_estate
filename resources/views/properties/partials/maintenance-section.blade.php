@@ -1,11 +1,11 @@
-<div id="property-maintenance-section" class="scroll-mt-24 mt-8 rounded-[2rem] border border-[#d9cab3] bg-white p-6 md:p-8 shadow-sm">
-    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#f0e4cf] pb-5">
+<div id="property-maintenance-section" class="scroll-mt-24 md:col-span-2 flex flex-col h-full rounded-[2rem] border border-[#d9cab3] bg-white p-6 sm:p-8 shadow-sm dark:bg-[#111827] dark:border-slate-800 min-w-0 break-words">
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#f0e4cf] pb-5 dark:border-slate-800">
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded-full bg-blue-900 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-200">Property Management</span>
-                <h3 class="text-2xl font-black text-[#1d3c34]">Maintenance & Housekeeping Desk</h3>
+                <h3 class="text-2xl font-black text-[#1d3c34] dark:text-white">Maintenance & Housekeeping Desk</h3>
             </div>
-            <p class="mt-1 text-xs text-slate-500">Report facility issues, schedule preventative repairs, or request housekeeping assistance.</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Report facility issues, schedule preventative repairs, or request housekeeping assistance.</p>
         </div>
         <button type="button" data-auth-gate onclick="document.getElementById('maintenance-form-wrapper').classList.toggle('hidden')" class="rounded-xl border border-[#102b25] bg-[#102b25] px-4 py-2 text-xs font-bold text-[#d4af37] shadow-xs hover:bg-[#1d3c34] transition">
             + New Service Ticket

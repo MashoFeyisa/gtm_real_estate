@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\Property;
 use App\Models\PropertyFavorite;
 use App\Models\PropertyReview;
+use App\Services\RefundService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -199,6 +201,37 @@ class GuestDashboardController extends Controller
                 // Same day / past check-in: Non-refundable
                 $refundAmount = 0.0;
                 $refundStatus = 'non_refundable';
+            }
+        }
+
+        // A cancellation that owes money is a real refund: it advances the
+        // booking's payment and posts a balanced journal through the one refund
+        // writer (SRS §132), so an online stay cancellation leaves the same
+        // trace as a finance-desk refund.
+        //
+        // Two fees are deliberately kept apart:
+        //   * the guest-facing service fee (`booking.service_fee`) is the
+        //     policy's own retention - it is simply left out of the refund
+        //     amount above; and
+        //   * the platform fee (`payment.platform_fee`) is the platform's cut
+        //     on the money, so the accounting reverses it proportionally.
+        if ($refundAmount > 0) {
+            $payment = Payment::query()
+                ->where('payable_type', Booking::class)
+                ->where('payable_id', $booking->id)
+                ->where('status', 'completed')
+                ->latest('id')
+                ->first();
+
+            if ($payment) {
+                app(RefundService::class)->refund(
+                    payment: $payment,
+                    amount: $refundAmount,
+                    reason: $validated['cancellation_reason'] ?? 'Stay cancelled by guest',
+                    actor: $user,
+                    idempotencyKey: $request->header('Idempotency-Key'),
+                    reverseFee: true,
+                );
             }
         }
 
