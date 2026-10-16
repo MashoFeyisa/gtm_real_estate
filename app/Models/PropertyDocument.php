@@ -122,6 +122,13 @@ class PropertyDocument extends Model
             return true;
         }
 
+        // Landlord of the property through a lease (the seller/landlord desk
+        // scopes properties by `leases.landlord_user_id`, so document access must
+        // follow the same rule).
+        if ($this->property && $this->property->leases()->where('landlord_user_id', $user->id)->exists()) {
+            return true;
+        }
+
         if ($this->access_level === 'public') {
             return true;
         }

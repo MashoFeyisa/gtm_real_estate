@@ -10,6 +10,42 @@
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
+            <exclude>tests/Feature/P1MoneyGovernanceAndPayoutsTest.php</exclude>
+            <exclude>tests/Feature/P1MoneyGovernanceFollowUpsTest.php</exclude>
+            <exclude>tests/Feature/PayoutConcurrencyOnMySqlTest.php</exclude>
+            <exclude>tests/Feature/FinanceSettingsGovernanceTest.php</exclude>
+            <exclude>tests/Feature/FinanceSettingsAndDoubleEntryLedgerTest.php</exclude>
+            <exclude>tests/Feature/FinancialReportingAndCommissionSettlementTest.php</exclude>
+            <exclude>tests/Feature/EthiopianPaymentAndFinancialLedgerTest.php</exclude>
+            <exclude>tests/Feature/RefundIntegrityTest.php</exclude>
+            <exclude>tests/Feature/StayAndRentMoneyIntegrityTest.php</exclude>
+            <exclude>tests/Feature/PaymentSeparationOfDutiesTest.php</exclude>
+            <exclude>tests/Feature/PaymentCallbackSecurityTest.php</exclude>
+            <exclude>tests/Feature/LegacyLedgerReconciliationTest.php</exclude>
+            <exclude>tests/Feature/FinanceDashboardPermissionsTest.php</exclude>
+            <exclude>tests/Feature/FinanceDeskAgentScopingTest.php</exclude>
+            <exclude>tests/Feature/FinanceOfficerAccessTest.php</exclude>
+            <exclude>tests/Feature/Batch4OperationsGovernanceAndFinanceTest.php</exclude>
+            <exclude>tests/Feature/AgentCommissionSplitAndHierarchyTest.php</exclude>
+        </testsuite>
+        <testsuite name="Money">
+            <file>tests/Feature/P1MoneyGovernanceAndPayoutsTest.php</file>
+            <file>tests/Feature/P1MoneyGovernanceFollowUpsTest.php</file>
+            <file>tests/Feature/PayoutConcurrencyOnMySqlTest.php</file>
+            <file>tests/Feature/FinanceSettingsGovernanceTest.php</file>
+            <file>tests/Feature/FinanceSettingsAndDoubleEntryLedgerTest.php</file>
+            <file>tests/Feature/FinancialReportingAndCommissionSettlementTest.php</file>
+            <file>tests/Feature/EthiopianPaymentAndFinancialLedgerTest.php</file>
+            <file>tests/Feature/RefundIntegrityTest.php</file>
+            <file>tests/Feature/StayAndRentMoneyIntegrityTest.php</file>
+            <file>tests/Feature/PaymentSeparationOfDutiesTest.php</file>
+            <file>tests/Feature/PaymentCallbackSecurityTest.php</file>
+            <file>tests/Feature/LegacyLedgerReconciliationTest.php</file>
+            <file>tests/Feature/FinanceDashboardPermissionsTest.php</file>
+            <file>tests/Feature/FinanceDeskAgentScopingTest.php</file>
+            <file>tests/Feature/FinanceOfficerAccessTest.php</file>
+            <file>tests/Feature/Batch4OperationsGovernanceAndFinanceTest.php</file>
+            <file>tests/Feature/AgentCommissionSplitAndHierarchyTest.php</file>
         </testsuite>
     </testsuites>
     <source>

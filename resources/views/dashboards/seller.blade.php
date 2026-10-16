@@ -297,8 +297,8 @@
                                         </td>
                                         <td class="text-right">
                                             <div class="flex items-center justify-end gap-2">
-                                                @if ($doc->file_path)
-                                                    <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="font-bold hover:underline">Download</a>
+                                                @if ($doc->file_path && $doc->isAccessibleBy(auth()->user()))
+                                                    <a href="{{ route('media.document', $doc) }}" target="_blank" class="font-bold hover:underline">Download</a>
                                                 @endif
                                                 <form action="{{ route('seller.documents.destroy', $doc) }}" method="POST" onsubmit="return confirm('Delete this legal document?');">
                                                     @csrf

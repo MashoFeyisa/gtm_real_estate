@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Payment;
 use App\Models\PaymentGatewayLog;
+use App\Models\RentSchedule;
 use App\Models\User;
 use App\Notifications\PaymentStatusNotification;
 use App\Services\FinanceSettings;
@@ -142,6 +143,14 @@ class PaymentController extends Controller
         $user = auth()->user();
         $isPayer = $payment->user_id === $user?->id;
         $isAgent = $payment->property && $user?->agentProfile && $payment->property->agent_id === $user->agentProfile->id;
+
+        // Rent installments belong to a lease, and the lease (not always the
+        // property) names the agent who brokered the deal, so the lease agent
+        // must be able to open the receipt too.
+        if (! $isAgent && $user?->agentProfile && $payment->payable_type === RentSchedule::class) {
+            $lease = RentSchedule::find($payment->payable_id)?->lease;
+            $isAgent = $lease && $lease->agent_id === $user->agentProfile->id;
+        }
 
         abort_unless($user && ($user->isAdmin() || $user->isFinanceOfficer() || $isPayer || $isAgent), 403);
 

@@ -205,12 +205,12 @@
                                         @endphp
                                         @if ($dedicatedRoute && Route::has($dedicatedRoute))
                                             <p class="mt-2 text-[11px] font-bold text-[#1d3c34]">
-                                                Control Center: <a href="{{ route($dedicatedRoute) }}" target="_blank" class="underline hover:text-[#254d43]">{{ route($dedicatedRoute) }}</a>
+                                                Control Center: <span class="font-mono">{{ route($dedicatedRoute) }}</span>
                                             </p>
                                         @endif
                                         @if ($persona['portal'] && Route::has($persona['portal']) && $persona['portal'] !== $dedicatedRoute)
                                             <p class="mt-1 text-[11px] font-semibold text-slate-400">
-                                                RBAC Desk: <a href="{{ route($persona['portal']) }}" target="_blank" class="underline hover:text-slate-600">{{ route($persona['portal']) }}</a>
+                                                RBAC Desk: <span class="font-mono">{{ route($persona['portal']) }}</span>
                                             </p>
                                         @endif
                                     </div>

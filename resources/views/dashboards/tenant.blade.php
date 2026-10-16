@@ -554,8 +554,8 @@
                             </td>
                             <td class="token-muted">{{ $doc->file_size ? number_format($doc->file_size / 1024, 1) . ' KB' : '—' }}</td>
                             <td class="text-right space-x-2">
-                                @if ($doc->file_path)
-                                    <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="text-xs font-bold text-[var(--token-primary)] hover:underline">Download</a>
+                                @if ($doc->file_path && $doc->isAccessibleBy(auth()->user()))
+                                    <a href="{{ route('media.document', $doc) }}" target="_blank" class="text-xs font-bold text-[var(--token-primary)] hover:underline">Download</a>
                                 @endif
                                 <form method="POST" action="{{ route('tenant.documents.destroy', $doc) }}" class="inline" onsubmit="return confirm('Delete this document?')">
                                     @csrf

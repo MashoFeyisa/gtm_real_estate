@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
         // Persona / permission catalog (role defaults for every actor)
         $this->call(RolePermissionSeeder::class);
 
+        // Baseline dated finance-rate book (SRS §171)
+        $this->call(FinanceRateSeeder::class);
+
         // Database-configurable property categories & listing types
         $this->call(PropertyTaxonomySeeder::class);
 

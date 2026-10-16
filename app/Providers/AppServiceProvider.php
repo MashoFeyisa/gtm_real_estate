@@ -9,9 +9,11 @@ use App\Models\SiteSetting;
 use App\Policies\DeveloperEscrowDisbursementPolicy;
 use App\Policies\ListingPolicy;
 use App\Policies\PropertyPolicy;
+use App\Support\MigrationStatus;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
@@ -20,6 +22,11 @@ use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * Whether the local pending-migration warning has already been evaluated.
+     */
+    private static bool $migrationWarningChecked = false;
+
     /**
      * Register any application services.
      */
@@ -44,6 +51,39 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Project::class, DeveloperEscrowDisbursementPolicy::class);
 
         $this->configureRateLimiting();
+
+        // On a dev machine, warn loudly (once per process) when the database is
+        // behind the code, so a missing migration is caught at boot instead of
+        // surfacing as a "Unknown column" 500 on some page later.
+        if ($this->app->isLocal() && ! $this->app->runningInConsole()) {
+            $this->warnAboutPendingMigrations();
+        }
+    }
+
+    /**
+     * Log a warning when the local database has un-run migrations.
+     */
+    private function warnAboutPendingMigrations(): void
+    {
+        if (self::$migrationWarningChecked) {
+            return;
+        }
+
+        self::$migrationWarningChecked = true;
+
+        try {
+            $pending = MigrationStatus::pending();
+        } catch (Throwable) {
+            return;
+        }
+
+        if ($pending === []) {
+            return;
+        }
+
+        Log::warning('Local database is behind the code: pending migrations must be run (`php artisan migrate`).', [
+            'pending' => $pending,
+        ]);
     }
 
     /**
