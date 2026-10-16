@@ -854,14 +854,18 @@ Demo account: **agent@realestate.com**.
 | Problem | Who handles it |
 |---|---|
 | Their agent profile is switched off | Their login is **blocked** (`AuthController.php:71-79`) — only an admin can fix it |
-| Cannot get paid | **No agent payout system exists** |
+| Cannot get paid | **Fixed** — the payouts queue has a request form and an approve/disburse flow |
 | Client complaint | Customer Support |
 | Listing reported | Moderator |
 
-**Handy detail:** a real multi-tier commission engine exists
-(`CommissionSplitService`) that can split a commission between a junior, senior and
-principal agent, handle co-brokered deals and referral cuts — but it is **never called
-by any production code**. Only tests use it.
+**Handy detail:** `CommissionSplitService` holds a multi-tier commission engine (junior
+60% / senior 70% / principal 80% splits, co-brokered and referral cuts). Only its **tier
+lookup** (`getTierDetails`) is called in production — `Agent`, `UserManagementController`
+and `WorkerManagementController` use it for default splits. The **split engine**
+(`calculateSplits` / `recordDealCommission`) is **not called by any production code**; the
+deal-close flow creates a single-agent `Commission` for the full pool. Wiring the engine in
+would change how much an agent is paid (a tier split instead of the full pool), which is a
+commission-policy decision still open with the product owner.
 
 ---
 
@@ -1152,16 +1156,26 @@ invoice, and reconcile the front desk.
    stored. If the commission was already paid out, a **recovery** reverses the party's
    earning so their ledger-derived balance goes negative.
 7. **Pay people** (SRS §194) → the payouts queue shows each party's **ledger-derived
-   available balance** (never a stored number). A request must clear the minimum
-   threshold, the configurable schedule (`immediately`, `after check-in`, `after
-   checkout`, `weekly`, `monthly`) and the holdback. Finance approves (maker-checker:
-   the requester can never approve their own payout), then disburses: withholding tax
-   applied, voucher issued, bank reference recorded, marked a manual disbursement.
+   available balance** (never a stored number). Agents, hosts and professional service
+   providers all use the same balance and payout services: each sees only their own
+   balance and payout rows (`payouts.view`), with their bank account number **masked** to
+   the last four digits; only finance sees the full book and full bank details. A request
+   (`payouts.request`) must clear the minimum threshold, the configurable schedule
+   (`immediately`, `after check-in`, `after checkout`, `weekly`, `monthly`) and the
+   holdback. Finance approves (maker-checker: the requester can never approve their own
+   payout), then disburses: withholding tax applied, voucher issued, bank reference
+   recorded, marked a manual disbursement. A party whose balance is negative appears on
+   finance's **"people who owe the platform"** list; a later earning nets against the debt.
+   The balance check runs inside a transaction that locks the party row, so two requests
+   cannot together exceed the balance.
 8. **Export the ledger to CSV**, print an audit statement, or open the **VAT payable
    report** (`/finance/vat`) and record a **remittance** to the tax authority (debit
    `vat_payable`, credit `cash`, with the authority's reference).
-9. **Match bank references** (`/finance/reconciliation`) → a bank reference is matched
-   to a pending payment and settles it.
+9. **Match bank references** (`/finance/reconciliation`) → a bank reference is matched to
+   its pending payment(s) and settles them. One transfer may cover several payments that
+   share the reference (all are settled together); a reference that was already matched is
+   rejected; an amount that does not equal the payments' total is **flagged for review,
+   never auto-matched**.
 10. **Verify a front-desk shift** → the receptionist's cash is reconciled.
 11. **Every day at midnight** → the rent command creates overdue rows and late fees.
 
@@ -1709,9 +1723,12 @@ Every part of the platform is marked:
 | Finance reports, period filters, charts | **Working** | `FinancialReportingController.php:31-215` |
 | Commission creation | **Working** | sale and rental both use the agent's rate or the one configured default (`finance.default_commission_rate`) |
 | Commission defaults disagree | **Fixed** | one source of truth: `FinanceSettings::defaultCommissionRate()` |
-| `CommissionSplitService` (tiers, co-broking, referrals) | **Working** | the tier lookup (`getTierDetails`) is used across the agent/worker desks, and the split engine (`calculateSplits`, `recordDealCommission`) drives co-brokered and referral deals |
+| `CommissionSplitService` (tiers, co-broking, referrals) | **Partly working** | the **tier lookup** (`getTierDetails`) is used across the agent/worker desks; the **split engine** (`calculateSplits`, `recordDealCommission`) is retained and tested but has **no production caller** — no co-brokered/referral deal flow exists, and wiring it changes the agent's payout (tier split vs full pool), a policy decision still open |
 | Commission settlement + voucher | **Working** | a **Settle (manual)** button on the finance desk applies the withholding tax, issues a voucher, records the bank reference and posts a balanced journal |
-| Agent payout / withdrawal | **Working** | the finance desk shows each party's ledger-derived available balance (`AgentBalanceService`) and a request form; a request must clear the minimum threshold, the schedule and the holdback, and finance approves (maker-checker) then disburses as a manual disbursement |
+| Agent / host / professional payout | **Working** | the payout queue shows each party's ledger-derived available balance (`AgentBalanceService`); agents, hosts and professionals share the same balance and payout services, each seeing **only their own** balance and payouts (`payouts.view` / `payouts.request`) with the bank account number **masked** to the last four digits; only finance sees the full book. A request must clear the minimum threshold, the schedule and the holdback, the balance check runs under a party-row lock, and finance approves (maker-checker) then disburses as a manual disbursement |
+| Negative balances (people who owe the platform) | **Working** | a refund after payout posts a recovery; finance gets a **"people who owe the platform"** list, and a later earning nets against the debt |
+| Encrypted bank details | **Working** | `payout_requests.account_number` / `bank_name` and `payments.bank_account_number` are encrypted at rest (`App\Casts\EncryptedString`) and masked on screen |
+| Legacy ledger attribution backfill | **Working** | `php artisan ledger:backfill-party` (dry-run first) fills `party_user_id` on old commission/payout legs, idempotently, so pre-existing balances read correctly |
 | Refunds | **Working** | the limit is the original amount minus what was already refunded, the linked booking/offer/unit/rent schedule is reversed or flagged, each refund writes a `refunds` row and a balanced audit journal, a VAT reversal issues a credit note, and a refund after payout posts a recovery |
 | Stay cancellation refund | **Working** | a cancellation that owes money advances the booking's payment and posts a balanced journal through the shared `RefundService`; the guest-facing service fee is kept while the platform fee is reversed proportionally |
 | Rent: landlord route leaves no financial trace | **Working** | the landlord and tenant rent desks share `RentPaymentService`, so both write a verified payment and a balanced journal |
@@ -1720,7 +1737,7 @@ Every part of the platform is marked:
 | Legacy single-sided rows | **Working** | kept out of net revenue and the P&L and shown as their own totals; see `docs/LEDGER_RECONCILIATION.md` |
 | Rate-change governance | **Working** | a change logs old and new values, and an optional second-person approval holds it `pending` until a different finance user approves |
 | Real money movement | **Missing** | no gateway, no SDK, no API key, no bank call; payouts are recorded as **manual disbursements** |
-| Bank reconciliation against the slip reference | **Partly working** | `/finance/reconciliation` lists pending/matched references and `finance.reconciliation.match` matches a reference to a payment and settles it; there is still no import of a bank statement file |
+| Bank reconciliation against the slip reference | **Partly working** | `/finance/reconciliation` lists pending/matched references and `finance.reconciliation.match` matches a reference to its pending payment(s) and settles them. One transfer may cover several payments sharing the reference; a reference already matched is rejected; an amount that does not equal the payments' total is **flagged for review, never auto-matched**. There is still no import of a bank statement file |
 
 ### 7.3 Roles and access
 

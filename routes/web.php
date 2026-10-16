@@ -554,7 +554,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/finance/payments/{payment}/refund', [FinancialReportingController::class, 'issueRefund'])->middleware('permission:refunds.manage')->name('finance.payments.refund');
     Route::post('/finance/invoices', [FinancialReportingController::class, 'storeInvoice'])->middleware('permission:invoices.manage')->name('finance.invoices.store');
     Route::patch('/finance/invoices/{invoice}/status', [FinancialReportingController::class, 'updateInvoiceStatus'])->middleware('permission:invoices.manage')->name('finance.invoices.status');
-    Route::post('/finance/payouts', [FinancialReportingController::class, 'storePayoutRequest'])->middleware('permission:commissions.manage')->name('finance.payouts.store');
+    Route::post('/finance/payouts', [FinancialReportingController::class, 'storePayoutRequest'])->middleware('permission:payouts.request')->name('finance.payouts.store');
     Route::patch('/finance/payouts/{payout}', [FinancialReportingController::class, 'processPayout'])->middleware('permission:payouts.update')->name('finance.payouts.process');
     Route::patch('/finance/subscriptions/{subscription}', [FinancialReportingController::class, 'updateSubscription'])->middleware('permission:subscriptions.manage')->name('finance.subscriptions.update');
     Route::post('/finance/settings/rates', [FinancialReportingController::class, 'updateFinanceRate'])->middleware('permission:finance.settings.update')->name('finance.settings.rates.store');

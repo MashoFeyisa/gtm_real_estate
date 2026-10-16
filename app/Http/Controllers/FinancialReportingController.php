@@ -16,6 +16,7 @@ use App\Models\Payment;
 use App\Models\PayoutRequest;
 use App\Models\Refund;
 use App\Models\RentSchedule;
+use App\Models\User;
 use App\Models\VatRemittance;
 use App\Notifications\CommissionGeneratedNotification;
 use App\Services\AgentBalanceService;
@@ -64,7 +65,28 @@ class FinancialReportingController extends Controller
 
         $isAdmin = $user->isAdmin();
         $isFinanceOfficer = $user->isFinanceOfficer();
-        $canViewPlatformBooks = $isAdmin || $isFinanceOfficer || $hasFinancePerm;
+
+        // Seeing the platform books is a finance-staff capability. `payouts.view`
+        // only opens a user's own payout desk, so it is deliberately excluded
+        // here: a host, agent or professional must never see the whole book.
+        $hasPlatformBookPerm = ! empty($catalog) && $user->hasAnyPermission([
+            'ledger.view',
+            'ledger.create',
+            'reconciliation.view',
+            'reconciliation.manage',
+            'tax.manage',
+            'tax.view',
+            'payments.manage',
+            'refunds.manage',
+            'refunds.view',
+            'invoices.manage',
+            'invoices.view',
+            'subscriptions.manage',
+            'subscriptions.view',
+        ]);
+
+        $canViewPlatformBooks = $isAdmin || $isFinanceOfficer || $hasPlatformBookPerm;
+        $canRequestPayout = $user->hasPermission('payouts.request');
 
         // Agents join this desk only for their own deals
         $scopedAgent = (! $canViewPlatformBooks) ? $user->agentProfile : null;
@@ -226,7 +248,17 @@ class FinancialReportingController extends Controller
 
         // Batch 4: Invoices, Payouts, Subscriptions
         $invoices = Invoice::query()->with(['user', 'property'])->latest()->paginate(10, ['*'], 'invoices_page')->withQueryString();
-        $payouts = PayoutRequest::query()->with(['user', 'processor'])->latest()->paginate(10, ['*'], 'payouts_page')->withQueryString();
+
+        // A user only ever sees their own payouts; the platform books (all
+        // payouts, with full bank details) are for finance and admin only.
+        $canSeeAllPayouts = $canViewPlatformBooks;
+        $payouts = PayoutRequest::query()
+            ->with(['user', 'processor'])
+            ->when(! $canSeeAllPayouts, fn ($payoutQuery) => $payoutQuery->where('user_id', $user->id))
+            ->latest()
+            ->paginate(10, ['*'], 'payouts_page')
+            ->withQueryString();
+
         $subscriptions = CompanyWhiteLabel::query()->with('user')->latest()->get();
 
         $actionableTasks = app(WorkflowIntegrationService::class)->getActorActionableTasks($user);
@@ -242,6 +274,28 @@ class FinancialReportingController extends Controller
         $payoutSchedule = $settings->payoutSchedule();
         $payoutHoldbackRate = $settings->payoutHoldbackRate();
         $payoutScheduleOpen = app(PayoutService::class)->scheduleAllows($user);
+
+        // Finance-only: everyone whose ledger-derived balance is negative, i.e.
+        // people who owe the platform after a recovery (SRS §132, §194).
+        $negativeBalances = collect();
+        if ($canSeeAllPayouts) {
+            $partyIds = FinancialLedger::query()
+                ->where('is_legacy', false)
+                ->whereNotNull('party_user_id')
+                ->distinct()
+                ->pluck('party_user_id');
+
+            $negativeBalances = User::query()
+                ->whereIn('id', $partyIds)
+                ->get()
+                ->map(fn (User $party): array => [
+                    'user' => $party,
+                    'balance' => $balanceService->availableFor($party),
+                ])
+                ->filter(fn (array $row): bool => $row['balance'] < 0)
+                ->sortBy('balance')
+                ->values();
+        }
 
         // Rollback-safety flags for the finance desk to review.
         $financeReviewFlags = FinanceReviewFlag::with(['payment', 'reviewable'])
@@ -277,7 +331,10 @@ class FinancialReportingController extends Controller
             'payoutHoldbackRate',
             'payoutScheduleOpen',
             'financeReviewFlags',
-            'pendingRates'
+            'pendingRates',
+            'canSeeAllPayouts',
+            'negativeBalances',
+            'canRequestPayout'
         ));
     }
 
@@ -812,38 +869,77 @@ class FinancialReportingController extends Controller
 
         $validated = $request->validate([
             'reference' => ['required', 'string', 'max:100'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $payment = Payment::query()
+        // One transfer can cover several payments, so match every payment that
+        // carries this reference.
+        $payments = Payment::query()
             ->where('bank_transaction_reference', $validated['reference'])
-            ->latest('id')
-            ->first();
+            ->get();
 
-        abort_if($payment === null, 404, 'No payment found for that bank reference.');
+        abort_if($payments->isEmpty(), 404, 'No payment found for that bank reference.');
+
+        // A reference that has already been matched must not be matched twice.
+        $alreadyMatched = $payments->where('status', '!=', 'pending');
+        abort_if($alreadyMatched->isNotEmpty(), 409, 'This bank reference has already been matched.');
 
         // A payer can never verify their own payment (SRS §83).
-        abort_if((int) $payment->user_id === (int) $user->id, 403, 'You cannot match and settle your own payment.');
+        abort_if(
+            $payments->contains(fn (Payment $payment): bool => (int) $payment->user_id === (int) $user->id),
+            403,
+            'You cannot match and settle your own payment.'
+        );
 
-        if ($payment->status === 'pending') {
-            $payment->settle();
+        $total = round((float) $payments->sum('amount'), 2);
+
+        // An amount mismatch is flagged for review, never auto-matched: the
+        // bank credited something other than what the payments say they owe.
+        if ($request->filled('amount')) {
+            $bankAmount = round((float) $validated['amount'], 2);
+
+            if (abs($bankAmount - $total) > 0.01) {
+                foreach ($payments as $payment) {
+                    FinanceReviewFlag::create([
+                        'reviewable_type' => $payment::class,
+                        'reviewable_id' => $payment->id,
+                        'payment_id' => $payment->id,
+                        'reason' => "Bank reference {$validated['reference']} matched ".number_format($bankAmount, 2)
+                            .' ETB but the payment(s) total '.number_format($total, 2).' ETB.',
+                    ]);
+                }
+
+                return back()->with('error', 'Amount mismatch: the reference covers '.number_format($total, 2)
+                    .' ETB but the bank amount is '.number_format($bankAmount, 2).' ETB. Flagged for review; nothing was settled.');
+            }
+        }
+
+        foreach ($payments as $payment) {
             $payment->update([
                 'status' => 'completed',
                 'verified_at' => now(),
                 'verified_by' => $user->id,
             ]);
+
+            $payment->settle();
         }
 
         AuditLog::log(
             user: $user,
             action: 'finance.bank_reference_matched',
-            entity: $payment,
+            entity: $payments->first(),
             oldValue: ['status' => 'pending'],
-            newValue: ['status' => $payment->status, 'reference' => $validated['reference']],
-            reason: 'Bank reference matched to payment during reconciliation',
+            newValue: [
+                'status' => 'completed',
+                'reference' => $validated['reference'],
+                'payments' => $payments->pluck('transaction_number')->all(),
+                'total' => $total,
+            ],
+            reason: 'Bank reference matched to payment(s) during reconciliation',
             request: $request
         );
 
-        return back()->with('success', "Bank reference {$validated['reference']} matched to Payment #{$payment->transaction_number}.");
+        return back()->with('success', "Bank reference {$validated['reference']} matched to {$payments->count()} payment(s) totalling ".number_format($total, 2).' ETB.');
     }
 
     /**

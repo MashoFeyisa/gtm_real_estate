@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedString;
 use App\Services\FinanceSettings;
 use App\Services\LedgerService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -59,6 +60,7 @@ class Payment extends Model
         'refunded_amount' => 'decimal:2',
         'verified_at' => 'datetime',
         'payment_metadata' => 'array',
+        'bank_account_number' => EncryptedString::class,
     ];
 
     protected static function booted(): void

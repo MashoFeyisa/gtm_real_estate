@@ -13,6 +13,7 @@
     $canManagePayments = auth()->user()->hasPermission('payments.manage');
     $canManageCommissions = auth()->user()->hasPermission('commissions.manage');
     $canReconcileAccounts = auth()->user()->hasPermission('reconciliation.manage');
+    $canProcessPayouts = auth()->user()->hasPermission('payouts.update');
 
     // Agents join this desk scoped to their own deals: the controller filters
     // every collection, so the view must surface those read sections (without
@@ -209,6 +210,17 @@
             <a href="{{ route('finance.reconciliation') }}" class="rounded-lg border border-[var(--token-border-subtle)] px-3 py-1.5 text-xs font-semibold">Bank reference reconciliation</a>
             <span class="text-xs token-muted">Outstanding VAT: {{ number_format($stats['vat_balance'] ?? 0, 2) }} ETB</span>
         </div>
+
+        @if (($negativeBalances ?? collect())->isNotEmpty())
+            <div class="mb-8 rounded-lg border border-[var(--token-warning)] bg-[var(--token-surface-subtle)] p-4">
+                <p class="text-xs font-bold text-[var(--token-warning-text)]">People who owe the platform ({{ $negativeBalances->count() }})</p>
+                <ul class="mt-2 space-y-1 text-xs token-muted">
+                    @foreach($negativeBalances as $row)
+                        <li>{{ $row['user']->name }} — {{ number_format($row['balance'], 2) }} ETB (future payouts net against this)</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         @if (($financeReviewFlags ?? collect())->isNotEmpty())
             <div class="mb-8 rounded-lg border border-[var(--token-danger)] bg-[var(--token-surface-subtle)] p-4">
@@ -895,6 +907,7 @@
             </div>
         </div>
 
+        @if($canRequestPayout ?? false)
         <form method="POST" action="{{ route('finance.payouts.store') }}" class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-5">
             @csrf
             <input type="number" step="0.01" min="{{ $payoutMinimum }}" name="gross_amount" class="token-field !text-xs" placeholder="Amount (ETB)" required>
@@ -907,6 +920,7 @@
             <input type="text" name="account_number" class="token-field !text-xs" placeholder="Account number">
             <button type="submit" class="token-btn-primary !text-xs">Request payout</button>
         </form>
+        @endif
 
         <div class="token-table-wrap">
             <table class="token-table w-full !text-xs">
@@ -937,7 +951,7 @@
                             <td class="font-bold text-[var(--token-success)]">{{ number_format($payout->net_amount, 2) }}</td>
                             <td>
                                 <div>{{ strtoupper($payout->payment_method) }}</div>
-                                <div class="text-[10px] token-muted">{{ $payout->bank_name ?? 'CBE' }} ({{ $payout->account_number ?? 'N/A' }})</div>
+                                <div class="text-[10px] token-muted">{{ $payout->bank_name ?? 'CBE' }} ({{ ($canSeeAllPayouts ?? false) ? ($payout->account_number ?? 'N/A') : $payout->masked_account_number }})</div>
                             </td>
                             <td>
                                 <span class="token-badge !text-[10px] uppercase @if($payout->status === 'disbursed') token-badge-success @elseif($payout->status === 'approved') token-badge-info @elseif($payout->status === 'rejected') token-badge-danger @else token-badge-warning @endif">
@@ -945,7 +959,9 @@
                                 </span>
                             </td>
                             <td class="text-right">
-                                @if($payout->status === 'pending')
+                                @if(! $canProcessPayouts)
+                                    <span class="token-muted text-[10px] font-mono">{{ $payout->status }}</span>
+                                @elseif($payout->status === 'pending')
                                     <form method="POST" action="{{ route('finance.payouts.process', $payout) }}" class="inline-flex items-center gap-1.5">
                                         @csrf
                                         @method('PATCH')

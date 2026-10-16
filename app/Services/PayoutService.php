@@ -56,22 +56,32 @@ class PayoutService
 
     /**
      * Submit a payout request against the party's ledger-derived balance.
+     *
+     * The threshold, schedule and balance checks all run inside one transaction
+     * that first takes a row lock on the party, so two concurrent requests for
+     * the same party are serialised and cannot together exceed the balance
+     * (SRS §194).
      */
     public function request(User $party, float $gross, string $method, ?string $bankName, ?string $accountNumber, string $role): PayoutRequest
     {
         $gross = round($gross, 2);
 
-        abort_if(! $this->scheduleAllows($party), 422, 'Payouts are not open on the configured schedule right now.');
-        abort_if($gross < $this->settings->payoutMinimumThreshold(), 422, 'Payout amount is below the minimum threshold of '.number_format($this->settings->payoutMinimumThreshold(), 2).' ETB.');
+        return DB::transaction(function () use ($party, $gross, $method, $bankName, $accountNumber, $role) {
+            // Serialise concurrent requests for the same party. The balance is
+            // derived from the ledger and from other pending requests, so the
+            // lock on the party row is what makes the check-then-create atomic.
+            User::query()->whereKey($party->id)->lockForUpdate()->first();
 
-        $available = $this->balances->payoutableFor($party);
+            abort_if(! $this->scheduleAllows($party), 422, 'Payouts are not open on the configured schedule right now.');
+            abort_if($gross < $this->settings->payoutMinimumThreshold(), 422, 'Payout amount is below the minimum threshold of '.number_format($this->settings->payoutMinimumThreshold(), 2).' ETB.');
 
-        abort_if($gross - $available > 0.004, 422, 'Payout exceeds the available balance of '.number_format($available, 2).' ETB.');
+            $available = $this->balances->payoutableFor($party);
 
-        $withholding = $this->settings->withholdingTax($gross);
-        $net = round($gross - $withholding, 2);
+            abort_if($gross - $available > 0.004, 422, 'Payout exceeds the available balance of '.number_format($available, 2).' ETB.');
 
-        return DB::transaction(function () use ($party, $gross, $method, $bankName, $accountNumber, $role, $withholding, $net) {
+            $withholding = $this->settings->withholdingTax($gross);
+            $net = round($gross - $withholding, 2);
+
             $payout = PayoutRequest::create([
                 'payout_code' => 'PAY-REQ-'.strtoupper(substr(uniqid(), -8)),
                 'user_id' => $party->id,

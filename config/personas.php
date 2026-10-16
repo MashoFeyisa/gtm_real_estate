@@ -381,6 +381,7 @@ return [
 
                 // Payouts
                 'payouts.view' => 'View payout history',
+                'payouts.request' => 'Request a payout',
 
                 // Photos & documents
                 'photos.create' => 'Upload photos',
@@ -521,6 +522,10 @@ return [
                 // Commissions
                 'commissions.view' => 'View commissions',
                 'commissions.manage' => 'Manage commissions',
+
+                // Payouts
+                'payouts.view' => 'View payout history',
+                'payouts.request' => 'Request a payout',
 
                 // CRM
                 'crm.view' => 'View CRM pipeline',
@@ -808,6 +813,10 @@ return [
                 // Payments
                 'services.payments_view' => 'View payment history',
                 'services.payments_receive' => 'Receive payments',
+
+                // Payouts
+                'payouts.view' => 'View payout history',
+                'payouts.request' => 'Request a payout',
 
                 // Messages
                 'messages.create' => 'Send messages',

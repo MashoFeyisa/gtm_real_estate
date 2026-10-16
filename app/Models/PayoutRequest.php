@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,7 +40,24 @@ class PayoutRequest extends Model
         'net_amount' => 'decimal:2',
         'processed_at' => 'datetime',
         'approved_at' => 'datetime',
+        'bank_name' => EncryptedString::class,
+        'account_number' => EncryptedString::class,
     ];
+
+    /**
+     * The account number with all but the last four digits masked, for any
+     * screen that is not the finance desk.
+     */
+    public function getMaskedAccountNumberAttribute(): string
+    {
+        $value = (string) ($this->account_number ?? '');
+
+        if ($value === '') {
+            return '—';
+        }
+
+        return str_repeat('•', max(0, strlen($value) - 4)).substr($value, -4);
+    }
 
     public function user(): BelongsTo
     {

@@ -361,8 +361,33 @@ plus the seeded `finance_rates` rows.
 | Payout request screen | Minimum threshold, configurable schedule (SRS §194: `immediately`, `after_check_in`, `after_check_out`, `weekly`, `monthly`) and a holdback are enforced by `PayoutService`; the finance desk shows the balance, held amount, threshold and schedule. | `P1MoneyGovernanceAndPayoutsTest` — threshold, schedule, holdback |
 | Maker-checker | The requester can never approve or disburse their own payout. Finance approves, withholding tax is applied, a voucher number is issued, the bank reference is recorded, and the transfer is marked a **manual disbursement** (no bank integration). | `P1MoneyGovernanceAndPayoutsTest` — maker-checker + disbursement |
 | Commission settlement | The finance desk's `commissions.settle` keeps the same rules (WHT, voucher, bank reference, balanced journal) and now attributes the legs to the agent's user. | `FinanceSettingsAndDoubleEntryLedgerTest`, `FinancialReportingAndCommissionSettlementTest` |
-| `CommissionSplitService` | **Kept and used.** It already drives co-brokered/referral splits and the tier lookup; removing it would delete a working, tested engine. | `AgentCommissionSplitAndHierarchyTest` |
+| `CommissionSplitService` | **Kept.** The **tier lookup** (`getTierDetails`) is used in production (`Agent`, `UserManagementController`, `WorkerManagementController`). The **split engine** (`calculateSplits` / `recordDealCommission`) is retained and tested but has **no production caller**: the deal-close flow creates a single-agent commission for the full pool, and no co-brokered/referral deal flow exists to call it. Wiring it in changes the agent's payout (tier split vs full pool) — a commission-policy decision left to the product owner (see Check 7 options). | `AgentCommissionSplitAndHierarchyTest` |
 | Bank reference matching | `GET /finance/reconciliation` lists pending/matched references; `POST /finance/reconciliation/match` matches a reference to a payment and settles it (the payer can never match their own). | `P1MoneyGovernanceAndPayoutsTest` — "a bank reference can be matched" |
 | Notifications | `PayoutStatusNotification` fires on requested/approved/rejected/paid. | `P1MoneyGovernanceAndPayoutsTest` — disbursement notification |
 | Idempotency / audit / balanced journals / append-only | Payout disbursement is idempotent per `payout:{id}`; every step is audit-logged; journals balance; ledger rows stay append-only. | `P1MoneyGovernanceAndPayoutsTest`, `LedgerService` tests |
+
+---
+
+## P1 Batch C follow-up checks (this pass)
+
+All checks are covered by `tests/Feature/P1MoneyGovernanceFollowUpsTest.php` unless
+noted.
+
+| # | Check | What was done |
+|---|---|---|
+| 0 | Commit per batch | The whole money-governance body of work is committed on branch `money-governance` (commit `f129fbc`) and tagged `money-governance-v1`; the follow-up checks are a second commit on the same branch. |
+| 1 | Concurrency | `PayoutService::request()` now runs the schedule, threshold and balance checks **inside** `DB::transaction` after `lockForUpdate()` on the party row, so two requests cannot together exceed the balance. Test: two 800 ETB requests against a 1,000 ETB balance leave exactly one. |
+| 2 | Backfill | `php artisan ledger:backfill-party` (with `--dry-run`) attributes `party_user_id` on old `commission:*`, `commission-recovery:*` and `payout:*` legs, idempotently, writing only the attribution column. Test: an unattributed earning reads 0, then backfills to the correct balance; dry-run changes nothing and a second run is a no-op. |
+| 3 | Hosts & professionals | Hosts, agents and professional service providers share `AgentBalanceService` and `PayoutService`. New `payouts.request` permission opens the payout request route (was `commissions.manage`, a finance-only key), and `payouts.view` was added to the agent and service-provider personas. Tests: host/professional/agent request through the route; a host cannot approve or disburse. |
+| 4 | Access control | `finance.index` scopes payouts to the viewer unless they hold a finance-staff permission (platform books no longer keyed on `payouts.view`), so a party sees only their own balance and payouts. Bank details are encrypted at rest (`App\Casts\EncryptedString`) and masked to the last four digits on screen; only finance sees the full value. Tests: ciphertext at rest, masked accessor, agent sees only own, finance sees full. |
+| 5 | Negative balances | A refund after payout makes the balance negative; a later earning nets against it and `payoutableFor` stays 0 until cleared. Finance gets a **"people who owe the platform"** list. Test: balance −980 → +500 earning → −480, and the list renders. |
+| 6 | Reconciliation | `matchBankReference` settles **all** pending payments sharing a reference (one transfer, several payments), rejects a reference that was already matched (409), and **flags** an amount mismatch (`finance_review_flags`) without settling. Tests for all three. |
+| 7 | Rate-change approval | Already built (Batch A/C): the maker can never approve their own change (403), a `pending` rate moves no money (`rateFor` ignores it), and a different finance user approves it. Tests: "a rate change logs the old and new values", "with second approval on, a rate change needs a different approver". |
+| 8 | P0 evidence | `PaymentCallbackSecurityTest` (fail-closed empty secret, HMAC over the raw body via `hash_equals`, timestamp window, rate limit, payer cannot verify own), `RouteAuthorizationCoverageTest` (every route authenticated/permission-guarded/allowlisted), `PermissionCatalogueCoverageTest` (a used key absent from the catalogue fails), `DemoAccountEnvironmentTest` (`demo:purge` removes demo accounts outside local), and `.env.example` sets `APP_ENV=production`. |
+
+**Open (not decided):** the three commission/fee options remain open — default commission
+rate (2% vs 5%), rental commission base (one month's rent vs the lease value), and the fee
+on front-desk cash (0% vs standard). Also open: whether to wire `CommissionSplitService`'s
+split engine into the deal-close flow (see the Batch C table row).
+
 

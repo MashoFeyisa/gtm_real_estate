@@ -313,6 +313,7 @@ class ActorSeedDataSeeder extends Seeder
         GuestServiceRequest::factory()->count(2)->create([
             'property_id' => $stayProperty->id,
             'booking_id' => $booking->id,
+            'status' => 'pending',
         ]);
 
         GuestServiceRequest::factory()->completed()->create([
